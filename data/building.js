@@ -1,5 +1,14 @@
 // Building data for The Oasis explorer.
-// Swap `points` (image-percentage polygons) and unit details with your real picker output.
+// Unit polygons sourced from 6000×4421px picker output (see flat zones below).
+
+export const IMAGE_SIZE = { width: 6000, height: 4421 };
+
+/** Convert picker coordinates (px) to image-percentage for the SVG overlay. */
+export const toPctPoints = (points) =>
+  points.map(([x, y]) => [
+    +((x / IMAGE_SIZE.width) * 100).toFixed(2),
+    +((y / IMAGE_SIZE.height) * 100).toFixed(2),
+  ]);
 
 export const PROJECT = {
   "name": "The Oasis",
@@ -14,6 +23,7 @@ export const PROJECT = {
 export const BLOCKS = [
   {
     "name": "Block A",
+    "available": true,
     "points": [
       [29.72, 67.91],
       [29.72, 37.8],
@@ -49,6 +59,27 @@ export const BLOCKS = [
     ],
     "centroid": [62.69, 49.28],
     "floors": ["Floor 4", "Floor 3", "Floor 2", "Floor 1"]
+  },
+  {
+    "name": "Block B",
+    "available": false,
+    "points": [],
+    "centroid": [0, 0],
+    "floors": []
+  },
+  {
+    "name": "Block C",
+    "available": false,
+    "points": [],
+    "centroid": [0, 0],
+    "floors": []
+  },
+  {
+    "name": "Block D",
+    "available": false,
+    "points": [],
+    "centroid": [0, 0],
+    "floors": []
   }
 ];
 
@@ -149,14 +180,17 @@ export const UNITS = {
     "label": "Flat 401",
     "floor": "Floor 4",
     "points": [
-      [37.45, 32.45],
-      [44.42, 29.77],
-      [74.29, 41.75],
-      [73.83, 51.38],
-      [43.96, 42.38],
-      [38.26, 44.12]
+      [37.69, 32.72],
+      [44.03, 29.69],
+      [47.65, 31.11],
+      [74.4, 42.16],
+      [74.27, 50.78],
+      [68.97, 49.45],
+      [47.65, 42.84],
+      [44.1, 41.61],
+      [37.76, 43.69]
     ],
-    "centroid": [52.04, 40.31]
+    "centroid": [52.95, 40.45]
   },
   "402": {
     "type": "4 BHK",
@@ -170,12 +204,12 @@ export const UNITS = {
     "label": "Flat 402",
     "floor": "Floor 4",
     "points": [
-      [75.92, 42.54],
-      [92.31, 50.27],
-      [92.07, 56.27],
-      [75.34, 51.22]
+      [75.39, 42.41],
+      [91.9, 50.02],
+      [91.83, 56.83],
+      [75.35, 51.46]
     ],
-    "centroid": [83.91, 50.08]
+    "centroid": [83.62, 50.18]
   },
   "301": {
     "type": "3 BHK",
@@ -189,14 +223,18 @@ export const UNITS = {
     "label": "Flat 301",
     "floor": "Floor 3",
     "points": [
-      [38.03, 45.85],
-      [44.19, 43.96],
-      [73.83, 52.16],
-      [73.71, 60.84],
-      [44.54, 54.37],
-      [37.68, 55.0]
+      [37.76, 43.69],
+      [44.1, 41.61],
+      [47.65, 42.84],
+      [68.97, 49.45],
+      [74.27, 50.78],
+      [74.13, 59.92],
+      [68.83, 58.88],
+      [47.79, 54.81],
+      [44.03, 54.15],
+      [37.9, 55.28]
     ],
-    "centroid": [52.0, 52.03]
+    "centroid": [54.54, 51.14]
   },
   "302": {
     "type": "4 BHK",
@@ -210,12 +248,12 @@ export const UNITS = {
     "label": "Flat 302",
     "floor": "Floor 3",
     "points": [
-      [75.34, 52.16],
-      [92.07, 57.37],
-      [91.84, 63.99],
-      [75.34, 60.37]
+      [75.35, 51.46],
+      [91.83, 56.83],
+      [91.81, 64.08],
+      [75.52, 60.01]
     ],
-    "centroid": [83.65, 58.47]
+    "centroid": [83.63, 58.09]
   },
   "201": {
     "type": "3 BHK",
@@ -229,14 +267,18 @@ export const UNITS = {
     "label": "Flat 201",
     "floor": "Floor 2",
     "points": [
-      [37.56, 57.05],
-      [44.19, 55.79],
-      [73.94, 61.47],
-      [73.71, 69.36],
-      [43.84, 66.52],
-      [37.33, 66.99]
+      [37.9, 55.28],
+      [44.03, 54.15],
+      [47.79, 54.81],
+      [68.83, 58.88],
+      [74.13, 59.92],
+      [74.03, 68.78],
+      [68.86, 68.35],
+      [47.68, 66.49],
+      [43.99, 66.07],
+      [38.01, 66.45]
     ],
-    "centroid": [51.76, 62.86]
+    "centroid": [54.53, 61.92]
   },
   "202": {
     "type": "4 BHK",
@@ -250,12 +292,12 @@ export const UNITS = {
     "label": "Flat 202",
     "floor": "Floor 2",
     "points": [
-      [75.57, 61.63],
-      [91.84, 64.63],
-      [91.84, 71.25],
-      [75.1, 69.67]
+      [75.52, 60.01],
+      [91.81, 64.08],
+      [91.84, 70.5],
+      [75.56, 69.07]
     ],
-    "centroid": [83.59, 66.8]
+    "centroid": [83.68, 65.91]
   },
   "101": {
     "type": "3 BHK",
@@ -269,12 +311,25 @@ export const UNITS = {
     "label": "Flat 101",
     "floor": "Floor 1",
     "points": [
-      [44.54, 67.62],
-      [73.83, 70.3],
-      [73.48, 76.93],
-      [44.89, 77.4]
+      [38.01, 66.45],
+      [43.99, 66.07],
+      [47.68, 66.49],
+      [68.86, 68.35],
+      [74.03, 68.78],
+      [73.97, 78.63],
+      [43.78, 78.7],
+      [43.82, 72.06],
+      [44.32, 71.59],
+      [44.3, 70.28],
+      [44.77, 69.75],
+      [45.46, 68.88],
+      [46.37, 68.1],
+      [44.23, 67.53],
+      [42.04, 67.57],
+      [39.99, 67.63],
+      [38.01, 67.72]
     ],
-    "centroid": [59.19, 73.06]
+    "centroid": [48.45, 69.68]
   },
   "102": {
     "type": "4 BHK",
@@ -288,11 +343,11 @@ export const UNITS = {
     "label": "Flat 102",
     "floor": "Floor 1",
     "points": [
-      [75.57, 70.78],
-      [91.72, 72.2],
-      [92.07, 77.72],
-      [75.57, 77.72]
+      [75.56, 69.07],
+      [91.84, 70.5],
+      [91.89, 78.24],
+      [75.61, 78.37]
     ],
-    "centroid": [83.73, 74.61]
+    "centroid": [83.73, 74.05]
   }
 };

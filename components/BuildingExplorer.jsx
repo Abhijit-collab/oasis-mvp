@@ -56,8 +56,20 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const floorFromSlider = (n) => `Floor ${n}`;
 
   const applyFloorSlider = (value) => {
+    const filterActive = unitFilter.available || unitFilter.sold;
+    const changed = value[0] !== floorSlider[0];
     setFloorSlider(value);
     if (!block) return;
+    setFloor(null);
+    setUnit(null);
+    setHoverUnit(null);
+    setHoverFloor(null);
+    if (filterActive || changed) setUnitFilter(defaultUnitFilter());
+  };
+
+  const onFloorSliderInteract = () => {
+    if (!unitFilter.available && !unitFilter.sold) return;
+    setUnitFilter(defaultUnitFilter());
     setFloor(null);
     setUnit(null);
     setHoverUnit(null);
@@ -111,11 +123,25 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     return sold ? unitFilter.sold : unitFilter.available;
   };
 
+  const visibleUnitIds = useMemo(() => {
+    if (!block) return [];
+    if (floor && curFloor) return curFloor.units;
+    if (!showFilteredUnits) return [];
+    return scopedUnitIds.filter((id) => unitVisible(id));
+  }, [block, floor, curFloor, showFilteredUnits, scopedUnitIds, unitFilter, units]);
+
+  const canShowUnitTip = (id) => {
+    if (floor && curFloor) return curFloor.units.includes(id);
+    return unitVisible(id);
+  };
+
   const toggleUnitFilter = (key) => {
     setUnitFilter((prev) => {
       const next = { ...prev, [key]: !prev[key] };
-      if (!next.available && !next.sold) return prev;
-      if (unit) {
+      if (!floor && !next.available && !next.sold) {
+        setUnit(null);
+        setHoverUnit(null);
+      } else if (!floor && unit) {
         const sold = isUnitSold(units[unit]);
         if ((sold && !next.sold) || (!sold && !next.available)) {
           setUnit(null);
@@ -134,7 +160,9 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setHoverFloor(null);
     setHoverUnit(null);
     setModal(null);
+    setReserveModal(false);
     setSent(false);
+    setReserveSent(false);
     setFloorSlider([1]);
     setUnitFilter(defaultUnitFilter());
   };
@@ -198,7 +226,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
       meta: `${b.floors.length} floors · ${total} residences`,
       sold: false,
     };
-  } else if (block && hoverUnit && unitVisible(hoverUnit)) {
+  } else if (block && hoverUnit && canShowUnitTip(hoverUnit)) {
     const u = units[hoverUnit];
     const sold = isUnitSold(u);
     tip = {
@@ -251,7 +279,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
 
           {block && <rect x="0" y="0" width="100" height="100" className="be-scrim-r" />}
 
-          {block && !floor &&
+          {block && !floor && !showFilteredUnits &&
             blockFloors.map((f) => (
               <polygon
                 key={f.name}
@@ -280,10 +308,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
             ))}
 
           {block &&
-            showFilteredUnits &&
-            scopedUnitIds
-              .filter((id) => unitVisible(id))
-              .map((id) => {
+            visibleUnitIds.map((id) => {
               const u = units[id];
               const sold = isUnitSold(u);
               return (
@@ -367,10 +392,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           </div>
         )}
 
-        {!floor && (
-          <div
-            className={"be-block-picker" + (block ? " be-block-picker--raised2" : "")}
-          >
+        <div className={"be-block-picker" + (block ? " be-block-picker--raised2" : "")}>
             <span className="be-block-picker-label">Block</span>
             <div className="be-block-picker-row">
               {BLOCKS.map((b) => {
@@ -398,9 +420,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               })}
             </div>
           </div>
-        )}
 
-        {block && !floor && (
+        {block && (
           <div className="be-floor-slider be-floor-slider--raised">
             <span className="be-floor-slider-label">Floor</span>
             <div className="be-floor-slider-row">
@@ -408,6 +429,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               <FloorSlider
                 value={floorSlider}
                 onValueChange={applyFloorSlider}
+                onInteractStart={onFloorSliderInteract}
               />
               <span className="be-floor-slider-mark">4</span>
             </div>
@@ -447,7 +469,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
         </div>
       </div>
 
-      {block && unit && (
+      {block && unit && curUnit && (
       <aside className={"be-side" + (panelOpen ? "" : " closed")}>
         <div className="be-tab" onClick={() => setPanelOpen((o) => !o)}>
           {panelOpen ? "\u2212" : "+"}
@@ -569,6 +591,11 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               <span className="be-price-lbl">Starting at</span>
               <span className="be-price-big">{curUnit.price}</span>
             </div>
+            {!isUnitSold(curUnit) && (
+              <button type="button" className="be-cta be-cta-reserve">
+                Pay for Reservation
+              </button>
+            )}
             <button className="be-cta" onClick={() => openModal(curUnit.id)}>
               Enquire Now
             </button>

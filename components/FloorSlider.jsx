@@ -2,7 +2,7 @@
 
 import * as SliderPrimitive from "@radix-ui/react-slider";
 
-export default function FloorSlider({ value, onValueChange, disabled, min = 1, max = 4 }) {
+export default function FloorSlider({ value, onValueChange, disabled, onInteractStart, min = 1, max = 4 }) {
   return (
     <SliderPrimitive.Root
       className="be-floor-range"
@@ -13,6 +13,7 @@ export default function FloorSlider({ value, onValueChange, disabled, min = 1, m
       value={value}
       onValueChange={onValueChange}
       disabled={disabled}
+      onPointerDown={() => onInteractStart?.()}
     >
       <SliderPrimitive.Track className="be-floor-range-track">
         <SliderPrimitive.Range className="be-floor-range-fill" />

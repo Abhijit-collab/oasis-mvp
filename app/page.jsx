@@ -1,4 +1,4 @@
-import BuildingExplorer from "@/components/BuildingExplorer";
+import HomeExplorer from "@/components/HomeExplorer";
 
 // Live unit status/price comes from DynamoDB via a Lambda Function URL.
 // Set UNITS_API_URL in your environment (Vercel project env var). If it's
@@ -19,5 +19,5 @@ async function getLiveUnits() {
 
 export default async function Home() {
   const liveUnits = await getLiveUnits();
-  return <BuildingExplorer liveUnits={liveUnits} />;
+  return <HomeExplorer liveUnits={liveUnits} />;
 }

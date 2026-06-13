@@ -1,13 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { BLOCKS, FLOORS, UNITS, PROJECT } from "@/data/building";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { BLOCKS, FLOORS, UNITS, PROJECT, getUnitImages, getUnitBrochureUrl } from "@/data/building";
 import FloorSlider from "@/components/FloorSlider";
+import DownloadMenu from "@/components/DownloadMenu";
+import UnitGallery from "@/components/UnitGallery";
+import { useAuth } from "@/components/auth/AuthContext";
 
 const pts = (a) => a.map((p) => p.join(",")).join(" ");
 
 const isUnitSold = (u) => u.status === "sold";
 const defaultUnitFilter = () => ({ available: false, sold: false });
+
+const matchesUnitFilters = (id, units, filter, sqft) => {
+  if (sqft !== null && units[id].area !== sqft) return false;
+  const sold = isUnitSold(units[id]);
+  const statusFilter = filter.available || filter.sold;
+  if (!statusFilter) return true;
+  return sold ? filter.sold : filter.available;
+};
 
 // Anchor hover cards on the polygon roofline at horizontal center.
 const anchorAbove = (points) => {
@@ -40,6 +52,8 @@ const anchorAbove = (points) => {
 // e.g. [{ unitId: "301", status: "sold", price: "₹1.30 Cr" }]. Only the fields present
 // override the static geometry/details; everything else stays as defined in building.js.
 export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUnits = null }) {
+  const router = useRouter();
+  const { logout } = useAuth() || {};
   const [block, setBlock] = useState(null);
   const [floor, setFloor] = useState(null);
   const [unit, setUnit] = useState(null);
@@ -50,25 +64,26 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const [sent, setSent] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
-  const [floorSlider, setFloorSlider] = useState([1]);
+  const [sqftSlider, setSqftSlider] = useState([0]);
   const [unitFilter, setUnitFilter] = useState(defaultUnitFilter);
+  const unitPanelRef = useRef(null);
+  const floorSlider = [0];
 
-  const floorFromSlider = (n) => `Floor ${n}`;
-
-  const applyFloorSlider = (value) => {
-    const filterActive = unitFilter.available || unitFilter.sold;
-    const changed = value[0] !== floorSlider[0];
-    setFloorSlider(value);
+  const applySqftSlider = (value) => {
+    const statusFilterActive = unitFilter.available || unitFilter.sold;
+    const changed = value[0] !== sqftSlider[0];
+    setSqftSlider(value);
     if (!block) return;
     setFloor(null);
     setUnit(null);
     setHoverUnit(null);
     setHoverFloor(null);
-    if (filterActive || changed) setUnitFilter(defaultUnitFilter());
+    if (statusFilterActive || changed) setUnitFilter(defaultUnitFilter());
   };
 
-  const onFloorSliderInteract = () => {
-    if (!unitFilter.available && !unitFilter.sold) return;
+  const onSqftSliderInteract = () => {
+    if (sqftSlider[0] === 0 && !unitFilter.available && !unitFilter.sold) return;
+    if (sqftSlider[0] > 0) return;
     setUnitFilter(defaultUnitFilter());
     setFloor(null);
     setUnit(null);
@@ -95,8 +110,11 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     : FLOORS;
   const curFloor = floor ? FLOORS.find((f) => f.name === floor) : null;
   const curUnit = unit ? units[unit] : null;
-  const sliderFloor = floorFromSlider(floorSlider[0]);
-  const isFloorActive = (name) => !floor && name === sliderFloor;
+  const floorLevel = (name) => parseInt(name.replace(/\D/g, ""), 10) || 0;
+  const maxFloorLevel = useMemo(
+    () => (blockFloors.length ? Math.max(...blockFloors.map((f) => floorLevel(f.name))) : 4),
+    [blockFloors]
+  );
 
   const floorUnitCounts = useMemo(() => {
     const ids =
@@ -116,12 +134,17 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     return blockFloors.flatMap((f) => f.units);
   }, [block, floor, curFloor, blockFloors]);
 
-  const showFilteredUnits = unitFilter.available || unitFilter.sold;
+  const blockSqftOptions = useMemo(() => {
+    const ids = block ? blockFloors.flatMap((f) => f.units) : [];
+    return [...new Set(ids.map((id) => units[id].area))].sort((a, b) => a - b);
+  }, [block, blockFloors, units]);
 
-  const unitVisible = (id) => {
-    const sold = isUnitSold(units[id]);
-    return sold ? unitFilter.sold : unitFilter.available;
-  };
+  const sqftFilter = sqftSlider[0] > 0 ? blockSqftOptions[sqftSlider[0] - 1] : null;
+  const sqftSliderMax = blockSqftOptions.length;
+
+  const showFilteredUnits = unitFilter.available || unitFilter.sold || sqftFilter !== null;
+
+  const unitVisible = (id) => matchesUnitFilters(id, units, unitFilter, sqftFilter);
 
   const visibleUnitIds = useMemo(() => {
     if (!block) return [];
@@ -138,15 +161,12 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const toggleUnitFilter = (key) => {
     setUnitFilter((prev) => {
       const next = { ...prev, [key]: !prev[key] };
-      if (!floor && !next.available && !next.sold) {
+      if (!floor && !next.available && !next.sold && sqftSlider[0] === 0) {
         setUnit(null);
         setHoverUnit(null);
-      } else if (!floor && unit) {
-        const sold = isUnitSold(units[unit]);
-        if ((sold && !next.sold) || (!sold && !next.available)) {
-          setUnit(null);
-          setHoverUnit(null);
-        }
+      } else if (!floor && unit && !matchesUnitFilters(unit, units, next, sqftFilter)) {
+        setUnit(null);
+        setHoverUnit(null);
       }
       return next;
     });
@@ -160,22 +180,25 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setHoverFloor(null);
     setHoverUnit(null);
     setModal(null);
-    setReserveModal(false);
     setSent(false);
-    setReserveSent(false);
-    setFloorSlider([1]);
+    setSqftSlider([0]);
     setUnitFilter(defaultUnitFilter());
   };
   const back = () => {
     if (unit) setUnit(null);
     else if (floor) setFloor(null);
-    else if (block) setBlock(null);
+    else if (block) {
+      setBlock(null);
+      setFloor(null);
+      setSqftSlider([0]);
+      setUnitFilter(defaultUnitFilter());
+    }
   };
   const pickBlock = (n) => {
     const b = BLOCKS.find((x) => x.name === n);
     if (!b?.available) return;
     setBlock(n);
-    setFloorSlider([1]);
+    setSqftSlider([0]);
     setFloor(null);
     setUnit(null);
     setHoverFloor(null);
@@ -184,8 +207,6 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   };
   const pickFloor = (n) => {
     setFloor(n);
-    const num = parseInt(n.replace(/\D/g, ""), 10);
-    if (num >= 1 && num <= 4) setFloorSlider([num]);
     setUnit(null);
     setHoverUnit(null);
     setHoverFloor(null);
@@ -200,6 +221,23 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setSent(false);
     setForm({ name: "", phone: "", email: "" });
   };
+  const goToBooking = () => {
+    if (!unit) return;
+    const params = new URLSearchParams({ unit, block: block || "Block A" });
+    router.push(`/booking?${params}`);
+  };
+
+  useEffect(() => {
+    if (!unit) return;
+    const onPointerDown = (e) => {
+      if (unitPanelRef.current?.contains(e.target)) return;
+      if (e.target.closest?.(".poly.unit")) return;
+      setUnit(null);
+      setHoverUnit(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [unit]);
 
   // Count available (unsold) residences across a set of floors.
   const availIn = (floorNames) =>
@@ -251,7 +289,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     ? !block
       ? "Select a block to begin"
       : !floor
-      ? "Toggle Available or Sold, pick a floor, or click a unit"
+      ? "Drag floor height, toggle filters, or click a unit"
       : !unit
       ? "Select a residence to explore"
       : null
@@ -284,25 +322,9 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               <polygon
                 key={f.name}
                 points={pts(f.points)}
-                className={
-                  "poly floor" +
-                  (hoverFloor === f.name ? " on" : "") +
-                  (isFloorActive(f.name) ? " sel" : "")
-                }
-                onMouseEnter={() => {
-                  setHoverFloor(f.name);
-                  const num = parseInt(f.name.replace(/\D/g, ""), 10);
-                  if (num >= 1 && num <= 4) setFloorSlider([num]);
-                }}
-                onMouseLeave={() => {
-                  setHoverFloor(null);
-                  if (floor) {
-                    const num = parseInt(floor.replace(/\D/g, ""), 10);
-                    if (num >= 1 && num <= 4) setFloorSlider([num]);
-                  } else {
-                    setFloorSlider([1]);
-                  }
-                }}
+                className={"poly floor" + (hoverFloor === f.name ? " on" : "")}
+                onMouseEnter={() => setHoverFloor(f.name)}
+                onMouseLeave={() => setHoverFloor(null)}
                 onClick={() => pickFloor(f.name)}
               />
             ))}
@@ -365,24 +387,24 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           <div className="be-brand" onClick={reset} style={{ cursor: "pointer" }} title="Back to building">
             <span className="be-crown">&#9819;</span>
             <div className="be-bk">
-              <span className="be-eyebrow">{PROJECT.developer}</span>
               <span className="be-brand-name">
                 THE <b>OASIS</b>
               </span>
             </div>
           </div>
           <div className="be-links">
-            {["Home", "Site Plan", "Location Map", "Gallery", "Contact", "Share"].map((l) => (
-              <span
-                key={l}
-                className="be-link"
-                onClick={l === "Home" ? reset : undefined}
-                role={l === "Home" ? "button" : undefined}
-                style={l === "Home" ? { cursor: "pointer" } : undefined}
-              >
+            <span className="be-link" onClick={reset} role="button" style={{ cursor: "pointer" }}>
+              Home
+            </span>
+            <DownloadMenu />
+            {["Location Map", "Gallery"].map((l) => (
+              <span key={l} className="be-link">
                 {l}
               </span>
             ))}
+            <span className="be-link" onClick={() => logout?.()} role="button" style={{ cursor: "pointer" }}>
+              Log out
+            </span>
           </div>
         </div>
 
@@ -392,7 +414,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           </div>
         )}
 
-        <div className={"be-block-picker" + (block ? " be-block-picker--raised2" : "")}>
+        <div className={"be-block-picker" + (block ? " be-block-picker--raised3" : " be-block-picker--center")}>
             <span className="be-block-picker-label">Block</span>
             <div className="be-block-picker-row">
               {BLOCKS.map((b) => {
@@ -421,17 +443,42 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
             </div>
           </div>
 
+        {block && sqftSliderMax > 0 && (
+          <div className="be-sqft-slider">
+            <span className="be-sqft-slider-label">
+              Sqft{sqftFilter !== null ? ` · ${sqftFilter.toLocaleString("en-IN")}` : ""}
+            </span>
+            <div className="be-sqft-slider-row">
+              <span className="be-sqft-slider-mark">All</span>
+              <FloorSlider
+                value={sqftSlider}
+                onValueChange={applySqftSlider}
+                onInteractStart={onSqftSliderInteract}
+                min={0}
+                max={sqftSliderMax}
+                ariaLabel="Select sqft"
+              />
+              <span className="be-sqft-slider-mark be-sqft-slider-mark--max">
+                {blockSqftOptions[sqftSliderMax - 1]?.toLocaleString("en-IN") ?? "—"}
+              </span>
+            </div>
+          </div>
+        )}
+
         {block && (
-          <div className="be-floor-slider be-floor-slider--raised">
-            <span className="be-floor-slider-label">Floor</span>
+          <div className="be-floor-slider be-floor-slider--raised2">
+            <span className="be-floor-slider-label">Floor height</span>
             <div className="be-floor-slider-row">
-              <span className="be-floor-slider-mark">1</span>
+              <span className="be-floor-slider-mark">All</span>
               <FloorSlider
                 value={floorSlider}
-                onValueChange={applyFloorSlider}
-                onInteractStart={onFloorSliderInteract}
+                onValueChange={() => {}}
+                disabled
+                min={0}
+                max={maxFloorLevel}
+                ariaLabel="Floor height (all)"
               />
-              <span className="be-floor-slider-mark">4</span>
+              <span className="be-floor-slider-mark">{maxFloorLevel}</span>
             </div>
           </div>
         )}
@@ -470,7 +517,10 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
       </div>
 
       {block && unit && curUnit && (
-      <aside className={"be-side" + (panelOpen ? "" : " closed")}>
+      <aside
+        ref={unitPanelRef}
+        className={"be-side" + (panelOpen ? "" : " closed") + (unit && curUnit ? " be-side--unit" : "")}
+      >
         <div className="be-tab" onClick={() => setPanelOpen((o) => !o)}>
           {panelOpen ? "\u2212" : "+"}
         </div>
@@ -561,49 +611,72 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
         */}
 
         {unit && curUnit && (
-          <>
-            <div className="be-side-head">
-              <span onClick={back} style={{ cursor: "pointer", color: "var(--gold-bright)", marginRight: 1 }}>
-                &larr;
-              </span>
-              <span className="ic">&#127970;</span>
-              {block} &middot; <b>{curUnit.floor}</b>
-            </div>
-            <div className="be-acc">
-              <span className="bar" />
-              <h3>{curUnit.label}</h3>
-            </div>
-            <div className="be-type-line">
-              {curUnit.type} Residence &middot; {curUnit.facing} facing
-            </div>
-            <div className="be-specs">
-              <div>
-                <span>{curUnit.beds}</span>Beds
+          <div className="be-unit-panel">
+            <div className="be-unit-top">
+              <div className="be-unit-head">
+                <button type="button" className="be-unit-back" onClick={back} aria-label="Go back">
+                  &larr;
+                </button>
+                <span className="be-unit-head-text">
+                  {block} &middot; <strong>{curUnit.floor}</strong>
+                </span>
               </div>
-              <div>
-                <span>{curUnit.baths}</span>Baths
+              <div className="be-unit-title-row">
+                <span className="be-unit-bar" aria-hidden />
+                <div>
+                  <h3 className="be-unit-title">{curUnit.label}</h3>
+                  <p className="be-unit-meta">
+                    {curUnit.type} Residence &middot; {curUnit.facing} facing
+                  </p>
+                </div>
               </div>
-              <div>
-                <span>{curUnit.area}</span>Sqft
+              <div className="be-unit-stats-block">
+                <div className="be-unit-stats">
+                  <div>
+                    <span className="be-unit-stat-val">{curUnit.beds}</span>
+                    <span className="be-unit-stat-lbl">Beds</span>
+                  </div>
+                  <div>
+                    <span className="be-unit-stat-val">{curUnit.baths}</span>
+                    <span className="be-unit-stat-lbl">Baths</span>
+                  </div>
+                  <div>
+                    <span className="be-unit-stat-val">{curUnit.area}</span>
+                    <span className="be-unit-stat-lbl">Sqft</span>
+                  </div>
+                </div>
+                <UnitGallery key={curUnit.id} images={getUnitImages(curUnit.id)} unitLabel={curUnit.label} compact />
               </div>
             </div>
-            <div className="be-price-row">
-              <span className="be-price-lbl">Starting at</span>
-              <span className="be-price-big">{curUnit.price}</span>
+
+            <div className="be-unit-mid">
+              <div className="be-unit-price">
+                <span className="be-unit-price-lbl">Starting at</span>
+                <span className="be-unit-price-val">{curUnit.price}</span>
+              </div>
             </div>
-            {!isUnitSold(curUnit) && (
-              <button type="button" className="be-cta be-cta-reserve">
-                Pay for Reservation
+
+            <div className="be-unit-actions">
+              {!isUnitSold(curUnit) && (
+                <button type="button" className="be-unit-btn be-unit-btn--teal" onClick={goToBooking}>
+                  Pay for Reservation
+                </button>
+              )}
+              <button type="button" className="be-unit-btn be-unit-btn--gold" onClick={() => openModal(curUnit.id)}>
+                Enquire Now
               </button>
-            )}
-            <button className="be-cta" onClick={() => openModal(curUnit.id)}>
-              Enquire Now
-            </button>
-            <button className="be-ghost" onClick={() => openModal(curUnit.id)}>
-              Step inside &middot; 360&deg;
-            </button>
-            <p className="be-note">360&deg; interior walkthrough &mdash; next build</p>
-          </>
+              <button type="button" className="be-unit-btn be-unit-btn--ghost" onClick={() => openModal(curUnit.id)}>
+                Step inside &middot; 360&deg;
+              </button>
+              <a
+                href={getUnitBrochureUrl(curUnit.id)}
+                className="be-unit-btn be-unit-btn--ghost be-brochure-btn"
+                download
+              >
+                Download brochure
+              </a>
+            </div>
+          </div>
         )}
       </aside>
       )}

@@ -351,3 +351,21 @@ export const UNITS = {
     "centroid": [83.73, 74.05]
   }
 };
+
+export const UNIT_GALLERY_IMAGES = [
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=900&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900&auto=format&fit=crop",
+];
+
+export function getUnitImages(unitId) {
+  const n = parseInt(unitId, 10) || 0;
+  return Array.from({ length: 4 }, (_, i) => UNIT_GALLERY_IMAGES[(n + i) % UNIT_GALLERY_IMAGES.length]);
+}
+
+export function getUnitBrochureUrl(unitId) {
+  return `/downloads/units/${unitId}-brochure.pdf`;
+}

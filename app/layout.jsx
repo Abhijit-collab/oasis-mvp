@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Bodoni_Moda, Hanken_Grotesk } from "next/font/google";
+import RotatePhonePrompt from "@/components/RotatePhonePrompt";
 
 const display = Bodoni_Moda({
   subsets: ["latin"],
@@ -22,7 +23,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${display.variable} ${sans.variable}`}>
-      <body>{children}</body>
+      <body>
+        <RotatePhonePrompt />
+        {children}
+      </body>
     </html>
   );
 }

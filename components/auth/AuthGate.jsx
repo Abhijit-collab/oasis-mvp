@@ -8,6 +8,13 @@ import WhatsAppButton from "@/components/WhatsAppButton";
 import { AuthContext } from "@/components/auth/AuthContext";
 
 const STORAGE_KEY = "oasis_access";
+const REFRESH_COUNT_KEY = "oasis_refresh_count";
+const MAX_REFRESHES = 3;
+
+function isPageReload() {
+  const nav = performance.getEntriesByType?.("navigation")?.[0];
+  return nav?.type === "reload" || performance.navigation?.type === 1;
+}
 
 export default function AuthGate({ children }) {
   const router = useRouter();
@@ -21,13 +28,27 @@ export default function AuthGate({ children }) {
       const raw = sessionStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed?.coupon) setSession(parsed);
+        if (parsed?.coupon) {
+          if (isPageReload()) {
+            const count = parseInt(sessionStorage.getItem(REFRESH_COUNT_KEY) || "0", 10) + 1;
+            if (count > MAX_REFRESHES) {
+              sessionStorage.removeItem(STORAGE_KEY);
+              sessionStorage.removeItem(REFRESH_COUNT_KEY);
+              if (window.location.pathname !== "/") router.replace("/");
+              setReady(true);
+              return;
+            }
+            sessionStorage.setItem(REFRESH_COUNT_KEY, String(count));
+          }
+          setSession(parsed);
+        }
       }
     } catch {
       sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(REFRESH_COUNT_KEY);
     }
     setReady(true);
-  }, []);
+  }, [router]);
 
   const handleLogin = ({ name, coupon }) => {
     if (!coupon) {
@@ -37,6 +58,7 @@ export default function AuthGate({ children }) {
     setLoginError("");
     const next = { name, coupon, at: Date.now() };
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    sessionStorage.setItem(REFRESH_COUNT_KEY, "0");
     setSession(next);
     setShowWelcome(true);
   };
@@ -45,6 +67,7 @@ export default function AuthGate({ children }) {
 
   const logout = () => {
     sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(REFRESH_COUNT_KEY);
     setSession(null);
     setShowWelcome(false);
     setLoginError("");

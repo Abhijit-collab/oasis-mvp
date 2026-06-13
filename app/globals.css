@@ -521,3 +521,56 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
   .login-card{padding:26px 20px 22px}
   .login-brand{font-size:26px}
 }
+
+/* ---- Mobile rotate-to-landscape prompt ---- */
+body.rotate-prompt-open{overflow:hidden}
+.rotate-prompt{
+  position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;padding:28px 22px;
+  background:radial-gradient(ellipse 80% 60% at 50% 40%,rgba(216,182,90,.12),transparent 55%),
+    linear-gradient(180deg,#07090d 0%,#050608 100%);
+  animation:fade .25s ease}
+.rotate-prompt-inner{
+  width:100%;max-width:360px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:0}
+.rotate-prompt-anim{
+  position:relative;width:148px;height:148px;margin:0 auto 28px;display:flex;align-items:center;justify-content:center}
+.rotate-prompt-orbit{
+  position:absolute;inset:0;width:100%;height:100%;
+  animation:rotate-orbit 2.4s ease-in-out infinite}
+.rotate-prompt-phone{
+  position:relative;width:52px;height:88px;border-radius:12px;border:2.5px solid rgba(216,182,90,.75);
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+  box-shadow:0 12px 32px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.12);
+  transform-origin:center center;
+  animation:rotate-phone-hint 2.4s ease-in-out infinite}
+.rotate-prompt-notch{
+  position:absolute;top:7px;left:50%;transform:translateX(-50%);width:22px;height:4px;border-radius:999px;
+  background:rgba(216,182,90,.45)}
+.rotate-prompt-screen{
+  position:absolute;inset:12px 7px 10px;border-radius:6px;
+  background:linear-gradient(135deg,rgba(216,182,90,.22),rgba(0,229,204,.12))}
+.rotate-prompt-eyebrow{
+  font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--teal);margin-bottom:10px}
+.rotate-prompt-title{
+  font-family:var(--serif);font-size:clamp(28px,7vw,34px);font-weight:600;color:var(--ink);
+  line-height:1.15;margin-bottom:12px}
+.rotate-prompt-copy{font-size:15px;color:var(--muted);line-height:1.6;margin-bottom:20px;max-width:320px}
+.rotate-prompt-steps{
+  list-style:none;display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px;text-align:left;
+  counter-reset:rotate-step}
+.rotate-prompt-steps li{
+  position:relative;padding:12px 14px 12px 42px;font-size:13px;line-height:1.45;color:rgba(245,241,230,.82);
+  background:rgba(255,255,255,.04);border:1px solid var(--hair);border-radius:10px;counter-increment:rotate-step}
+.rotate-prompt-steps li::before{
+  content:counter(rotate-step);position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:#1a1405;background:var(--gold)}
+@keyframes rotate-phone-hint{
+  0%,18%{transform:rotate(0deg)}
+  45%,55%{transform:rotate(90deg)}
+  82%,100%{transform:rotate(0deg)}}
+@keyframes rotate-orbit{
+  0%,18%{transform:rotate(0deg);opacity:.35}
+  45%,55%{transform:rotate(90deg);opacity:1}
+  82%,100%{transform:rotate(0deg);opacity:.35}}
+@media(orientation:landscape) and (max-width:900px){
+  .rotate-prompt{display:none!important}}

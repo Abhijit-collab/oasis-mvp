@@ -1,6 +1,6 @@
 "use client";
 
-const PHONE = "919876543210";
+const PHONE = "91737733143";
 const MESSAGE = encodeURIComponent("Hi, I'd like to know more about The Oasis residences.");
 
 export default function WhatsAppButton() {

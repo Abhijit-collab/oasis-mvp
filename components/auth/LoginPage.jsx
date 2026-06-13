@@ -18,7 +18,7 @@ export default function LoginPage({ onSubmit, error }) {
         <header className="login-header">
           <span className="login-crown">&#10022;</span>
           <div>
-            <p className="login-eyebrow">Navanaami Residences</p>
+            <p className="login-eyebrow">Metro Group</p>
             <h1 className="login-brand">
               THE <span>OASIS</span>
             </h1>

@@ -275,7 +275,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
       meta: `${u.type} · ${u.area} Sqft`,
       sold,
     };
-  } else if (block && !floor && hoverFloor && !hoverUnit) {
+  } else if (block && hoverFloor && !hoverUnit) {
     const f = FLOORS.find((x) => x.name === hoverFloor);
     tip = {
       c: anchorAbove(f.points),
@@ -317,12 +317,16 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
 
           {block && <rect x="0" y="0" width="100" height="100" className="be-scrim-r" />}
 
-          {block && !floor && !showFilteredUnits &&
+          {block &&
             blockFloors.map((f) => (
               <polygon
                 key={f.name}
                 points={pts(f.points)}
-                className={"poly floor" + (hoverFloor === f.name ? " on" : "")}
+                className={
+                  "poly floor" +
+                  (floor === f.name ? " sel" : "") +
+                  (hoverFloor === f.name ? " on" : "")
+                }
                 onMouseEnter={() => setHoverFloor(f.name)}
                 onMouseLeave={() => setHoverFloor(null)}
                 onClick={() => pickFloor(f.name)}

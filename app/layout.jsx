@@ -7,6 +7,7 @@ const display = Bodoni_Moda({
   weight: ["500", "600", "700"],
   variable: "--font-display",
   display: "swap",
+  adjustFontFallback: false,
 });
 const sans = Hanken_Grotesk({
   subsets: ["latin"],

@@ -11,15 +11,18 @@ import { useAuth } from "@/components/auth/AuthContext";
 const pts = (a) => a.map((p) => p.join(",")).join(" ");
 
 const isUnitSold = (u) => u.status === "sold";
-const defaultUnitFilter = () => ({ available: false, sold: false });
+const defaultUnitFilter = () => ({ all: false, available: false, sold: false });
 
 const matchesUnitFilters = (id, units, filter, sqft) => {
   if (sqft !== null && units[id].area !== sqft) return false;
+  if (filter.all) return true;
   const sold = isUnitSold(units[id]);
   const statusFilter = filter.available || filter.sold;
   if (!statusFilter) return true;
   return sold ? filter.sold : filter.available;
 };
+
+const isUnitFilterActive = (filter) => filter.all || filter.available || filter.sold;
 
 // Anchor hover cards on the polygon roofline at horizontal center.
 const anchorAbove = (points) => {
@@ -67,10 +70,9 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const [sqftSlider, setSqftSlider] = useState([0]);
   const [unitFilter, setUnitFilter] = useState(defaultUnitFilter);
   const unitPanelRef = useRef(null);
-  const floorSlider = [0];
 
   const applySqftSlider = (value) => {
-    const statusFilterActive = unitFilter.available || unitFilter.sold;
+    const statusFilterActive = isUnitFilterActive(unitFilter);
     const changed = value[0] !== sqftSlider[0];
     setSqftSlider(value);
     if (!block) return;
@@ -82,7 +84,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   };
 
   const onSqftSliderInteract = () => {
-    if (sqftSlider[0] === 0 && !unitFilter.available && !unitFilter.sold) return;
+    if (sqftSlider[0] === 0 && !isUnitFilterActive(unitFilter)) return;
     if (sqftSlider[0] > 0) return;
     setUnitFilter(defaultUnitFilter());
     setFloor(null);
@@ -116,17 +118,25 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     [blockFloors]
   );
 
-  const floorUnitCounts = useMemo(() => {
-    const ids =
-      floor && curFloor ? curFloor.units : block ? blockFloors.flatMap((f) => f.units) : [];
-    let available = 0;
-    let sold = 0;
-    for (const id of ids) {
-      if (isUnitSold(units[id])) sold++;
-      else available++;
+  const floorSliderValue = useMemo(() => [floor ? floorLevel(floor) : 0], [floor]);
+
+  const applyFloorSlider = (value) => {
+    const level = value[0];
+    if (level === 0) {
+      setFloor(null);
+      setUnit(null);
+      setHoverUnit(null);
+      setHoverFloor(null);
+      return;
     }
-    return { available, sold };
-  }, [floor, curFloor, block, blockFloors, units]);
+    const match = blockFloors.find((f) => floorLevel(f.name) === level);
+    if (match) {
+      setFloor(match.name);
+      setUnit(null);
+      setHoverUnit(null);
+      setHoverFloor(null);
+    }
+  };
 
   const scopedUnitIds = useMemo(() => {
     if (!block) return [];
@@ -142,7 +152,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const sqftFilter = sqftSlider[0] > 0 ? blockSqftOptions[sqftSlider[0] - 1] : null;
   const sqftSliderMax = blockSqftOptions.length;
 
-  const showFilteredUnits = unitFilter.available || unitFilter.sold || sqftFilter !== null;
+  const showFilteredUnits = isUnitFilterActive(unitFilter) || sqftFilter !== null;
 
   const unitVisible = (id) => matchesUnitFilters(id, units, unitFilter, sqftFilter);
 
@@ -160,8 +170,14 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
 
   const toggleUnitFilter = (key) => {
     setUnitFilter((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      if (!floor && !next.available && !next.sold && sqftSlider[0] === 0) {
+      let next;
+      if (key === "all") {
+        next = prev.all ? defaultUnitFilter() : { all: true, available: false, sold: false };
+      } else {
+        next = { ...prev, all: false, [key]: !prev[key] };
+      }
+
+      if (!floor && !isUnitFilterActive(next) && sqftSlider[0] === 0) {
         setUnit(null);
         setHoverUnit(null);
       } else if (!floor && unit && !matchesUnitFilters(unit, units, next, sqftFilter)) {
@@ -184,6 +200,18 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setSqftSlider([0]);
     setUnitFilter(defaultUnitFilter());
   };
+
+  const resetFilters = () => {
+    setFloor(null);
+    setUnit(null);
+    setHoverFloor(null);
+    setHoverUnit(null);
+    setSqftSlider([0]);
+    setUnitFilter(defaultUnitFilter());
+  };
+
+  const hasActiveFilters =
+    floor !== null || sqftSlider[0] > 0 || isUnitFilterActive(unitFilter);
   const back = () => {
     if (unit) setUnit(null);
     else if (floor) setFloor(null);
@@ -318,20 +346,27 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           {block && <rect x="0" y="0" width="100" height="100" className="be-scrim-r" />}
 
           {block &&
-            blockFloors.map((f) => (
+            blockFloors.map((f) => {
+              const isHover = hoverFloor === f.name;
+              let floorCls = "poly floor";
+              if (!floor) {
+                if (isHover) floorCls += " on";
+              } else if (isHover && f.name !== floor) {
+                floorCls += " on-switch";
+              } else {
+                floorCls += " silent";
+              }
+              return (
               <polygon
                 key={f.name}
                 points={pts(f.points)}
-                className={
-                  "poly floor" +
-                  (floor === f.name ? " sel" : "") +
-                  (hoverFloor === f.name ? " on" : "")
-                }
+                className={floorCls}
                 onMouseEnter={() => setHoverFloor(f.name)}
                 onMouseLeave={() => setHoverFloor(null)}
                 onClick={() => pickFloor(f.name)}
               />
-            ))}
+              );
+            })}
 
           {block &&
             visibleUnitIds.map((id) => {
@@ -346,6 +381,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
                   className={
                     "poly unit " +
                     (sold ? "sold" : "avail") +
+                    (unitFilter.all ? " all-on" : "") +
                     (unit === id ? " sel" : "") +
                     (hoverUnit === id ? " hov" : "")
                   }
@@ -418,7 +454,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           </div>
         )}
 
-        <div className={"be-block-picker" + (block ? " be-block-picker--raised3" : " be-block-picker--center")}>
+        {!block ? (
+          <div className="be-block-picker be-block-picker--center">
             <span className="be-block-picker-label">Block</span>
             <div className="be-block-picker-row">
               {BLOCKS.map((b) => {
@@ -446,66 +483,119 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               })}
             </div>
           </div>
+        ) : (
+          <div className="be-filter-column">
+          <div className="be-filter-stack">
+            <div className="be-unit-filter">
+              <span className="be-unit-filter-label">Show units</span>
+              <div className="be-unit-filter-row">
+                <button
+                  type="button"
+                  className={"be-unit-filter-btn all" + (unitFilter.all ? " on" : "")}
+                  onClick={() => toggleUnitFilter("all")}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={"be-unit-filter-btn avail" + (unitFilter.available ? " on" : "")}
+                  onClick={() => toggleUnitFilter("available")}
+                >
+                  Available
+                </button>
+                <button
+                  type="button"
+                  className={"be-unit-filter-btn sold" + (unitFilter.sold ? " on" : "")}
+                  onClick={() => toggleUnitFilter("sold")}
+                >
+                  Sold
+                </button>
+              </div>
+            </div>
 
-        {block && sqftSliderMax > 0 && (
-          <div className="be-sqft-slider">
-            <span className="be-sqft-slider-label">
-              Sqft{sqftFilter !== null ? ` · ${sqftFilter.toLocaleString("en-IN")}` : ""}
-            </span>
-            <div className="be-sqft-slider-row">
-              <span className="be-sqft-slider-mark">All</span>
-              <FloorSlider
-                value={sqftSlider}
-                onValueChange={applySqftSlider}
-                onInteractStart={onSqftSliderInteract}
-                min={0}
-                max={sqftSliderMax}
-                ariaLabel="Select sqft"
-              />
-              <span className="be-sqft-slider-mark be-sqft-slider-mark--max">
-                {blockSqftOptions[sqftSliderMax - 1]?.toLocaleString("en-IN") ?? "—"}
+            <div className="be-floor-slider">
+              <span className="be-floor-slider-label">
+                Floor height{floor ? ` · ${floor}` : ""}
               </span>
+              <div className="be-floor-slider-row">
+                <span className="be-floor-slider-mark">All</span>
+                <FloorSlider
+                  value={floorSliderValue}
+                  onValueChange={applyFloorSlider}
+                  min={0}
+                  max={maxFloorLevel}
+                  ariaLabel={floor ? floor : "All floors"}
+                />
+                <span className="be-floor-slider-mark">{maxFloorLevel}</span>
+              </div>
+            </div>
+
+            {sqftSliderMax > 0 && (
+              <div className="be-sqft-slider">
+                <span className="be-sqft-slider-label">
+                  Sqft{sqftFilter !== null ? ` · ${sqftFilter.toLocaleString("en-IN")}` : ""}
+                </span>
+                <div className="be-sqft-slider-row">
+                  <span className="be-sqft-slider-mark">All</span>
+                  <FloorSlider
+                    value={sqftSlider}
+                    onValueChange={applySqftSlider}
+                    onInteractStart={onSqftSliderInteract}
+                    min={0}
+                    max={sqftSliderMax}
+                    ariaLabel="Select sqft"
+                  />
+                  <span className="be-sqft-slider-mark be-sqft-slider-mark--max">
+                    {blockSqftOptions[sqftSliderMax - 1]?.toLocaleString("en-IN") ?? "—"}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="be-block-picker">
+              <span className="be-block-picker-label">Block</span>
+              <div className="be-block-picker-row">
+                {BLOCKS.map((b) => {
+                  const available = b.available !== false;
+                  const active = block === b.name;
+                  const hot = hoverBlock === b.name;
+                  return (
+                    <button
+                      key={b.name}
+                      type="button"
+                      className={
+                        "be-block-btn" +
+                        (active ? " on" : "") +
+                        (hot && !active ? " hov" : "") +
+                        (!available ? " disabled" : "")
+                      }
+                      disabled={!available}
+                      onMouseEnter={() => available && setHoverBlock(b.name)}
+                      onMouseLeave={() => setHoverBlock(null)}
+                      onClick={() => pickBlock(b.name)}
+                    >
+                      {b.name.replace("Block ", "")}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        )}
 
-        {block && (
-          <div className="be-floor-slider be-floor-slider--raised2">
-            <span className="be-floor-slider-label">Floor height</span>
-            <div className="be-floor-slider-row">
-              <span className="be-floor-slider-mark">All</span>
-              <FloorSlider
-                value={floorSlider}
-                onValueChange={() => {}}
-                disabled
-                min={0}
-                max={maxFloorLevel}
-                ariaLabel="Floor height (all)"
-              />
-              <span className="be-floor-slider-mark">{maxFloorLevel}</span>
-            </div>
-          </div>
-        )}
-
-        {block && (
-          <div className="be-unit-filter">
-            <span className="be-unit-filter-label">Show units</span>
-            <div className="be-unit-filter-row">
-              <button
-                type="button"
-                className={"be-unit-filter-btn avail" + (unitFilter.available ? " on" : "")}
-                onClick={() => toggleUnitFilter("available")}
-              >
-                Available ({floorUnitCounts.available})
-              </button>
-              <button
-                type="button"
-                className={"be-unit-filter-btn sold" + (unitFilter.sold ? " on" : "")}
-                onClick={() => toggleUnitFilter("sold")}
-              >
-                Sold ({floorUnitCounts.sold})
-              </button>
-            </div>
+            <button
+              type="button"
+              className={"be-filter-reset-btn" + (hasActiveFilters ? " live" : "")}
+              onClick={resetFilters}
+              disabled={!hasActiveFilters}
+              aria-label="Reset filters"
+            >
+              <span className="be-filter-reset-icon" aria-hidden="true">&#8635;</span>
+              <span className="be-filter-reset-copy">
+                <span className="be-filter-reset-title">Clear filters</span>
+                <span className="be-filter-reset-sub">Restore default view</span>
+              </span>
+              <span className="be-filter-reset-glow" aria-hidden="true" />
+            </button>
           </div>
         )}
 

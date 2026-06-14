@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import LoginPage from "@/components/auth/LoginPage";
 import WelcomeModal from "@/components/auth/WelcomeModal";
@@ -10,6 +10,9 @@ import { AuthContext } from "@/components/auth/AuthContext";
 const STORAGE_KEY = "oasis_access";
 const REFRESH_COUNT_KEY = "oasis_refresh_count";
 const MAX_REFRESHES = 3;
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+const IDLE_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
 
 function isPageReload() {
   const nav = performance.getEntriesByType?.("navigation")?.[0];
@@ -65,14 +68,35 @@ export default function AuthGate({ children }) {
 
   const dismissWelcome = () => setShowWelcome(false);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(REFRESH_COUNT_KEY);
     setSession(null);
     setShowWelcome(false);
     setLoginError("");
     router.push("/");
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (!session) return;
+
+    const timeoutRef = { id: null };
+
+    const resetIdleTimer = () => {
+      clearTimeout(timeoutRef.id);
+      timeoutRef.id = setTimeout(logout, IDLE_TIMEOUT_MS);
+    };
+
+    const onActivity = () => resetIdleTimer();
+
+    IDLE_EVENTS.forEach((event) => window.addEventListener(event, onActivity, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(timeoutRef.id);
+      IDLE_EVENTS.forEach((event) => window.removeEventListener(event, onActivity));
+    };
+  }, [session, logout]);
 
   if (!ready) {
     return (

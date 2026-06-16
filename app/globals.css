@@ -56,7 +56,7 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
   align-items:center;padding:18px 26px}
 .be-brand{display:flex;align-items:center;gap:13px}
 .be-crown{color:var(--gold);font-size:26px;line-height:1;filter:drop-shadow(0 1px 4px rgba(0,0,0,.5))}
-.be-bk{display:flex;flex-direction:column}
+.be-bk{display:flex;flex-direction:column;gap:6px;margin-top:2px}
 .be-eyebrow{font-size:9px;letter-spacing:.38em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .be-brand-name{font-family:var(--serif);font-size:27px;font-weight:600;letter-spacing:.14em;line-height:1.05;
   text-shadow:0 2px 12px rgba(0,0,0,.5)}
@@ -391,6 +391,7 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
     transform:none!important;max-height:none;border-left:none;border-right:none;border-bottom:none}
   .be-tab{display:none}.be-arrow.r{right:22px}.be-side.closed{transform:none!important}
   .be-root{background:#06070a}
+  .be-brand .premium-badge{display:none}
 }
 
 /* ---- Booking / demo payment page ---- */
@@ -512,7 +513,7 @@ html:has(.login-page),body:has(.login-page){overflow:hidden;height:100%;padding:
 .login-eyebrow{font-size:9px;letter-spacing:.38em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .login-brand{font-family:var(--serif);font-size:32px;font-weight:600;letter-spacing:.14em;line-height:1.05;color:#fff}
 .login-brand span{color:var(--gold-bright)}
-.login-card{background:rgba(12,14,18,.82);border:1px solid rgba(255,255,255,.12);border-radius:22px;
+.login-card{position:relative;overflow:visible;background:rgba(12,14,18,.82);border:1px solid rgba(255,255,255,.12);border-radius:22px;
   padding:32px 28px 28px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   box-shadow:0 28px 70px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06)}
 .login-kicker{font-size:10px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
@@ -532,6 +533,33 @@ html:has(.login-page),body:has(.login-page){overflow:hidden;height:100%;padding:
   box-shadow:0 4px 22px rgba(216,182,90,.3),inset 0 1px 0 rgba(255,255,255,.25);transition:filter .16s,transform .16s}
 .login-btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
 .login-foot{margin-top:18px;font-size:11px;color:rgba(245,241,230,.38);text-align:center;letter-spacing:.04em;line-height:1.45}
+.login-premium-ribbon{
+  position:fixed;top:0;right:0;z-index:101;width:148px;height:148px;overflow:hidden;pointer-events:none}
+.login-premium-ribbon span{
+  position:absolute;top:34px;right:-46px;display:block;width:210px;padding:8px 0;text-align:center;
+  transform:rotate(45deg);background:linear-gradient(90deg,#c9a44e,#f0cf72,#c9a44e);color:#1a1405;
+  font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+.login-card-premium{display:flex;justify-content:flex-start;margin-bottom:4px}
+.login-welcome-badge-row{display:flex;justify-content:center;margin-bottom:6px}
+.login-welcome-modal .premium-perks{margin:0 auto 18px;max-width:360px}
+
+/* ---- Premium member experience ---- */
+.premium-badge{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 11px 5px 9px;border-radius:999px;
+  border:1px solid rgba(216,182,90,.45);background:linear-gradient(135deg,rgba(216,182,90,.16),rgba(0,229,204,.08));
+  color:var(--gold-bright);font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  box-shadow:0 0 0 1px rgba(216,182,90,.12),0 4px 14px rgba(216,182,90,.12);white-space:nowrap}
+.premium-badge-star{font-size:10px;line-height:1;color:var(--gold-bright);filter:drop-shadow(0 0 4px rgba(242,210,126,.6))}
+.premium-badge--sm{padding:4px 9px 4px 7px;font-size:8px;letter-spacing:.14em}
+.premium-perks{
+  list-style:none;display:flex;flex-direction:column;gap:8px;margin:0 0 18px;padding:12px 14px;border-radius:12px;
+  border:1px solid rgba(216,182,90,.18);background:rgba(216,182,90,.05)}
+.premium-perks li{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.45;color:rgba(245,241,230,.78)}
+.premium-perks-mark{flex-shrink:0;color:var(--gold-bright);font-size:11px;line-height:1.45;opacity:.9}
+.premium-perks--compact{gap:6px;margin-bottom:16px;padding:10px 12px}
+.premium-perks--compact li{font-size:11px}
+
 .login-welcome-bg{position:fixed;inset:0;z-index:200;background:rgba(4,6,10,.84);backdrop-filter:blur(8px);
   -webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;animation:fade .35s}
 .login-welcome-modal{position:relative;width:100%;max-width:460px;text-align:center;padding:38px 32px 32px;

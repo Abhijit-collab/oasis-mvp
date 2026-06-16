@@ -7,6 +7,7 @@ import FloorSlider from "@/components/FloorSlider";
 import DownloadMenu from "@/components/DownloadMenu";
 import UnitGallery from "@/components/UnitGallery";
 import { useAuth } from "@/components/auth/AuthContext";
+import PremiumBadge from "@/components/PremiumBadge";
 
 const pts = (a) => a.map((p) => p.join(",")).join(" ");
 
@@ -430,6 +431,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               <span className="be-brand-name">
                 THE <b>OASIS</b>
               </span>
+              <PremiumBadge label="Premium Experience" size="sm" />
             </div>
           </div>
           <div className="be-links">

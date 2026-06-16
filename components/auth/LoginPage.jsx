@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import PremiumBadge from "@/components/PremiumBadge";
+import PremiumPerks from "@/components/PremiumPerks";
 
 export default function LoginPage({ onSubmit, error }) {
   const [name, setName] = useState("");
@@ -14,6 +16,10 @@ export default function LoginPage({ onSubmit, error }) {
   return (
     <div className="login-page">
       <div className="login-bg" aria-hidden />
+      <div className="login-premium-ribbon">
+        <span>By invitation only</span>
+      </div>
+
       <div className="login-shell">
         <header className="login-header">
           <span className="login-crown">&#10022;</span>
@@ -26,11 +32,16 @@ export default function LoginPage({ onSubmit, error }) {
         </header>
 
         <div className="login-card">
-          <p className="login-kicker">Private preview</p>
+          <div className="login-card-premium">
+            <PremiumBadge label="Premium Preview" />
+          </div>
           <h2 className="login-title">Enter your invitation</h2>
           <p className="login-copy">
-            This experience is reserved for invited guests. Enter your coupon code to explore the residences.
+            This immersive experience is reserved exclusively for our premium customers. Enter your
+            personal invitation code to unlock your private tour.
           </p>
+
+          <PremiumPerks compact />
 
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-field">
@@ -45,7 +56,7 @@ export default function LoginPage({ onSubmit, error }) {
             </div>
             <div className="login-field">
               <label htmlFor="login-coupon">
-                Coupon code <span className="login-req">*</span>
+                Invitation code <span className="login-req">*</span>
               </label>
               <input
                 id="login-coupon"
@@ -58,11 +69,11 @@ export default function LoginPage({ onSubmit, error }) {
             </div>
             {error && <p className="login-error">{error}</p>}
             <button type="submit" className="login-btn">
-              Unlock the experience
+              Unlock premium access
             </button>
           </form>
 
-          <p className="login-foot">Demo access · any coupon code works for this preview</p>
+          <p className="login-foot">Your access is personal and non-transferable · For premium members only</p>
         </div>
       </div>
     </div>

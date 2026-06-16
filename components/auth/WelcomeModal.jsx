@@ -1,22 +1,37 @@
 "use client";
 
+import PremiumBadge from "@/components/PremiumBadge";
+import PremiumPerks from "@/components/PremiumPerks";
+
 export default function WelcomeModal({ name, onContinue }) {
-  const guest = name || "Guest";
+  const guest = name || "Premium Member";
 
   return (
     <div className="login-welcome-bg">
       <div className="login-welcome-modal">
         <div className="login-welcome-glow" aria-hidden />
+        <div className="login-welcome-badge-row">
+          <PremiumBadge label="Premium Member" />
+        </div>
         <span className="login-welcome-spark">&#10022;</span>
         <p className="login-welcome-kicker">Welcome, {guest}</p>
         <h2 className="login-welcome-title">Your private tour awaits</h2>
         <p className="login-welcome-copy">
-          Thank you for joining this exclusive preview of <strong>The Oasis</strong>. Step onto the terrace,
-          glide through every floor, and discover the residence meant for you — before anyone else does.
+          Thank you for being part of our <strong>premium circle</strong>. You now have exclusive access to
+          explore every floor, residence, and detail of <strong>The Oasis</strong> — before the public
+          launch.
         </p>
-        <p className="login-welcome-tagline">Where the skyline meets your story.</p>
+        <PremiumPerks
+          compact
+          items={[
+            "Full building explorer unlocked",
+            "Priority reservation pathway",
+            "Personal concierge on WhatsApp",
+          ]}
+        />
+        <p className="login-welcome-tagline">Crafted for those who expect more.</p>
         <button type="button" className="login-btn" onClick={onContinue}>
-          Begin exploring
+          Enter your private tour
         </button>
       </div>
     </div>

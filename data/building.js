@@ -1,6 +1,10 @@
 // Building data for The Oasis explorer.
 // Unit polygons sourced from 6000×4421px picker output (see flat zones below).
 
+import { TRANSITION_VIDEOS } from "@/data/assets";
+
+export { ENTRANCE_IMAGE, ELEVATION_IMAGE, TRANSITION_VIDEOS } from "@/data/assets";
+
 export const IMAGE_SIZE = { width: 6000, height: 4421 };
 
 /** Convert picker coordinates (px) to image-percentage for the SVG overlay. */
@@ -58,21 +62,27 @@ export const BLOCKS = [
       [44.32, 67.56]
     ],
     "centroid": [62.69, 49.28],
-    "floors": ["Floor 4", "Floor 3", "Floor 2", "Floor 1"]
+    "floors": ["Floor 4", "Floor 3", "Floor 2", "Floor 1"],
+    "transitionLeadIn": TRANSITION_VIDEOS.entrance,
+    "transitionOut": TRANSITION_VIDEOS.blockAOut
   },
   {
     "name": "Block B",
-    "available": false,
+    "available": true,
     "points": [],
     "centroid": [0, 0],
-    "floors": []
+    "floors": [],
+    "transitionIn": TRANSITION_VIDEOS.blockBIn,
+    "transitionOut": TRANSITION_VIDEOS.blockBOut
   },
   {
     "name": "Block C",
-    "available": false,
+    "available": true,
     "points": [],
     "centroid": [0, 0],
-    "floors": []
+    "floors": [],
+    "transitionIn": TRANSITION_VIDEOS.blockCIn,
+    "transitionOut": TRANSITION_VIDEOS.blockCOut
   },
   {
     "name": "Block D",

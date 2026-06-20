@@ -8,6 +8,9 @@ import DownloadMenu from "@/components/DownloadMenu";
 import UnitGallery from "@/components/UnitGallery";
 import { useAuth } from "@/components/auth/AuthContext";
 import PremiumBadge from "@/components/PremiumBadge";
+import Video360 from "@/components/Video360";
+import { VIDEO_360_URL } from "@/data/assets";
+import { prefetchVideo } from "@/hooks/usePreloadVideos";
 
 const pts = (a) => a.map((p) => p.join(",")).join(" ");
 
@@ -65,12 +68,17 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const [hoverFloor, setHoverFloor] = useState(null);
   const [hoverUnit, setHoverUnit] = useState(null);
   const [modal, setModal] = useState(null);
+  const [show360, setShow360] = useState(false);
   const [sent, setSent] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
   const [sqftSlider, setSqftSlider] = useState([0]);
   const [unitFilter, setUnitFilter] = useState(defaultUnitFilter);
   const unitPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (VIDEO_360_URL) prefetchVideo(VIDEO_360_URL);
+  }, []);
 
   const applySqftSlider = (value) => {
     const statusFilterActive = isUnitFilterActive(unitFilter);
@@ -324,6 +332,37 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
       : null
     : null;
 
+  const blockPicker = (
+    <div className="be-block-picker">
+      <span className="be-block-picker-label">Block</span>
+      <div className="be-block-picker-row">
+        {BLOCKS.map((b) => {
+          const available = b.available !== false;
+          const active = block === b.name;
+          const hot = hoverBlock === b.name;
+          return (
+            <button
+              key={b.name}
+              type="button"
+              className={
+                "be-block-btn" +
+                (active ? " on" : "") +
+                (hot && !active ? " hov" : "") +
+                (!available ? " disabled" : "")
+              }
+              disabled={!available}
+              onMouseEnter={() => available && setHoverBlock(b.name)}
+              onMouseLeave={() => setHoverBlock(null)}
+              onClick={() => pickBlock(b.name)}
+            >
+              {b.name.replace("Block ", "")}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <div className="be-root">
       <div className="be-stage">
@@ -456,134 +495,82 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           </div>
         )}
 
-        {!block ? (
-          <div className="be-block-picker be-block-picker--center">
-            <span className="be-block-picker-label">Block</span>
-            <div className="be-block-picker-row">
-              {BLOCKS.map((b) => {
-                const available = b.available !== false;
-                const active = block === b.name;
-                const hot = hoverBlock === b.name;
-                return (
-                  <button
-                    key={b.name}
-                    type="button"
-                    className={
-                      "be-block-btn" +
-                      (active ? " on" : "") +
-                      (hot && !active ? " hov" : "") +
-                      (!available ? " disabled" : "")
-                    }
-                    disabled={!available}
-                    onMouseEnter={() => available && setHoverBlock(b.name)}
-                    onMouseLeave={() => setHoverBlock(null)}
-                    onClick={() => pickBlock(b.name)}
-                  >
-                    {b.name.replace("Block ", "")}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="be-filter-column">
-          <div className="be-filter-stack">
-            <div className="be-unit-filter">
-              <span className="be-unit-filter-label">Show units</span>
-              <div className="be-unit-filter-row">
-                <button
-                  type="button"
-                  className={"be-unit-filter-btn all" + (unitFilter.all ? " on" : "")}
-                  onClick={() => toggleUnitFilter("all")}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  className={"be-unit-filter-btn avail" + (unitFilter.available ? " on" : "")}
-                  onClick={() => toggleUnitFilter("available")}
-                >
-                  Available
-                </button>
-                <button
-                  type="button"
-                  className={"be-unit-filter-btn sold" + (unitFilter.sold ? " on" : "")}
-                  onClick={() => toggleUnitFilter("sold")}
-                >
-                  Sold
-                </button>
-              </div>
-            </div>
-
-            <div className="be-floor-slider">
-              <span className="be-floor-slider-label">
-                Floor height{floor ? ` · ${floor}` : ""}
-              </span>
-              <div className="be-floor-slider-row">
-                <span className="be-floor-slider-mark">All</span>
-                <FloorSlider
-                  value={floorSliderValue}
-                  onValueChange={applyFloorSlider}
-                  min={0}
-                  max={maxFloorLevel}
-                  ariaLabel={floor ? floor : "All floors"}
-                />
-                <span className="be-floor-slider-mark">{maxFloorLevel}</span>
-              </div>
-            </div>
-
-            {sqftSliderMax > 0 && (
-              <div className="be-sqft-slider">
-                <span className="be-sqft-slider-label">
-                  Sqft{sqftFilter !== null ? ` · ${sqftFilter.toLocaleString("en-IN")}` : ""}
-                </span>
-                <div className="be-sqft-slider-row">
-                  <span className="be-sqft-slider-mark">All</span>
-                  <FloorSlider
-                    value={sqftSlider}
-                    onValueChange={applySqftSlider}
-                    onInteractStart={onSqftSliderInteract}
-                    min={0}
-                    max={sqftSliderMax}
-                    ariaLabel="Select sqft"
-                  />
-                  <span className="be-sqft-slider-mark be-sqft-slider-mark--max">
-                    {blockSqftOptions[sqftSliderMax - 1]?.toLocaleString("en-IN") ?? "—"}
-                  </span>
+        <div className={"be-filter-column" + (block ? "" : " be-filter-column--initial")}>
+          <div className={"be-filter-stack" + (block ? " be-filter-stack--expanded" : "")}>
+            {block && (
+              <div className="be-filter-extra">
+                <div className="be-unit-filter">
+                  <span className="be-unit-filter-label">Show units</span>
+                  <div className="be-unit-filter-row">
+                    <button
+                      type="button"
+                      className={"be-unit-filter-btn all" + (unitFilter.all ? " on" : "")}
+                      onClick={() => toggleUnitFilter("all")}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      className={"be-unit-filter-btn avail" + (unitFilter.available ? " on" : "")}
+                      onClick={() => toggleUnitFilter("available")}
+                    >
+                      Available
+                    </button>
+                    <button
+                      type="button"
+                      className={"be-unit-filter-btn sold" + (unitFilter.sold ? " on" : "")}
+                      onClick={() => toggleUnitFilter("sold")}
+                    >
+                      Sold
+                    </button>
+                  </div>
                 </div>
+
+                <div className="be-floor-slider">
+                  <span className="be-floor-slider-label">
+                    Floor height{floor ? ` · ${floor}` : ""}
+                  </span>
+                  <div className="be-floor-slider-row">
+                    <span className="be-floor-slider-mark">All</span>
+                    <FloorSlider
+                      value={floorSliderValue}
+                      onValueChange={applyFloorSlider}
+                      min={0}
+                      max={maxFloorLevel}
+                      ariaLabel={floor ? floor : "All floors"}
+                    />
+                    <span className="be-floor-slider-mark">{maxFloorLevel}</span>
+                  </div>
+                </div>
+
+                {sqftSliderMax > 0 && (
+                  <div className="be-sqft-slider">
+                    <span className="be-sqft-slider-label">
+                      Sqft{sqftFilter !== null ? ` · ${sqftFilter.toLocaleString("en-IN")}` : ""}
+                    </span>
+                    <div className="be-sqft-slider-row">
+                      <span className="be-sqft-slider-mark">All</span>
+                      <FloorSlider
+                        value={sqftSlider}
+                        onValueChange={applySqftSlider}
+                        onInteractStart={onSqftSliderInteract}
+                        min={0}
+                        max={sqftSliderMax}
+                        ariaLabel="Select sqft"
+                      />
+                      <span className="be-sqft-slider-mark be-sqft-slider-mark--max">
+                        {blockSqftOptions[sqftSliderMax - 1]?.toLocaleString("en-IN") ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="be-block-picker">
-              <span className="be-block-picker-label">Block</span>
-              <div className="be-block-picker-row">
-                {BLOCKS.map((b) => {
-                  const available = b.available !== false;
-                  const active = block === b.name;
-                  const hot = hoverBlock === b.name;
-                  return (
-                    <button
-                      key={b.name}
-                      type="button"
-                      className={
-                        "be-block-btn" +
-                        (active ? " on" : "") +
-                        (hot && !active ? " hov" : "") +
-                        (!available ? " disabled" : "")
-                      }
-                      disabled={!available}
-                      onMouseEnter={() => available && setHoverBlock(b.name)}
-                      onMouseLeave={() => setHoverBlock(null)}
-                      onClick={() => pickBlock(b.name)}
-                    >
-                      {b.name.replace("Block ", "")}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {blockPicker}
           </div>
 
+          {block && (
             <button
               type="button"
               className={"be-filter-reset-btn" + (hasActiveFilters ? " live" : "")}
@@ -598,8 +585,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               </span>
               <span className="be-filter-reset-glow" aria-hidden="true" />
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="be-compass">
           <svg viewBox="0 0 40 40" fill="none">
@@ -761,7 +748,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               <button type="button" className="be-unit-btn be-unit-btn--gold" onClick={() => openModal(curUnit.id)}>
                 Enquire Now
               </button>
-              <button type="button" className="be-unit-btn be-unit-btn--ghost" onClick={() => openModal(curUnit.id)}>
+              <button type="button" className="be-unit-btn be-unit-btn--ghost" onClick={() => setShow360(true)}>
                 Step inside &middot; 360&deg;
               </button>
               <a
@@ -775,6 +762,36 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           </div>
         )}
       </aside>
+      )}
+
+      {show360 && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/88 p-4 backdrop-blur-md"
+          onClick={() => setShow360(false)}
+        >
+          <div
+            className="relative w-full max-w-5xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShow360(false)}
+              className="absolute -top-12 right-0 rounded-full border border-white/15 bg-black/50 px-4 py-2 text-xs font-semibold tracking-wider text-[#e6cd84] uppercase backdrop-blur-md transition hover:border-[#d8b65a]/50 hover:text-[#d8b65a]"
+              style={{ fontFamily: "var(--sans)" }}
+            >
+              Close
+            </button>
+            {curUnit && (
+              <p
+                className="absolute -top-12 left-0 text-sm text-white/55"
+                style={{ fontFamily: "var(--sans)" }}
+              >
+                {curUnit.label} &middot; {block}
+              </p>
+            )}
+            <Video360 src={VIDEO_360_URL} />
+          </div>
+        </div>
       )}
 
       {modal && (

@@ -6,3 +6,7 @@ build
 *.log
 .env*
 .vercel
+public/oasis-360.mp4
+public/rev/
+oasis-360.mp4
+360-source/

@@ -21,6 +21,7 @@ export default function ExplorerPremiumChrome({
   onPickFloor,
   onHoverBlock,
   onClearBlock,
+  filtersInteractive = true,
 }) {
   const router = useRouter();
   const unitPanelRef = useRef(null);
@@ -38,6 +39,8 @@ export default function ExplorerPremiumChrome({
     () => (block ? [block.replace(/^Block\s+/i, "")] : []),
     [block]
   );
+  const blockRef = useRef(block);
+  blockRef.current = block;
 
   const curBlock = block ? BLOCKS.find((b) => b.name === block) : null;
   const blockFloors = curBlock ? FLOORS.filter((f) => curBlock.floors.includes(f.name)) : [];
@@ -45,18 +48,23 @@ export default function ExplorerPremiumChrome({
   const curUnit = unit ? units[unit] : null;
 
   const handleFilterChange = useCallback((filtered) => {
-    setMatchingIds(new Set(filtered.map((u) => u.id)));
+    const ids = filtered.map((u) => u.id);
+    setMatchingIds((prev) => {
+      if (prev.size === ids.length && ids.every((id) => prev.has(id))) return prev;
+      return new Set(ids);
+    });
   }, []);
 
   const handleBlockChange = useCallback(
     (blocks) => {
       if (blocks.length === 1) {
-        onPickBlock?.(`Block ${blocks[0]}`);
+        const name = `Block ${blocks[0]}`;
+        if (blockRef.current !== name) onPickBlock?.(name);
         return;
       }
-      if (blocks.length === 0 && block) onClearBlock?.();
+      if (blocks.length === 0 && blockRef.current) onClearBlock?.();
     },
-    [block, onPickBlock, onClearBlock]
+    [onPickBlock, onClearBlock]
   );
 
   const pickUnit = (id) => {
@@ -95,9 +103,10 @@ export default function ExplorerPremiumChrome({
       <div className="be-filter-column">
         <FilterPanel
           units={panelUnits}
-          onChange={handleFilterChange}
-          onBlockChange={handleBlockChange}
-          selectedBlocks={selectedBlocks}
+          interactive={filtersInteractive}
+          onChange={filtersInteractive ? handleFilterChange : undefined}
+          onBlockChange={filtersInteractive ? handleBlockChange : undefined}
+          selectedBlocks={filtersInteractive ? selectedBlocks : []}
         />
       </div>
 

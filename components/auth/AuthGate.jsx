@@ -50,9 +50,9 @@ export default function AuthGate({ children, deferUntilWelcome = true }) {
     if (showWelcome) prefetchTourVideos();
   }, [showWelcome]);
 
-  const handleLogin = ({ name, coupon }) => {
+  const handleLogin = useCallback(({ name, coupon }) => {
     if (!coupon) {
-      setLoginError("Please enter your coupon code to continue.");
+      setLoginError("Please enter your invitation code to continue.");
       return;
     }
     setLoginError("");
@@ -60,7 +60,7 @@ export default function AuthGate({ children, deferUntilWelcome = true }) {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setSession(next);
     setShowWelcome(true);
-  };
+  }, []);
 
   const dismissWelcome = () => setShowWelcome(false);
 

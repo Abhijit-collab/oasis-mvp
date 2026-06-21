@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect } from "react";
 import {
   ORBIT_360_URL,
   ORBIT_STEP_CLIPS,
@@ -44,6 +44,8 @@ export default function BuildingExplorer360() {
   const [hoverBlock, setHoverBlock] = useState(null);
   const [hoverFloor, setHoverFloor] = useState(null);
   const [holdResetKey, setHoldResetKey] = useState(0);
+  const blockRef = useRef(null);
+  blockRef.current = block;
   /** null | "out" (fade current) | "wait" (frame swap) | "in" (fade reveal) */
   const [homePhase, setHomePhase] = useState(null);
   const stepRef = useRef(0);
@@ -117,6 +119,7 @@ export default function BuildingExplorer360() {
     setLandAfterPlay(null);
     setPlayToken(0);
     setIsPlaying(false);
+    blockRef.current = null;
     setBlock(null);
     setFloor(null);
     setHoverBlock(null);
@@ -219,25 +222,31 @@ export default function BuildingExplorer360() {
 
   const handleLogout = () => logout?.();
 
-  const pickBlock = (name) => {
+  const pickBlock = useCallback((name) => {
+    if (blockRef.current === name) return;
+    blockRef.current = name;
     setBlock(name);
     setFloor(null);
+    setHoverBlock(null);
     setHoverFloor(null);
-  };
+  }, []);
 
-  const pickFloor = (name) => {
-    setFloor(name || null);
-  };
+  const pickFloor = useCallback((name) => {
+    setFloor((prev) => (prev === name ? prev : name || null));
+  }, []);
 
-  const clearBlock = () => {
+  const clearBlock = useCallback(() => {
+    if (!blockRef.current) return;
+    blockRef.current = null;
     setBlock(null);
     setFloor(null);
     setHoverBlock(null);
     setHoverFloor(null);
-  };
+  }, []);
 
   useEffect(() => {
     if (!ORBIT_STEP_ZONES[step]) {
+      blockRef.current = null;
       setBlock(null);
       setFloor(null);
       setHoverBlock(null);
@@ -272,12 +281,13 @@ export default function BuildingExplorer360() {
   const showZoneOverlay = Boolean(
     zoneConfig && mode === "hold" && !isPlaying && !homeResetting
   );
+  const showZonePicker = Boolean(zoneConfig && !homeResetting && (showZoneOverlay || block));
 
   const zoneHint = showZoneOverlay
     ? !block
       ? "Select a block to begin"
       : !floor
-      ? "Drag floor height, toggle filters, or pick a floor on the building"
+      ? "Open filters or click a floor on the building"
       : "Select a residence from the panel"
     : null;
 
@@ -323,7 +333,7 @@ export default function BuildingExplorer360() {
               onHoldFrameReady={handleHoldFrameReady}
             />
 
-            {showZoneOverlay && !homeResetting && (
+            {showZonePicker && (
               <OrbitZoneOverlay
                 zones={zoneConfig}
                 block={block}
@@ -409,6 +419,7 @@ export default function BuildingExplorer360() {
           onPickFloor={pickFloor}
           onHoverBlock={setHoverBlock}
           onClearBlock={clearBlock}
+          filtersInteractive={false}
         />
         </div>
       </div>

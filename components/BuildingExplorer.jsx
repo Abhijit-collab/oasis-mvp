@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BLOCKS, FLOORS, UNITS, PROJECT, getUnitImages, getUnitBrochureUrl } from "@/data/building";
 import FilterPanel from "@/components/FilterPanel";
@@ -64,6 +64,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
   const [filtersActive, setFiltersActive] = useState(false);
   const unitPanelRef = useRef(null);
+  const blockRef = useRef(block);
+  blockRef.current = block;
 
   useEffect(() => {
     if (VIDEO_360_URL) prefetchVideo(VIDEO_360_URL);
@@ -87,29 +89,41 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     [block]
   );
 
-  const handleFilterChange = (filtered) => {
-    setMatchingIds(new Set(filtered.map((u) => u.id)));
-  };
+  const handleFilterChange = useCallback((filtered) => {
+    const ids = filtered.map((u) => u.id);
+    setMatchingIds((prev) => {
+      if (prev.size === ids.length && ids.every((id) => prev.has(id))) return prev;
+      return new Set(ids);
+    });
+  }, []);
 
-  const pickBlock = (n) => {
+  const pickBlock = useCallback((n) => {
     const b = BLOCKS.find((x) => x.name === n);
-    if (!b?.available) return;
+    if (!b?.available || blockRef.current === n) return;
     setBlock(n);
     setFloor(null);
     setUnit(null);
     setHoverFloor(null);
     setHoverUnit(null);
-  };
+    setFiltersActive(false);
+  }, []);
 
-  const handleBlockChange = (blocks) => {
-    if (blocks.length === 1) pickBlock(`Block ${blocks[0]}`);
-    else if (blocks.length === 0 && block) {
+  const handleBlockChange = useCallback((blocks) => {
+    if (blocks.length === 1) {
+      pickBlock(`Block ${blocks[0]}`);
+      return;
+    }
+    if (blocks.length === 0 && blockRef.current) {
       setBlock(null);
       setFloor(null);
       setUnit(null);
       setFiltersActive(false);
     }
-  };
+  }, [pickBlock]);
+
+  const handleApply = useCallback(() => {
+    setFiltersActive(true);
+  }, []);
 
   const curBlock = block ? BLOCKS.find((b) => b.name === block) : null;
   // Floors that belong to the selected block (falls back to all floors).
@@ -385,8 +399,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
             units={panelUnits}
             onChange={handleFilterChange}
             onBlockChange={handleBlockChange}
-            onActiveChange={(count) => setFiltersActive(count > 0)}
-            onApply={() => setFiltersActive(true)}
+            onApply={handleApply}
+            applyMapBlocksToFilter
             selectedBlocks={selectedBlocks}
           />
         </div>

@@ -19,19 +19,24 @@ const STATUS_OPTIONS = [
   { val: "sold", label: "Sold", cls: "s-sold", dot: "sold" },
 ];
 
-function Chip({ on, cls = "", dot, children, onClick }) {
+function Chip({ on, cls = "", dot, children, onClick, disabled = false }) {
   return (
     <span
       role="button"
-      tabIndex={0}
-      className={`fp-chip ${cls} ${on ? "on" : ""}`}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
+      className={`fp-chip ${cls} ${on && !disabled ? "on" : ""}${disabled ? " fp-chip--disabled" : ""}`}
+      onClick={disabled ? undefined : onClick}
+      onKeyDown={
+        disabled
+          ? undefined
+          : (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+      }
     >
       {dot && <span className={`fp-dot ${dot}`} aria-hidden />}
       <span className="fp-chip-text">{children}</span>
@@ -41,6 +46,8 @@ function Chip({ on, cls = "", dot, children, onClick }) {
 
 /**
  * Animated glassmorphic filter panel for the Oasis explorer.
+ * `selectedBlocks` reflects map selection (chip highlight only).
+ * `userBlocks` holds filter-panel toggles that affect the unit query.
  */
 export default function FilterPanel({
   units = [],
@@ -49,6 +56,8 @@ export default function FilterPanel({
   onBlockChange,
   onActiveChange,
   selectedBlocks = [],
+  applyMapBlocksToFilter = false,
+  interactive = true,
   className = "",
 }) {
   const bhkOptions = useMemo(
@@ -74,24 +83,56 @@ export default function FilterPanel({
     return { min: Math.min(...xs), max: Math.max(...xs) };
   }, [units]);
 
+  const blockKey = selectedBlocks.join("\0");
+  const mapBlocks = useMemo(
+    () => new Set(selectedBlocks.filter(Boolean)),
+    [blockKey]
+  );
+
   const [open, setOpen] = useState(true);
   const [bhk, setBhk] = useState(() => new Set());
   const [status, setStatus] = useState(() => new Set());
-  const [block, setBlock] = useState(() => new Set());
+  const [userBlocks, setUserBlocks] = useState(() => new Set());
   const [facing, setFacing] = useState(() => new Set());
   const [minSqft, setMinSqft] = useState(sqftBounds.min);
   const [minFloor, setMinFloor] = useState(floorBounds.min);
+
+  const userBlockKey = [...userBlocks].sort().join("\0");
+  const queryBlocks = useMemo(() => {
+    if (!applyMapBlocksToFilter) return userBlocks;
+    const next = new Set(userBlocks);
+    mapBlocks.forEach((b) => next.add(b));
+    return next;
+  }, [applyMapBlocksToFilter, blockKey, userBlockKey, userBlocks, mapBlocks]);
 
   useEffect(() => setMinSqft(sqftBounds.min), [sqftBounds.min]);
   useEffect(() => setMinFloor(floorBounds.min), [floorBounds.min]);
 
   useEffect(() => {
-    const next = new Set(selectedBlocks.filter(Boolean));
-    setBlock((prev) => {
-      if (prev.size === next.size && [...prev].every((b) => next.has(b))) return prev;
-      return next;
-    });
-  }, [selectedBlocks]);
+    if (!interactive || blockKey === "") setUserBlocks(new Set());
+  }, [blockKey, interactive]);
+
+  const isBlockChipOn = (val) => mapBlocks.has(val) || userBlocks.has(val);
+
+  const toggleBlock = (val) => {
+    if (mapBlocks.has(val)) {
+      onBlockChange?.(selectedBlocks.filter((b) => b !== val));
+      if (userBlocks.has(val)) {
+        setUserBlocks((prev) => {
+          const next = new Set(prev);
+          next.delete(val);
+          return next;
+        });
+      }
+      return;
+    }
+
+    const next = new Set(userBlocks);
+    if (next.has(val)) next.delete(val);
+    else next.add(val);
+    setUserBlocks(next);
+    onBlockChange?.([...next]);
+  };
 
   const toggleIn = (setFn) => (val) =>
     setFn((prev) => {
@@ -107,32 +148,59 @@ export default function FilterPanel({
         (u) =>
           (bhk.size === 0 || bhk.has(String(u.bhk))) &&
           (status.size === 0 || status.has(u.status)) &&
-          (block.size === 0 || block.has(u.block)) &&
+          (queryBlocks.size === 0 || queryBlocks.has(u.block)) &&
           (facing.size === 0 || facing.has(u.facing)) &&
           (u.sqft == null || u.sqft >= minSqft) &&
           (u.floor == null || u.floor >= minFloor)
       ),
-    [units, bhk, status, block, facing, minSqft, minFloor]
+    [units, bhk, status, queryBlocks, facing, minSqft, minFloor]
   );
 
+  const activeCount =
+    bhk.size +
+    status.size +
+    queryBlocks.size +
+    facing.size +
+    (minSqft > sqftBounds.min ? 1 : 0) +
+    (minFloor > floorBounds.min ? 1 : 0);
+
   const onChangeRef = useRef(onChange);
+  const lastFilteredKeyRef = useRef("");
+
   useEffect(() => {
     onChangeRef.current = onChange;
   });
-  useEffect(() => {
-    onChangeRef.current?.(filtered);
-  }, [filtered]);
 
   useEffect(() => {
-    onBlockChange?.([...block]);
-  }, [block, onBlockChange]);
+    if (!interactive) return;
+    const key = filtered.map((u) => u.id).join("\0");
+    if (key === lastFilteredKeyRef.current) return;
+    lastFilteredKeyRef.current = key;
+    onChangeRef.current?.(filtered);
+  }, [filtered, interactive]);
+
+  const onActiveChangeRef = useRef(onActiveChange);
+  const lastActiveCountRef = useRef(activeCount);
+
+  useEffect(() => {
+    onActiveChangeRef.current = onActiveChange;
+  });
+
+  useEffect(() => {
+    if (!interactive) return;
+    if (activeCount === lastActiveCountRef.current) return;
+    lastActiveCountRef.current = activeCount;
+    onActiveChangeRef.current?.(activeCount);
+  }, [activeCount, interactive]);
 
   const [display, setDisplay] = useState(filtered.length);
   const displayRef = useRef(filtered.length);
+
   useEffect(() => {
     let raf;
     const from = displayRef.current;
     const to = filtered.length;
+    if (from === to) return undefined;
     const start = performance.now();
     const dur = 260;
     const tick = (now) => {
@@ -146,32 +214,24 @@ export default function FilterPanel({
     return () => cancelAnimationFrame(raf);
   }, [filtered.length]);
 
-  const activeCount =
-    bhk.size +
-    status.size +
-    block.size +
-    facing.size +
-    (minSqft > sqftBounds.min ? 1 : 0) +
-    (minFloor > floorBounds.min ? 1 : 0);
-
-  useEffect(() => {
-    onActiveChange?.(activeCount);
-  }, [activeCount, onActiveChange]);
-
   const reset = () => {
+    if (!interactive) return;
     setBhk(new Set());
     setStatus(new Set());
-    setBlock(new Set());
+    setUserBlocks(new Set());
     setFacing(new Set());
     setMinSqft(sqftBounds.min);
     setMinFloor(floorBounds.min);
+    onBlockChange?.([]);
   };
+
+  const noop = () => {};
 
   const sqftPct = ((minSqft - sqftBounds.min) / Math.max(1, sqftBounds.max - sqftBounds.min)) * 100;
   const floorPct = ((minFloor - floorBounds.min) / Math.max(1, floorBounds.max - floorBounds.min)) * 100;
 
   return (
-    <div className={`fp ${className}`.trim()}>
+    <div className={`fp ${interactive ? "" : "fp--static"} ${className}`.trim()}>
       <button
         type="button"
         className={`fp-toggle ${open ? "open" : ""}`}
@@ -184,119 +244,153 @@ export default function FilterPanel({
           <polyline points="10 18 14 18" />
         </svg>
         <span>Filters</span>
-        <span className={`fp-toggle-count ${activeCount > 0 ? "show" : ""}`}>{activeCount}</span>
+        <span className={`fp-toggle-count ${interactive && activeCount > 0 ? "show" : ""}`}>
+          {activeCount}
+        </span>
       </button>
 
       <section className={`fp-panel ${open ? "open" : ""}`} aria-hidden={!open}>
         <div className="fp-panel-inner">
           <div className="fp-panel-head">
-            <span className="fp-panel-title">Refine your search</span>
-            <button type="button" className="fp-reset" onClick={reset}>
+            <div className="fp-panel-head-left">
+              <button
+                type="button"
+                className="fp-panel-back"
+                onClick={() => setOpen(false)}
+                aria-label="Close filters"
+              >
+                &larr;
+              </button>
+              <span className="fp-panel-title">Refine your search</span>
+            </div>
+            <button type="button" className="fp-reset" onClick={reset} disabled={!interactive}>
               Reset all
             </button>
           </div>
 
           <div className="fp-panel-body">
-          <div className="fp-group">
-            <label className="fp-lbl">Configuration</label>
-            <div className="fp-chips">
-              {bhkOptions.map((v) => (
-                <Chip key={v} on={bhk.has(v)} onClick={() => toggleIn(setBhk)(v)}>
-                  {v} BHK
-                </Chip>
-              ))}
+            <div className="fp-group">
+              <label className="fp-lbl">Configuration</label>
+              <div className="fp-chips">
+                {bhkOptions.map((v) => (
+                  <Chip
+                    key={v}
+                    disabled={!interactive}
+                    on={interactive ? bhk.has(v) : false}
+                    onClick={interactive ? () => toggleIn(setBhk)(v) : noop}
+                  >
+                    {v} BHK
+                  </Chip>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="fp-group">
-            <label className="fp-lbl">Units</label>
-            <div className="fp-chips">
-              <Chip on={status.size === 0} onClick={() => setStatus(new Set())}>
-                All
-              </Chip>
-              {STATUS_OPTIONS.map((s) => (
+            <div className="fp-group">
+              <label className="fp-lbl">Units</label>
+              <div className="fp-chips">
                 <Chip
-                  key={s.val}
-                  cls={s.cls}
-                  dot={s.dot}
-                  on={status.has(s.val)}
-                  onClick={() => toggleIn(setStatus)(s.val)}
+                  disabled={!interactive}
+                  on={interactive && status.size === 0}
+                  onClick={interactive ? () => setStatus(new Set()) : noop}
                 >
-                  {s.label}
+                  All
                 </Chip>
-              ))}
+                {STATUS_OPTIONS.map((s) => (
+                  <Chip
+                    key={s.val}
+                    disabled={!interactive}
+                    cls={s.cls}
+                    dot={s.dot}
+                    on={interactive ? status.has(s.val) : false}
+                    onClick={interactive ? () => toggleIn(setStatus)(s.val) : noop}
+                  >
+                    {s.label}
+                  </Chip>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="fp-group">
-            <label className="fp-lbl">Block</label>
-            <div className="fp-chips">
-              {blockOptions.map((v) => (
-                <Chip key={v} on={block.has(v)} onClick={() => toggleIn(setBlock)(v)}>
-                  Block {v}
-                </Chip>
-              ))}
+            <div className="fp-group">
+              <label className="fp-lbl">Block</label>
+              <div className="fp-chips">
+                {blockOptions.map((v) => (
+                  <Chip
+                    key={v}
+                    disabled={!interactive}
+                    on={interactive ? isBlockChipOn(v) : false}
+                    onClick={interactive ? () => toggleBlock(v) : noop}
+                  >
+                    Block {v}
+                  </Chip>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="fp-group">
-            <label className="fp-lbl">Facing</label>
-            <div className="fp-chips">
-              {facingOptions.map((v) => (
-                <Chip key={v} on={facing.has(v)} onClick={() => toggleIn(setFacing)(v)}>
-                  {FACING_LABELS[v] || v}
-                </Chip>
-              ))}
+            <div className="fp-group">
+              <label className="fp-lbl">Facing</label>
+              <div className="fp-chips">
+                {facingOptions.map((v) => (
+                  <Chip
+                    key={v}
+                    disabled={!interactive}
+                    on={interactive ? facing.has(v) : false}
+                    onClick={interactive ? () => toggleIn(setFacing)(v) : noop}
+                  >
+                    {FACING_LABELS[v] || v}
+                  </Chip>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="fp-group fp-group--slider">
-            <label className="fp-lbl">Carpet area</label>
-            <div className="fp-slider-row">
-              <span className="fp-hint">Minimum</span>
-              <span className="fp-val">
-                {minSqft <= sqftBounds.min ? (
-                  "Any"
-                ) : (
-                  <>
-                    {minSqft.toLocaleString("en-IN")}+<small> sq.ft</small>
-                  </>
-                )}
-              </span>
+            <div className="fp-group fp-group--slider">
+              <label className="fp-lbl">Carpet area</label>
+              <div className="fp-slider-row">
+                <span className="fp-hint">Minimum</span>
+                <span className="fp-val">
+                  {minSqft <= sqftBounds.min ? (
+                    "Any"
+                  ) : (
+                    <>
+                      {minSqft.toLocaleString("en-IN")}+<small> sq.ft</small>
+                    </>
+                  )}
+                </span>
+              </div>
+              <div className="fp-slider-track">
+                <input
+                  type="range"
+                  min={sqftBounds.min}
+                  max={sqftBounds.max}
+                  step={50}
+                  value={minSqft}
+                  disabled={!interactive}
+                  style={{ "--fill": `${sqftPct}%` }}
+                  onChange={(e) => interactive && setMinSqft(+e.target.value)}
+                />
+              </div>
             </div>
-            <div className="fp-slider-track">
-              <input
-                type="range"
-                min={sqftBounds.min}
-                max={sqftBounds.max}
-                step={50}
-                value={minSqft}
-                style={{ "--fill": `${sqftPct}%` }}
-                onChange={(e) => setMinSqft(+e.target.value)}
-              />
-            </div>
-          </div>
 
-          <div className="fp-group fp-group--slider">
-            <label className="fp-lbl">Floor</label>
-            <div className="fp-slider-row">
-              <span className="fp-hint">Minimum</span>
-              <span className="fp-val">
-                {minFloor <= floorBounds.min ? "Any" : `Floor ${minFloor}+`}
-              </span>
+            <div className="fp-group fp-group--slider">
+              <label className="fp-lbl">Floor</label>
+              <div className="fp-slider-row">
+                <span className="fp-hint">Minimum</span>
+                <span className="fp-val">
+                  {minFloor <= floorBounds.min ? "Any" : `Floor ${minFloor}+`}
+                </span>
+              </div>
+              <div className="fp-slider-track">
+                <input
+                  type="range"
+                  min={floorBounds.min}
+                  max={floorBounds.max}
+                  step={1}
+                  value={minFloor}
+                  disabled={!interactive}
+                  style={{ "--fill": `${floorPct}%` }}
+                  onChange={(e) => interactive && setMinFloor(+e.target.value)}
+                />
+              </div>
             </div>
-            <div className="fp-slider-track">
-              <input
-                type="range"
-                min={floorBounds.min}
-                max={floorBounds.max}
-                step={1}
-                value={minFloor}
-                style={{ "--fill": `${floorPct}%` }}
-                onChange={(e) => setMinFloor(+e.target.value)}
-              />
-            </div>
-          </div>
           </div>
 
           <div className="fp-panel-foot">
@@ -307,7 +401,8 @@ export default function FilterPanel({
             <button
               type="button"
               className="fp-apply"
-              onClick={() => onApply?.(filtered)}
+              disabled={!interactive}
+              onClick={() => interactive && onApply?.(filtered)}
             >
               Show homes
             </button>

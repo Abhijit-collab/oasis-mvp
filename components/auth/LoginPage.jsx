@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
 import { preloadEntranceImage } from "@/lib/tourAssetPreload";
@@ -13,10 +13,17 @@ export default function LoginPage({ onSubmit, error }) {
     preloadEntranceImage();
   }, []);
 
+  const submitLogin = useCallback(() => {
+    onSubmit({ name: name.trim(), coupon: coupon.trim() });
+  }, [name, coupon, onSubmit]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({ name: name.trim(), coupon: coupon.trim() });
+    submitLogin();
   };
+
+  // Prevent focused inputs from stealing the first tap (iOS / mobile keyboard blur).
+  const keepTapOnButton = (e) => e.preventDefault();
 
   return (
     <div className="login-page">
@@ -48,7 +55,7 @@ export default function LoginPage({ onSubmit, error }) {
 
           <PremiumPerks compact />
 
-          <form className="login-form" onSubmit={handleSubmit}>
+          <form className="login-form" onSubmit={handleSubmit} noValidate>
             <div className="login-field">
               <label htmlFor="login-name">Your name</label>
               <input
@@ -68,12 +75,11 @@ export default function LoginPage({ onSubmit, error }) {
                 value={coupon}
                 onChange={(e) => setCoupon(e.target.value)}
                 placeholder="e.g. OASIS-VIP"
-                required
                 autoComplete="off"
               />
             </div>
             {error && <p className="login-error">{error}</p>}
-            <button type="submit" className="login-btn">
+            <button type="submit" className="login-btn" onMouseDown={keepTapOnButton}>
               Unlock premium access
             </button>
           </form>

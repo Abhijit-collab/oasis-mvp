@@ -5,6 +5,7 @@ import LoginPage from "@/components/auth/LoginPage";
 import WelcomeModal from "@/components/auth/WelcomeModal";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import { AuthContext } from "@/components/auth/AuthContext";
+import { preloadEntranceImage, prefetchTourVideos } from "@/lib/tourAssetPreload";
 
 const STORAGE_KEY = "oasis_access";
 const IDLE_TIMEOUT_MS = 60 * 1000;
@@ -16,7 +17,7 @@ function isPageReload() {
   return nav?.type === "reload" || performance.navigation?.type === 1;
 }
 
-export default function AuthGate({ children, deferUntilWelcome = false }) {
+export default function AuthGate({ children, deferUntilWelcome = true }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -40,6 +41,14 @@ export default function AuthGate({ children, deferUntilWelcome = false }) {
     }
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    preloadEntranceImage();
+  }, []);
+
+  useEffect(() => {
+    if (showWelcome) prefetchTourVideos();
+  }, [showWelcome]);
 
   const handleLogin = ({ name, coupon }) => {
     if (!coupon) {

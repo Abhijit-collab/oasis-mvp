@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BLOCKS, FLOORS, UNITS, getUnitBrochureUrl, getUnitImages } from "@/data/building";
-import FloorSlider from "@/components/FloorSlider";
+import FilterPanel from "@/components/FilterPanel";
 import UnitGallery from "@/components/UnitGallery";
+import { buildFilterPanelUnits } from "@/lib/filterPanelUnits";
 
-const defaultUnitFilter = () => ({ all: false, available: false, sold: false });
 const isUnitSold = (u) => u.status === "sold";
-const isUnitFilterActive = (filter) => filter.all || filter.available || filter.sold;
 
 /**
  * Premium filter column, unit panel, and enquiry modal — shared with the main explorer.
@@ -31,102 +30,34 @@ export default function ExplorerPremiumChrome({
   const [modal, setModal] = useState(null);
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
-  const [sqftSlider, setSqftSlider] = useState([0]);
-  const [unitFilter, setUnitFilter] = useState(defaultUnitFilter);
+  const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
 
   const units = UNITS;
+  const panelUnits = useMemo(() => buildFilterPanelUnits(units), [units]);
+  const selectedBlocks = useMemo(
+    () => (block ? [block.replace(/^Block\s+/i, "")] : []),
+    [block]
+  );
+
   const curBlock = block ? BLOCKS.find((b) => b.name === block) : null;
   const blockFloors = curBlock ? FLOORS.filter((f) => curBlock.floors.includes(f.name)) : [];
   const curFloor = floor ? FLOORS.find((f) => f.name === floor) : null;
   const curUnit = unit ? units[unit] : null;
 
-  const floorLevel = (name) => parseInt(name.replace(/\D/g, ""), 10) || 0;
-  const maxFloorLevel = blockFloors.length
-    ? Math.max(...blockFloors.map((f) => floorLevel(f.name)))
-    : 4;
-  const floorSliderValue = [floor ? floorLevel(floor) : 0];
+  const handleFilterChange = useCallback((filtered) => {
+    setMatchingIds(new Set(filtered.map((u) => u.id)));
+  }, []);
 
-  const blockSqftOptions = useMemo(() => {
-    const ids = block ? blockFloors.flatMap((f) => f.units) : [];
-    return [...new Set(ids.map((id) => units[id].area))].sort((a, b) => a - b);
-  }, [block, blockFloors, units]);
-
-  const sqftFilter = sqftSlider[0] > 0 ? blockSqftOptions[sqftSlider[0] - 1] : null;
-  const sqftSliderMax = blockSqftOptions.length;
-
-  const matchesUnitFilters = (id, filter, sqft) => {
-    if (sqft !== null && units[id].area !== sqft) return false;
-    if (filter.all) return true;
-    const sold = isUnitSold(units[id]);
-    const statusFilter = filter.available || filter.sold;
-    if (!statusFilter) return true;
-    return sold ? filter.sold : filter.available;
-  };
-
-  const hasActiveFilters =
-    floor !== null || sqftSlider[0] > 0 || isUnitFilterActive(unitFilter);
-
-  const applyFloorSlider = (value) => {
-    const level = value[0];
-    if (level === 0) {
-      onPickFloor?.(null);
-      setUnit(null);
-      setHoverUnit(null);
-      return;
-    }
-    const match = blockFloors.find((f) => floorLevel(f.name) === level);
-    if (match) {
-      onPickFloor?.(match.name);
-      setUnit(null);
-      setHoverUnit(null);
-    }
-  };
-
-  const applySqftSlider = (value) => {
-    setSqftSlider(value);
-    setUnit(null);
-    setHoverUnit(null);
-    if (value[0] > 0 || isUnitFilterActive(unitFilter)) {
-      setUnitFilter(defaultUnitFilter());
-    }
-  };
-
-  const onSqftSliderInteract = () => {
-    if (sqftSlider[0] === 0 && !isUnitFilterActive(unitFilter)) return;
-    if (sqftSlider[0] > 0) return;
-    setUnitFilter(defaultUnitFilter());
-    setUnit(null);
-    setHoverUnit(null);
-  };
-
-  const toggleUnitFilter = (key) => {
-    setUnitFilter((prev) => {
-      if (key === "all") {
-        return prev.all ? defaultUnitFilter() : { all: true, available: false, sold: false };
+  const handleBlockChange = useCallback(
+    (blocks) => {
+      if (blocks.length === 1) {
+        onPickBlock?.(`Block ${blocks[0]}`);
+        return;
       }
-      return { ...prev, all: false, [key]: !prev[key] };
-    });
-    setUnit(null);
-    setHoverUnit(null);
-  };
-
-  const resetFilters = () => {
-    onPickFloor?.(null);
-    setUnit(null);
-    setHoverUnit(null);
-    setSqftSlider([0]);
-    setUnitFilter(defaultUnitFilter());
-  };
-
-  const pickBlock = (name) => {
-    const b = BLOCKS.find((x) => x.name === name);
-    if (!b?.available) return;
-    onPickBlock?.(name);
-    setSqftSlider([0]);
-    setUnit(null);
-    setHoverUnit(null);
-    setUnitFilter(defaultUnitFilter());
-  };
+      if (blocks.length === 0 && block) onClearBlock?.();
+    },
+    [block, onPickBlock, onClearBlock]
+  );
 
   const pickUnit = (id) => {
     if (isUnitSold(units[id])) return;
@@ -154,133 +85,20 @@ export default function ExplorerPremiumChrome({
 
   const filteredFloorUnits = useMemo(() => {
     if (!curFloor) return [];
-    return curFloor.units.filter((id) => matchesUnitFilters(id, unitFilter, sqftFilter));
-  }, [curFloor, unitFilter, sqftFilter]);
+    return curFloor.units.filter((id) => matchingIds.has(id));
+  }, [curFloor, matchingIds]);
 
   if (!visible) return null;
-
-  const blockPicker = (
-    <div className="be-block-picker">
-      <span className="be-block-picker-label">Block</span>
-      <div className="be-block-picker-row">
-        {BLOCKS.map((b) => {
-          const available = b.available !== false;
-          const active = block === b.name;
-          const hot = hoverBlock === b.name;
-          return (
-            <button
-              key={b.name}
-              type="button"
-              className={
-                "be-block-btn" +
-                (active ? " on" : "") +
-                (hot && !active ? " hov" : "") +
-                (!available ? " disabled" : "")
-              }
-              disabled={!available}
-              onMouseEnter={() => available && onHoverBlock?.(b.name)}
-              onMouseLeave={() => onHoverBlock?.(null)}
-              onClick={() => pickBlock(b.name)}
-            >
-              {b.name.replace("Block ", "")}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  if (!block) {
-    return <div className="be-filter-column be-filter-column--initial">{blockPicker}</div>;
-  }
 
   return (
     <>
       <div className="be-filter-column">
-        <div className="be-filter-stack be-filter-stack--expanded">
-          <div className="be-filter-extra">
-            <div className="be-unit-filter">
-              <span className="be-unit-filter-label">Show units</span>
-              <div className="be-unit-filter-row">
-                <button
-                  type="button"
-                  className={"be-unit-filter-btn all" + (unitFilter.all ? " on" : "")}
-                  onClick={() => toggleUnitFilter("all")}
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  className={"be-unit-filter-btn avail" + (unitFilter.available ? " on" : "")}
-                  onClick={() => toggleUnitFilter("available")}
-                >
-                  Available
-                </button>
-                <button
-                  type="button"
-                  className={"be-unit-filter-btn sold" + (unitFilter.sold ? " on" : "")}
-                  onClick={() => toggleUnitFilter("sold")}
-                >
-                  Sold
-                </button>
-              </div>
-            </div>
-
-            <div className="be-floor-slider">
-              <span className="be-floor-slider-label">Floor height{floor ? ` · ${floor}` : ""}</span>
-              <div className="be-floor-slider-row">
-                <span className="be-floor-slider-mark">All</span>
-                <FloorSlider
-                  value={floorSliderValue}
-                  onValueChange={applyFloorSlider}
-                  min={0}
-                  max={maxFloorLevel}
-                  ariaLabel={floor ? floor : "All floors"}
-                />
-                <span className="be-floor-slider-mark">{maxFloorLevel}</span>
-              </div>
-            </div>
-
-            {sqftSliderMax > 0 && (
-              <div className="be-sqft-slider">
-                <span className="be-sqft-slider-label">
-                  Sqft{sqftFilter !== null ? ` · ${sqftFilter.toLocaleString("en-IN")}` : ""}
-                </span>
-                <div className="be-sqft-slider-row">
-                  <span className="be-sqft-slider-mark">All</span>
-                  <FloorSlider
-                    value={sqftSlider}
-                    onValueChange={applySqftSlider}
-                    onInteractStart={onSqftSliderInteract}
-                    min={0}
-                    max={sqftSliderMax}
-                    ariaLabel="Select sqft"
-                  />
-                  <span className="be-sqft-slider-mark be-sqft-slider-mark--max">
-                    {blockSqftOptions[sqftSliderMax - 1]?.toLocaleString("en-IN") ?? "—"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className={"be-filter-reset-btn" + (hasActiveFilters ? " live" : "")}
-          onClick={resetFilters}
-          disabled={!hasActiveFilters}
-          aria-label="Reset filters"
-        >
-          <span className="be-filter-reset-icon" aria-hidden="true">
-            &#8635;
-          </span>
-          <span className="be-filter-reset-copy">
-            <span className="be-filter-reset-title">Clear filters</span>
-            <span className="be-filter-reset-sub">Restore default view</span>
-          </span>
-          <span className="be-filter-reset-glow" aria-hidden="true" />
-        </button>
+        <FilterPanel
+          units={panelUnits}
+          onChange={handleFilterChange}
+          onBlockChange={handleBlockChange}
+          selectedBlocks={selectedBlocks}
+        />
       </div>
 
       {floor && !unit && curFloor && (

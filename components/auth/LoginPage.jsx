@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
+import { preloadEntranceImage } from "@/lib/tourAssetPreload";
 
 export default function LoginPage({ onSubmit, error }) {
   const [name, setName] = useState("");
   const [coupon, setCoupon] = useState("");
+
+  useEffect(() => {
+    preloadEntranceImage();
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();

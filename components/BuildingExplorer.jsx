@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BLOCKS, FLOORS, UNITS, PROJECT, getUnitImages, getUnitBrochureUrl } from "@/data/building";
-import FloorSlider from "@/components/FloorSlider";
+import FilterPanel from "@/components/FilterPanel";
 import DownloadMenu from "@/components/DownloadMenu";
 import UnitGallery from "@/components/UnitGallery";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -11,22 +11,11 @@ import PremiumBadge from "@/components/PremiumBadge";
 import Video360 from "@/components/Video360";
 import { VIDEO_360_URL } from "@/data/assets";
 import { prefetchVideo } from "@/hooks/usePreloadVideos";
+import { buildFilterPanelUnits } from "@/lib/filterPanelUnits";
 
 const pts = (a) => a.map((p) => p.join(",")).join(" ");
 
 const isUnitSold = (u) => u.status === "sold";
-const defaultUnitFilter = () => ({ all: false, available: false, sold: false });
-
-const matchesUnitFilters = (id, units, filter, sqft) => {
-  if (sqft !== null && units[id].area !== sqft) return false;
-  if (filter.all) return true;
-  const sold = isUnitSold(units[id]);
-  const statusFilter = filter.available || filter.sold;
-  if (!statusFilter) return true;
-  return sold ? filter.sold : filter.available;
-};
-
-const isUnitFilterActive = (filter) => filter.all || filter.available || filter.sold;
 
 // Anchor hover cards on the polygon roofline at horizontal center.
 const anchorAbove = (points) => {
@@ -72,35 +61,13 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const [sent, setSent] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
-  const [sqftSlider, setSqftSlider] = useState([0]);
-  const [unitFilter, setUnitFilter] = useState(defaultUnitFilter);
+  const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
+  const [filtersActive, setFiltersActive] = useState(false);
   const unitPanelRef = useRef(null);
 
   useEffect(() => {
     if (VIDEO_360_URL) prefetchVideo(VIDEO_360_URL);
   }, []);
-
-  const applySqftSlider = (value) => {
-    const statusFilterActive = isUnitFilterActive(unitFilter);
-    const changed = value[0] !== sqftSlider[0];
-    setSqftSlider(value);
-    if (!block) return;
-    setFloor(null);
-    setUnit(null);
-    setHoverUnit(null);
-    setHoverFloor(null);
-    if (statusFilterActive || changed) setUnitFilter(defaultUnitFilter());
-  };
-
-  const onSqftSliderInteract = () => {
-    if (sqftSlider[0] === 0 && !isUnitFilterActive(unitFilter)) return;
-    if (sqftSlider[0] > 0) return;
-    setUnitFilter(defaultUnitFilter());
-    setFloor(null);
-    setUnit(null);
-    setHoverUnit(null);
-    setHoverFloor(null);
-  };
 
   const units = useMemo(() => {
     if (!Array.isArray(liveUnits) || liveUnits.length === 0) return UNITS;
@@ -114,6 +81,36 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     return merged;
   }, [liveUnits]);
 
+  const panelUnits = useMemo(() => buildFilterPanelUnits(units), [units]);
+  const selectedBlocks = useMemo(
+    () => (block ? [block.replace(/^Block\s+/i, "")] : []),
+    [block]
+  );
+
+  const handleFilterChange = (filtered) => {
+    setMatchingIds(new Set(filtered.map((u) => u.id)));
+  };
+
+  const pickBlock = (n) => {
+    const b = BLOCKS.find((x) => x.name === n);
+    if (!b?.available) return;
+    setBlock(n);
+    setFloor(null);
+    setUnit(null);
+    setHoverFloor(null);
+    setHoverUnit(null);
+  };
+
+  const handleBlockChange = (blocks) => {
+    if (blocks.length === 1) pickBlock(`Block ${blocks[0]}`);
+    else if (blocks.length === 0 && block) {
+      setBlock(null);
+      setFloor(null);
+      setUnit(null);
+      setFiltersActive(false);
+    }
+  };
+
   const curBlock = block ? BLOCKS.find((b) => b.name === block) : null;
   // Floors that belong to the selected block (falls back to all floors).
   const blockFloors = curBlock
@@ -121,31 +118,6 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     : FLOORS;
   const curFloor = floor ? FLOORS.find((f) => f.name === floor) : null;
   const curUnit = unit ? units[unit] : null;
-  const floorLevel = (name) => parseInt(name.replace(/\D/g, ""), 10) || 0;
-  const maxFloorLevel = useMemo(
-    () => (blockFloors.length ? Math.max(...blockFloors.map((f) => floorLevel(f.name))) : 4),
-    [blockFloors]
-  );
-
-  const floorSliderValue = useMemo(() => [floor ? floorLevel(floor) : 0], [floor]);
-
-  const applyFloorSlider = (value) => {
-    const level = value[0];
-    if (level === 0) {
-      setFloor(null);
-      setUnit(null);
-      setHoverUnit(null);
-      setHoverFloor(null);
-      return;
-    }
-    const match = blockFloors.find((f) => floorLevel(f.name) === level);
-    if (match) {
-      setFloor(match.name);
-      setUnit(null);
-      setHoverUnit(null);
-      setHoverFloor(null);
-    }
-  };
 
   const scopedUnitIds = useMemo(() => {
     if (!block) return [];
@@ -153,48 +125,16 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     return blockFloors.flatMap((f) => f.units);
   }, [block, floor, curFloor, blockFloors]);
 
-  const blockSqftOptions = useMemo(() => {
-    const ids = block ? blockFloors.flatMap((f) => f.units) : [];
-    return [...new Set(ids.map((id) => units[id].area))].sort((a, b) => a - b);
-  }, [block, blockFloors, units]);
-
-  const sqftFilter = sqftSlider[0] > 0 ? blockSqftOptions[sqftSlider[0] - 1] : null;
-  const sqftSliderMax = blockSqftOptions.length;
-
-  const showFilteredUnits = isUnitFilterActive(unitFilter) || sqftFilter !== null;
-
-  const unitVisible = (id) => matchesUnitFilters(id, units, unitFilter, sqftFilter);
-
   const visibleUnitIds = useMemo(() => {
     if (!block) return [];
-    if (floor && curFloor) return curFloor.units;
-    if (!showFilteredUnits) return [];
-    return scopedUnitIds.filter((id) => unitVisible(id));
-  }, [block, floor, curFloor, showFilteredUnits, scopedUnitIds, unitFilter, units]);
+    if (floor && curFloor) return curFloor.units.filter((id) => matchingIds.has(id));
+    if (!filtersActive) return [];
+    return scopedUnitIds.filter((id) => matchingIds.has(id));
+  }, [block, floor, curFloor, filtersActive, scopedUnitIds, matchingIds]);
 
   const canShowUnitTip = (id) => {
     if (floor && curFloor) return curFloor.units.includes(id);
-    return unitVisible(id);
-  };
-
-  const toggleUnitFilter = (key) => {
-    setUnitFilter((prev) => {
-      let next;
-      if (key === "all") {
-        next = prev.all ? defaultUnitFilter() : { all: true, available: false, sold: false };
-      } else {
-        next = { ...prev, all: false, [key]: !prev[key] };
-      }
-
-      if (!floor && !isUnitFilterActive(next) && sqftSlider[0] === 0) {
-        setUnit(null);
-        setHoverUnit(null);
-      } else if (!floor && unit && !matchesUnitFilters(unit, units, next, sqftFilter)) {
-        setUnit(null);
-        setHoverUnit(null);
-      }
-      return next;
-    });
+    return matchingIds.has(id);
   };
 
   const reset = () => {
@@ -206,41 +146,17 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setHoverUnit(null);
     setModal(null);
     setSent(false);
-    setSqftSlider([0]);
-    setUnitFilter(defaultUnitFilter());
+    setFiltersActive(false);
+    setMatchingIds(new Set(Object.keys(units)));
   };
 
-  const resetFilters = () => {
-    setFloor(null);
-    setUnit(null);
-    setHoverFloor(null);
-    setHoverUnit(null);
-    setSqftSlider([0]);
-    setUnitFilter(defaultUnitFilter());
-  };
-
-  const hasActiveFilters =
-    floor !== null || sqftSlider[0] > 0 || isUnitFilterActive(unitFilter);
   const back = () => {
     if (unit) setUnit(null);
     else if (floor) setFloor(null);
     else if (block) {
       setBlock(null);
       setFloor(null);
-      setSqftSlider([0]);
-      setUnitFilter(defaultUnitFilter());
     }
-  };
-  const pickBlock = (n) => {
-    const b = BLOCKS.find((x) => x.name === n);
-    if (!b?.available) return;
-    setBlock(n);
-    setSqftSlider([0]);
-    setFloor(null);
-    setUnit(null);
-    setHoverFloor(null);
-    setHoverUnit(null);
-    setUnitFilter(defaultUnitFilter());
   };
   const pickFloor = (n) => {
     setFloor(n);
@@ -326,42 +242,11 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     ? !block
       ? "Select a block to begin"
       : !floor
-      ? "Drag floor height, toggle filters, or click a unit"
+      ? "Open filters or click a floor / unit on the building"
       : !unit
       ? "Select a residence to explore"
       : null
     : null;
-
-  const blockPicker = (
-    <div className="be-block-picker">
-      <span className="be-block-picker-label">Block</span>
-      <div className="be-block-picker-row">
-        {BLOCKS.map((b) => {
-          const available = b.available !== false;
-          const active = block === b.name;
-          const hot = hoverBlock === b.name;
-          return (
-            <button
-              key={b.name}
-              type="button"
-              className={
-                "be-block-btn" +
-                (active ? " on" : "") +
-                (hot && !active ? " hov" : "") +
-                (!available ? " disabled" : "")
-              }
-              disabled={!available}
-              onMouseEnter={() => available && setHoverBlock(b.name)}
-              onMouseLeave={() => setHoverBlock(null)}
-              onClick={() => pickBlock(b.name)}
-            >
-              {b.name.replace("Block ", "")}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 
   return (
     <div className="be-root">
@@ -421,7 +306,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
                   className={
                     "poly unit " +
                     (sold ? "sold" : "avail") +
-                    (unitFilter.all ? " all-on" : "") +
+                    (filtersActive ? " all-on" : "") +
                     (unit === id ? " sel" : "") +
                     (hoverUnit === id ? " hov" : "")
                   }
@@ -495,107 +380,15 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           </div>
         )}
 
-        <div className={"be-filter-column" + (block ? "" : " be-filter-column--initial")}>
-          <div className={"be-filter-stack" + (block ? " be-filter-stack--expanded" : "")}>
-            {block && (
-              <div className="be-filter-extra">
-                <div className="be-unit-filter">
-                  <span className="be-unit-filter-label">Show units</span>
-                  <div className="be-unit-filter-row">
-                    <button
-                      type="button"
-                      className={"be-unit-filter-btn all" + (unitFilter.all ? " on" : "")}
-                      onClick={() => toggleUnitFilter("all")}
-                    >
-                      All
-                    </button>
-                    <button
-                      type="button"
-                      className={"be-unit-filter-btn avail" + (unitFilter.available ? " on" : "")}
-                      onClick={() => toggleUnitFilter("available")}
-                    >
-                      Available
-                    </button>
-                    <button
-                      type="button"
-                      className={"be-unit-filter-btn sold" + (unitFilter.sold ? " on" : "")}
-                      onClick={() => toggleUnitFilter("sold")}
-                    >
-                      Sold
-                    </button>
-                  </div>
-                </div>
-
-                <div className="be-floor-slider">
-                  <span className="be-floor-slider-label">
-                    Floor height{floor ? ` · ${floor}` : ""}
-                  </span>
-                  <div className="be-floor-slider-row">
-                    <span className="be-floor-slider-mark">All</span>
-                    <FloorSlider
-                      value={floorSliderValue}
-                      onValueChange={applyFloorSlider}
-                      min={0}
-                      max={maxFloorLevel}
-                      ariaLabel={floor ? floor : "All floors"}
-                    />
-                    <span className="be-floor-slider-mark">{maxFloorLevel}</span>
-                  </div>
-                </div>
-
-                {sqftSliderMax > 0 && (
-                  <div className="be-sqft-slider">
-                    <span className="be-sqft-slider-label">
-                      Sqft{sqftFilter !== null ? ` · ${sqftFilter.toLocaleString("en-IN")}` : ""}
-                    </span>
-                    <div className="be-sqft-slider-row">
-                      <span className="be-sqft-slider-mark">All</span>
-                      <FloorSlider
-                        value={sqftSlider}
-                        onValueChange={applySqftSlider}
-                        onInteractStart={onSqftSliderInteract}
-                        min={0}
-                        max={sqftSliderMax}
-                        ariaLabel="Select sqft"
-                      />
-                      <span className="be-sqft-slider-mark be-sqft-slider-mark--max">
-                        {blockSqftOptions[sqftSliderMax - 1]?.toLocaleString("en-IN") ?? "—"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {blockPicker}
-          </div>
-
-          {block && (
-            <button
-              type="button"
-              className={"be-filter-reset-btn" + (hasActiveFilters ? " live" : "")}
-              onClick={resetFilters}
-              disabled={!hasActiveFilters}
-              aria-label="Reset filters"
-            >
-              <span className="be-filter-reset-icon" aria-hidden="true">&#8635;</span>
-              <span className="be-filter-reset-copy">
-                <span className="be-filter-reset-title">Clear filters</span>
-                <span className="be-filter-reset-sub">Restore default view</span>
-              </span>
-              <span className="be-filter-reset-glow" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-
-        <div className="be-compass">
-          <svg viewBox="0 0 40 40" fill="none">
-            <circle cx="20" cy="20" r="18" stroke="rgba(255,255,255,.25)" />
-            <path d="M20 7 L24 21 L20 18 L16 21 Z" fill="#d8b65a" />
-            <text x="20" y="34" textAnchor="middle" fill="#f5f1e6" fontSize="9" fontWeight="700">
-              N
-            </text>
-          </svg>
+        <div className="be-filter-column">
+          <FilterPanel
+            units={panelUnits}
+            onChange={handleFilterChange}
+            onBlockChange={handleBlockChange}
+            onActiveChange={(count) => setFiltersActive(count > 0)}
+            onApply={() => setFiltersActive(true)}
+            selectedBlocks={selectedBlocks}
+          />
         </div>
       </div>
 

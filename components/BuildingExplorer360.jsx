@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 import usePreloadVideos, { prefetchVideo } from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
+import RotateButton from "@/components/RotateButton";
 import { ORBIT_STEP_ZONES } from "@/data/orbit360Zones";
 
 const ORBIT_ALL_CLIPS = [...ORBIT_STEP_CLIPS, ...ORBIT_STEP_CLIPS_REVERSE, ORBIT_360_URL];
@@ -288,8 +289,7 @@ export default function BuildingExplorer360() {
     <div
       className={"be-root" + (isPlaying ? " be-transitioning" : "")}
       style={{
-        "--filter-w": showPremiumChrome ? "252px" : "0px",
-        "--filter-stack-base": showPremiumChrome && block ? "268px" : "0px",
+        "--filter-w": showPremiumChrome ? "400px" : "0px",
       }}
     >
       <div className={"be-tour-reveal" + (tourRevealed ? " be-tour-reveal--in" : "")}>
@@ -386,41 +386,18 @@ export default function BuildingExplorer360() {
             </>
           ) : (
             <>
-              <span className="hand">&#9757;</span> Drag left / right or use arrows
+              <span className="hand">&#9757;</span> Drag left / right or use the 360 control
             </>
           )}
         </div>
 
-        <button
-          type="button"
-          className="be-arrow l"
-          aria-label="Previous"
-          disabled={!canPrev}
-          onClick={goPrev}
-          style={{ opacity: canPrev ? 1 : 0.35, cursor: canPrev ? "pointer" : "default" }}
-        >
-          &#8592;
-        </button>
-
-        <button
-          type="button"
-          className="be-arrow r"
-          aria-label="Next transition"
-          disabled={!canNext}
-          onClick={goNext}
-          style={{ right: 22, opacity: canNext ? 1 : 0.35, cursor: canNext ? "pointer" : "default" }}
-        >
-          &#8594;
-        </button>
-
-        <div className="be-compass">
-          <svg viewBox="0 0 40 40" fill="none">
-            <circle cx="20" cy="20" r="18" stroke="rgba(255,255,255,.25)" />
-            <path d="M20 7 L24 21 L20 18 L16 21 Z" fill="#d8b65a" />
-            <text x="20" y="34" textAnchor="middle" fill="#f5f1e6" fontSize="9" fontWeight="700">
-              N
-            </text>
-          </svg>
+        <div className="be-rotate-wrap">
+          <RotateButton
+            onLeft={goPrev}
+            onRight={goNext}
+            inactiveLeft={!canPrev}
+            inactiveRight={!canNext}
+          />
         </div>
 
         <ExplorerPremiumChrome

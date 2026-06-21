@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useCallback } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BLOCKS, FLOORS, UNITS, getUnitBrochureUrl, getUnitImages } from "@/data/building";
 import FilterPanel from "@/components/FilterPanel";
@@ -32,6 +32,7 @@ export default function ExplorerPremiumChrome({
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
   const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const units = UNITS;
   const panelUnits = useMemo(() => buildFilterPanelUnits(units), [units]);
@@ -67,9 +68,18 @@ export default function ExplorerPremiumChrome({
     [onPickBlock, onClearBlock]
   );
 
+  useEffect(() => {
+    setUnit(null);
+  }, [floor]);
+
+  useEffect(() => {
+    if (!block) setUnit(null);
+  }, [block]);
+
   const pickUnit = (id) => {
     if (isUnitSold(units[id])) return;
     setUnit(id);
+    setFiltersOpen(false);
     if (!floor) onPickFloor?.(units[id].floor);
   };
 
@@ -104,6 +114,8 @@ export default function ExplorerPremiumChrome({
         <FilterPanel
           units={panelUnits}
           interactive={filtersInteractive}
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
           onChange={filtersInteractive ? handleFilterChange : undefined}
           onBlockChange={filtersInteractive ? handleBlockChange : undefined}
           selectedBlocks={filtersInteractive ? selectedBlocks : []}
@@ -207,12 +219,14 @@ export default function ExplorerPremiumChrome({
                 />
               </div>
             </div>
+
             <div className="be-unit-mid">
               <div className="be-unit-price">
                 <span className="be-unit-price-lbl">Starting at</span>
                 <span className="be-unit-price-val">{curUnit.price}</span>
               </div>
             </div>
+
             <div className="be-unit-actions">
               {!isUnitSold(curUnit) && (
                 <button type="button" className="be-unit-btn be-unit-btn--teal" onClick={goToBooking}>

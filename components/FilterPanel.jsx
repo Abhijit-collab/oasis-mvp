@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 
 const FACING_LABELS = {
   N: "North",
@@ -58,6 +58,8 @@ export default function FilterPanel({
   selectedBlocks = [],
   applyMapBlocksToFilter = false,
   interactive = true,
+  open: openProp,
+  onOpenChange,
   className = "",
 }) {
   const bhkOptions = useMemo(
@@ -89,7 +91,17 @@ export default function FilterPanel({
     [blockKey]
   );
 
-  const [open, setOpen] = useState(true);
+  const [openInternal, setOpenInternal] = useState(true);
+  const isOpenControlled = openProp !== undefined;
+  const open = isOpenControlled ? openProp : openInternal;
+  const setOpen = useCallback(
+    (updater) => {
+      const next = typeof updater === "function" ? updater(open) : updater;
+      if (!isOpenControlled) setOpenInternal(next);
+      onOpenChange?.(next);
+    },
+    [isOpenControlled, open, onOpenChange]
+  );
   const [bhk, setBhk] = useState(() => new Set());
   const [status, setStatus] = useState(() => new Set());
   const [userBlocks, setUserBlocks] = useState(() => new Set());

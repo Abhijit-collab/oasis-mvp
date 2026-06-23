@@ -5,7 +5,7 @@ import BuildingExplorer360 from "@/components/BuildingExplorer360";
 
 export default function TestExplorer() {
   return (
-    <AuthGate>
+    <AuthGate preloadTourAfterLogin>
       <BuildingExplorer360 />
     </AuthGate>
   );

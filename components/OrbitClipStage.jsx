@@ -68,15 +68,6 @@ const sameClip = (a, b) => {
   return a === b || srcTail(a) === srcTail(b);
 };
 
-const hiddenPrefetchStyle = {
-  position: "absolute",
-  width: 0,
-  height: 0,
-  opacity: 0,
-  pointerEvents: "none",
-  visibility: "hidden",
-};
-
 /**
  * Dual-buffer video stage — always plays clips forward (use *-rev.mp4 for back nav).
  * The visible buffer is never hidden until the other buffer has a painted frame.
@@ -88,9 +79,7 @@ export default function OrbitClipStage({
   holdAt = "end",
   playDirection = "forward",
   landAfterPlay = null,
-  prefetchForward = null,
   prefetchBack = null,
-  prefetchLand = null,
   onComplete,
   onPlayingChange,
   onDragForward,
@@ -103,9 +92,6 @@ export default function OrbitClipStage({
 }) {
   const refA = useRef(null);
   const refB = useRef(null);
-  const prefetchFwdRef = useRef(null);
-  const prefetchBackRef = useRef(null);
-  const prefetchLandRef = useRef(null);
   const dragRef = useRef(null);
   const draggingRef = useRef(false);
   const firedRef = useRef(false);
@@ -297,28 +283,6 @@ export default function OrbitClipStage({
   }, [prepareHomeClip]);
 
   useEffect(() => {
-    if (mode !== "hold") return;
-
-    const fwdEl = prefetchFwdRef.current;
-    if (prefetchForward && fwdEl && !sameClip(fwdEl.currentSrc || fwdEl.src, prefetchForward)) {
-      fwdEl.src = prefetchForward;
-      fwdEl.load();
-    }
-
-    const backEl = prefetchBackRef.current;
-    if (prefetchBack && backEl && !sameClip(backEl.currentSrc || backEl.src, prefetchBack)) {
-      backEl.src = prefetchBack;
-      backEl.load();
-    }
-
-    const landEl = prefetchLandRef.current;
-    if (prefetchLand && landEl && !sameClip(landEl.currentSrc || landEl.src, prefetchLand)) {
-      landEl.src = prefetchLand;
-      landEl.load();
-    }
-  }, [mode, prefetchForward, prefetchBack, prefetchLand]);
-
-  useEffect(() => {
     if (mode !== "play" || !clipSrc || !playToken) return;
 
     const session = playToken;
@@ -483,33 +447,6 @@ export default function OrbitClipStage({
     <>
       {videoLayer(refA, 0)}
       {videoLayer(refB, 1)}
-      <video
-        ref={prefetchFwdRef}
-        muted
-        playsInline
-        preload="auto"
-        aria-hidden
-        tabIndex={-1}
-        style={hiddenPrefetchStyle}
-      />
-      <video
-        ref={prefetchBackRef}
-        muted
-        playsInline
-        preload="auto"
-        aria-hidden
-        tabIndex={-1}
-        style={hiddenPrefetchStyle}
-      />
-      <video
-        ref={prefetchLandRef}
-        muted
-        playsInline
-        preload="auto"
-        aria-hidden
-        tabIndex={-1}
-        style={hiddenPrefetchStyle}
-      />
       {dragEnabled && (
         <div
           ref={dragRef}

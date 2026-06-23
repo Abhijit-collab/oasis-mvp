@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 
 const CLIP_TIMEOUT_MS = 30000;
+/** url -> { depth: 'metadata' | 'full', promise } */
 const prefetchCache = new Map();
 
-/** Wait until a clip is buffered enough to play without stalling. */
-export const preloadOne = (url) =>
-  new Promise((resolve) => {
+function preloadOne(url, depth = "metadata") {
+  return new Promise((resolve) => {
     if (!url) {
       resolve({ url, ok: false });
       return;
     }
 
     const video = document.createElement("video");
-    video.preload = "auto";
+    video.preload = depth === "full" ? "auto" : "metadata";
     video.muted = true;
     video.playsInline = true;
 
@@ -23,51 +23,78 @@ export const preloadOne = (url) =>
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      video.removeEventListener("canplaythrough", onReady);
+      video.removeEventListener("canplaythrough", onFullReady);
       video.removeEventListener("loadeddata", onPartial);
+      video.removeEventListener("loadedmetadata", onMetaReady);
       video.removeEventListener("error", onError);
+      if (depth === "metadata") {
+        video.removeAttribute("src");
+        video.load();
+      }
       resolve({ url, ok });
     };
 
-    const onReady = () => settle(true);
+    const onFullReady = () => settle(true);
+    const onMetaReady = () => settle(true);
     const onPartial = () => {
       if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) settle(true);
     };
     const onError = () => settle(false);
 
     const timer = setTimeout(
-      () => settle(video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA),
+      () =>
+        settle(
+          depth === "full"
+            ? video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+            : video.readyState >= HTMLMediaElement.HAVE_METADATA
+        ),
       CLIP_TIMEOUT_MS
     );
 
-    video.addEventListener("canplaythrough", onReady, { once: true });
-    video.addEventListener("loadeddata", onPartial);
+    if (depth === "full") {
+      video.addEventListener("canplaythrough", onFullReady, { once: true });
+      video.addEventListener("loadeddata", onPartial);
+    } else {
+      video.addEventListener("loadedmetadata", onMetaReady, { once: true });
+    }
     video.addEventListener("error", onError, { once: true });
 
     video.src = url;
     video.load();
   });
+}
 
-/** Warm the browser cache for a clip (deduped per URL). */
-export const prefetchVideo = (url) => {
+/** Warm the browser cache for a clip (deduped per URL; upgrades metadata → full). */
+export const prefetchVideo = (url, { depth = "metadata" } = {}) => {
   if (!url) return Promise.resolve({ url, ok: false });
-  if (!prefetchCache.has(url)) {
-    prefetchCache.set(url, preloadOne(url));
+
+  const existing = prefetchCache.get(url);
+  if (existing) {
+    if (depth === "full" && existing.depth === "metadata") {
+      const upgraded = { depth: "full", promise: preloadOne(url, "full") };
+      prefetchCache.set(url, upgraded);
+      return upgraded.promise;
+    }
+    return existing.promise;
   }
-  return prefetchCache.get(url);
+
+  const entry = { depth, promise: preloadOne(url, depth) };
+  prefetchCache.set(url, entry);
+  return entry.promise;
 };
 
 /**
- * Preload video URLs in parallel. Returns ready=true once all clips resolve
- * (canplaythrough, or loadeddata before timeout).
+ * Preload video URLs in parallel. Reuses any in-flight work from early login prefetch.
  */
 export default function usePreloadVideos(urls) {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [failedCount, setFailedCount] = useState(0);
 
+  const listKey = [...new Set((urls || []).filter(Boolean))].join("\0");
+
   useEffect(() => {
-    const list = [...new Set((urls || []).filter(Boolean))];
+    const list = listKey ? listKey.split("\0") : [];
     if (!list.length) {
       setReady(true);
       setProgress(100);
@@ -97,7 +124,7 @@ export default function usePreloadVideos(urls) {
     return () => {
       cancelled = true;
     };
-  }, [urls]);
+  }, [listKey]);
 
   return { ready, progress, failedCount, total: urls?.length ?? 0 };
 }

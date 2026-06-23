@@ -755,7 +755,9 @@ html:has(.login-page),body:has(.login-page){overflow:hidden;height:100%;padding:
 
 .login-welcome-bg{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;animation:fade .35s;overflow:hidden;background:#06070a}
 .login-welcome-bg-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-  filter:blur(3px) brightness(.48);transform:scale(1.05);pointer-events:none}
+  filter:blur(3px) brightness(.48);transform:scale(1.05);pointer-events:none;
+  opacity:0;transition:opacity .45s ease}
+.login-welcome-bg-image--in{opacity:1}
 .login-welcome-bg-scrim{position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(165deg,rgba(4,6,10,.55) 0%,rgba(4,6,10,.78) 55%,rgba(4,6,10,.88) 100%)}
 .login-welcome-modal{position:relative;z-index:1;width:100%;max-width:460px;text-align:center;padding:38px 32px 32px;

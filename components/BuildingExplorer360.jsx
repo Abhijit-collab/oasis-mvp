@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState, useEffect } from "react";
 import {
-  ORBIT_360_URL,
   ORBIT_STEP_CLIPS,
   ORBIT_STEP_CLIPS_REVERSE,
   ORBIT_STEP_COUNT,
@@ -13,13 +12,13 @@ import ExplorerPremiumChrome from "@/components/ExplorerPremiumChrome";
 import DownloadMenu from "@/components/DownloadMenu";
 import PremiumBadge from "@/components/PremiumBadge";
 import { useAuth } from "@/components/auth/AuthContext";
-import usePreloadVideos, { prefetchVideo } from "@/hooks/usePreloadVideos";
+import usePreloadVideos from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
 import RotateButton from "@/components/RotateButton";
 import { ORBIT_STEP_ZONES } from "@/data/orbit360Zones";
+import { ORBIT_STEP_PRELOAD_URLS } from "@/lib/tourAssetPreload";
 
-const ORBIT_ALL_CLIPS = [...ORBIT_STEP_CLIPS, ...ORBIT_STEP_CLIPS_REVERSE, ORBIT_360_URL];
 const TOUR_REVEAL_MS = 900;
 const HOME_FADE_OUT_MS = 480;
 const HOME_FADE_IN_MS = 480;
@@ -70,7 +69,7 @@ export default function BuildingExplorer360() {
   const holdAtForStep = (s) => (s === 0 ? "start" : "end");
   const landHoldAtForBack = (landStep) => (landStep === 0 ? "start" : "end");
 
-  const { ready: assetsReady, progress: loadProgress } = usePreloadVideos(ORBIT_ALL_CLIPS);
+  const { ready: assetsReady, progress: loadProgress } = usePreloadVideos(ORBIT_STEP_PRELOAD_URLS);
   const { gateOpen, displayProgress } = useTourPreloadGate(assetsReady, loadProgress);
   const [tourRevealed, setTourRevealed] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
@@ -140,17 +139,6 @@ export default function BuildingExplorer360() {
     if (homeAwaitHoldRef.current) beginHomeReveal();
   };
 
-  const prefetchForward = forwardClipAtStep(step);
-  const prefetchBack = backClipAtStep(step);
-  const prefetchLandClip = holdClipForStep(prevStep(step));
-
-  useEffect(() => {
-    if (!assetsReady || mode !== "hold" || isPlaying) return;
-    prefetchVideo(prefetchForward);
-    prefetchVideo(prefetchBack);
-    if (prefetchLandClip) prefetchVideo(prefetchLandClip);
-  }, [assetsReady, mode, isPlaying, step, prefetchForward, prefetchBack, prefetchLandClip]);
-
   const pendingRef = useRef(false);
 
   const handlePlayingChange = (playing) => {
@@ -193,7 +181,6 @@ export default function BuildingExplorer360() {
   const goHome = () => {
     if (homeResetting) return;
 
-    prefetchVideo(MAIN_GATE_CLIP);
     clearTimeout(homeOutTimerRef.current);
     clearTimeout(homeInTimerRef.current);
     clearTimeout(homePrepFallbackRef.current);
@@ -319,9 +306,7 @@ export default function BuildingExplorer360() {
               playToken={playToken}
               playDirection={playDirection}
               landAfterPlay={landAfterPlay}
-              prefetchForward={prefetchForward}
-              prefetchBack={prefetchBack}
-              prefetchLand={prefetchLandClip}
+              prefetchBack={backClipAtStep(step)}
               onPlayingChange={handlePlayingChange}
               onComplete={onClipDone}
               onDragForward={goNext}

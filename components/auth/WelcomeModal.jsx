@@ -1,21 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
 import { ENTRANCE_IMAGE } from "@/data/assets";
+import { preloadEntranceImage } from "@/lib/tourAssetPreload";
 
 export default function WelcomeModal({ name, onContinue }) {
   const guest = name || "Premium Member";
+  const [bgReady, setBgReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const probe = new Image();
+    probe.src = ENTRANCE_IMAGE;
+    if (probe.complete && probe.naturalWidth > 0) {
+      setBgReady(true);
+      return undefined;
+    }
+    preloadEntranceImage().then(() => {
+      if (!cancelled) setBgReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="login-welcome-bg">
       <img
         src={ENTRANCE_IMAGE}
         alt=""
-        className="login-welcome-bg-image"
+        className={"login-welcome-bg-image" + (bgReady ? " login-welcome-bg-image--in" : "")}
         aria-hidden
         decoding="async"
         fetchPriority="high"
+        loading="eager"
+        onLoad={() => setBgReady(true)}
       />
       <div className="login-welcome-bg-scrim" aria-hidden />
       <div className="login-welcome-modal">

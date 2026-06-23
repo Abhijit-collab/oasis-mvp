@@ -160,5 +160,12 @@ export const ORBIT_STEP_ZONES = {
   },
 };
 
+/** Resolve overlay zones for an orbit stop (step 1 = end of T1, reuses gate mapping). */
+export function getOrbitStepZones(step) {
+  if (ORBIT_STEP_ZONES[step]) return ORBIT_STEP_ZONES[step];
+  if (step === 1 && ORBIT_STEP_ZONES[0]) return ORBIT_STEP_ZONES[0];
+  return null;
+}
+
 /** Steps that show a block/floor overlay (extend as you add more zone sets). */
 export const ORBIT_OVERLAY_STEPS = Object.keys(ORBIT_STEP_ZONES).map(Number);

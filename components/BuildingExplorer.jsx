@@ -12,12 +12,19 @@ import Video360 from "@/components/Video360";
 import { VIDEO_360_URL } from "@/data/assets";
 import { prefetchVideo } from "@/hooks/usePreloadVideos";
 import { buildFilterPanelUnits } from "@/lib/filterPanelUnits";
+import { floorLevelFromName } from "@/lib/floorLevel";
+import { getFloorSliderRange } from "@/lib/floorSliderRange";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 import useLiveUnitsPoll from "@/hooks/useLiveUnitsPoll";
+import {
+  isUnitSold,
+  unitPolyClass,
+  unitBadgeClass,
+  unitBadgeLabel,
+  unitTipBadgeClass,
+} from "@/lib/unitStatus";
 
 const pts = (a) => a.map((p) => p.join(",")).join(" ");
-
-const isUnitSold = (u) => u.status === "sold";
 
 // Anchor hover cards on the polygon roofline at horizontal center.
 const anchorAbove = (points) => {
@@ -65,6 +72,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
   const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
   const [filtersActive, setFiltersActive] = useState(false);
+  const [maxVisibleFloor, setMaxVisibleFloor] = useState(1);
   const unitPanelRef = useRef(null);
   const blockRef = useRef(block);
   blockRef.current = block;
@@ -90,6 +98,22 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     });
   }, []);
 
+  const handleActiveChange = useCallback((count) => {
+    setFiltersActive(count > 0);
+  }, []);
+
+  const handleAllStatusesSelect = useCallback(() => {
+    setFiltersActive(true);
+  }, []);
+
+  const handleAllStatusesDeselect = useCallback((remainingActiveCount = 0) => {
+    setFiltersActive(remainingActiveCount > 0);
+  }, []);
+
+  const handleFloorFilterChange = useCallback((maxFloor) => {
+    setMaxVisibleFloor(maxFloor);
+  }, []);
+
   const pickBlock = useCallback((n) => {
     const b = BLOCKS.find((x) => x.name === n);
     if (!b?.available || blockRef.current === n) return;
@@ -99,6 +123,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setHoverFloor(null);
     setHoverUnit(null);
     setFiltersActive(false);
+    setMaxVisibleFloor(1);
   }, []);
 
   const handleBlockChange = useCallback((blocks) => {
@@ -114,15 +139,18 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     }
   }, [pickBlock]);
 
-  const handleApply = useCallback(() => {
-    setFiltersActive(true);
-  }, []);
-
   const curBlock = block ? BLOCKS.find((b) => b.name === block) : null;
+  const floorSliderRange = useMemo(
+    () => getFloorSliderRange({ block }),
+    [block]
+  );
   // Floors that belong to the selected block (falls back to all floors).
-  const blockFloors = curBlock
-    ? FLOORS.filter((f) => curBlock.floors.includes(f.name))
-    : FLOORS;
+  const blockFloors = useMemo(() => {
+    if (!curBlock) return [];
+    return FLOORS.filter((f) => curBlock.floors.includes(f.name)).sort(
+      (a, b) => floorLevelFromName(a.name) - floorLevelFromName(b.name)
+    );
+  }, [curBlock]);
   const curFloor = floor ? FLOORS.find((f) => f.name === floor) : null;
   const curUnit = unit ? units[unit] : null;
 
@@ -237,12 +265,13 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     };
   } else if (block && hoverUnit && canShowUnitTip(hoverUnit)) {
     const u = units[hoverUnit];
+    const status = u.status ?? "available";
     const sold = isUnitSold(u);
     tip = {
       c: anchorAbove(u.points),
       title: u.label,
-      badge: sold ? "Sold" : "Available",
-      badgeCls: sold ? "b-sold" : "b-avail",
+      badge: unitBadgeLabel(status),
+      badgeCls: unitTipBadgeClass(status),
       meta: `${u.type} · ${u.area} Sqft`,
       sold,
     };
@@ -299,12 +328,18 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
 
           {block &&
             blockFloors.map((f) => {
+              const level = floorLevelFromName(f.name);
+              if (level > maxVisibleFloor) return null;
+
               const isHover = hoverFloor === f.name;
               let floorCls = "poly floor";
               if (!floor) {
+                floorCls += " filter-on floor-reveal";
                 if (isHover) floorCls += " on";
               } else if (isHover && f.name !== floor) {
                 floorCls += " on-switch";
+              } else if (f.name === floor) {
+                floorCls += " sel";
               } else {
                 floorCls += " silent";
               }
@@ -313,6 +348,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
                 key={f.name}
                 points={pts(f.points)}
                 className={floorCls}
+                style={{ animationDelay: `${(level - 1) * 0.08}s` }}
                 onMouseEnter={() => setHoverFloor(f.name)}
                 onMouseLeave={() => setHoverFloor(null)}
                 onClick={() => pickFloor(f.name)}
@@ -323,6 +359,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           {block &&
             visibleUnitIds.map((id) => {
               const u = units[id];
+              const status = u.status ?? "available";
               const sold = isUnitSold(u);
               return (
                 <polygon
@@ -332,7 +369,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
                   data-name={u.label}
                   className={
                     "poly unit " +
-                    (sold ? "sold" : "avail") +
+                    unitPolyClass(status) +
                     (filtersActive ? " all-on" : "") +
                     (unit === id ? " sel" : "") +
                     (hoverUnit === id ? " hov" : "")
@@ -411,8 +448,13 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
           <FilterPanel
             units={panelUnits}
             onChange={handleFilterChange}
+            onActiveChange={handleActiveChange}
+            onAllStatusesSelect={handleAllStatusesSelect}
+            onAllStatusesDeselect={handleAllStatusesDeselect}
             onBlockChange={handleBlockChange}
-            onApply={handleApply}
+            onClearFloors={() => setFloor(null)}
+            onFloorFilterChange={handleFloorFilterChange}
+            floorSliderRange={block ? floorSliderRange : null}
             applyMapBlocksToFilter
             selectedBlocks={selectedBlocks}
           />

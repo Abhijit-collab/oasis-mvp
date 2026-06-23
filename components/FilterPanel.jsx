@@ -15,9 +15,11 @@ const FACING_LABELS = {
 
 const STATUS_OPTIONS = [
   { val: "available", label: "Available", cls: "s-available", dot: "available" },
-  { val: "reserved", label: "Reserved", cls: "s-reserved", dot: "reserved" },
   { val: "sold", label: "Sold", cls: "s-sold", dot: "sold" },
+  { val: "reserved", label: "Reserved", cls: "s-reserved", dot: "reserved" },
 ];
+
+const BHK_OPTIONS = ["1", "2", "3"];
 
 function Chip({ on, cls = "", dot, children, onClick, disabled = false }) {
   return (
@@ -52,9 +54,13 @@ function Chip({ on, cls = "", dot, children, onClick, disabled = false }) {
 export default function FilterPanel({
   units = [],
   onChange,
-  onApply,
   onBlockChange,
   onActiveChange,
+  onAllStatusesSelect,
+  onAllStatusesDeselect,
+  onClearFloors,
+  onFloorFilterChange,
+  floorSliderRange = null,
   selectedBlocks = [],
   applyMapBlocksToFilter = false,
   interactive = true,
@@ -62,10 +68,7 @@ export default function FilterPanel({
   onOpenChange,
   className = "",
 }) {
-  const bhkOptions = useMemo(
-    () => [...new Set(units.map((u) => String(u.bhk)))].filter(Boolean).sort(),
-    [units]
-  );
+  const bhkOptions = BHK_OPTIONS;
   const blockOptions = useMemo(
     () => [...new Set(units.map((u) => u.block))].filter(Boolean).sort(),
     [units]
@@ -80,10 +83,13 @@ export default function FilterPanel({
     return { min: Math.floor(Math.min(...xs) / 50) * 50, max: Math.ceil(Math.max(...xs) / 50) * 50 };
   }, [units]);
   const floorBounds = useMemo(() => {
+    if (floorSliderRange?.min != null && floorSliderRange?.max != null) {
+      return { min: floorSliderRange.min, max: floorSliderRange.max };
+    }
     const xs = units.map((u) => u.floor).filter((n) => typeof n === "number");
-    if (!xs.length) return { min: 1, max: 36 };
+    if (!xs.length) return { min: 1, max: 4 };
     return { min: Math.min(...xs), max: Math.max(...xs) };
-  }, [units]);
+  }, [floorSliderRange, units]);
 
   const blockKey = selectedBlocks.join("\0");
   const mapBlocks = useMemo(
@@ -104,10 +110,11 @@ export default function FilterPanel({
   );
   const [bhk, setBhk] = useState(() => new Set());
   const [status, setStatus] = useState(() => new Set());
+  const [allStatusesSelected, setAllStatusesSelected] = useState(false);
   const [userBlocks, setUserBlocks] = useState(() => new Set());
   const [facing, setFacing] = useState(() => new Set());
   const [minSqft, setMinSqft] = useState(sqftBounds.min);
-  const [minFloor, setMinFloor] = useState(floorBounds.min);
+  const [visibleFloorCount, setVisibleFloorCount] = useState(floorBounds.min);
 
   const userBlockKey = [...userBlocks].sort().join("\0");
   const queryBlocks = useMemo(() => {
@@ -118,7 +125,9 @@ export default function FilterPanel({
   }, [applyMapBlocksToFilter, blockKey, userBlockKey, userBlocks, mapBlocks]);
 
   useEffect(() => setMinSqft(sqftBounds.min), [sqftBounds.min]);
-  useEffect(() => setMinFloor(floorBounds.min), [floorBounds.min]);
+  useEffect(() => {
+    setVisibleFloorCount(floorBounds.min);
+  }, [floorBounds.min, floorBounds.max, blockKey]);
 
   useEffect(() => {
     if (!interactive || blockKey === "") setUserBlocks(new Set());
@@ -154,6 +163,16 @@ export default function FilterPanel({
       return next;
     });
 
+  const toggleStatus = (val) => {
+    setAllStatusesSelected(false);
+    setStatus((prev) => {
+      const next = new Set(prev);
+      if (next.has(val)) next.delete(val);
+      else next.add(val);
+      return next;
+    });
+  };
+
   const filtered = useMemo(
     () =>
       units.filter(
@@ -162,10 +181,9 @@ export default function FilterPanel({
           (status.size === 0 || status.has(u.status)) &&
           (queryBlocks.size === 0 || queryBlocks.has(u.block)) &&
           (facing.size === 0 || facing.has(u.facing)) &&
-          (u.sqft == null || u.sqft >= minSqft) &&
-          (u.floor == null || u.floor >= minFloor)
+          (u.sqft == null || u.sqft >= minSqft)
       ),
-    [units, bhk, status, queryBlocks, facing, minSqft, minFloor]
+    [units, bhk, status, queryBlocks, facing, minSqft]
   );
 
   const activeCount =
@@ -173,8 +191,7 @@ export default function FilterPanel({
     status.size +
     queryBlocks.size +
     facing.size +
-    (minSqft > sqftBounds.min ? 1 : 0) +
-    (minFloor > floorBounds.min ? 1 : 0);
+    (minSqft > sqftBounds.min ? 1 : 0);
 
   const onChangeRef = useRef(onChange);
   const lastFilteredKeyRef = useRef("");
@@ -205,6 +222,11 @@ export default function FilterPanel({
     onActiveChangeRef.current?.(activeCount);
   }, [activeCount, interactive]);
 
+  useEffect(() => {
+    if (!interactive) return;
+    onFloorFilterChange?.(visibleFloorCount);
+  }, [visibleFloorCount, interactive, onFloorFilterChange]);
+
   const [display, setDisplay] = useState(filtered.length);
   const displayRef = useRef(filtered.length);
 
@@ -226,21 +248,42 @@ export default function FilterPanel({
     return () => cancelAnimationFrame(raf);
   }, [filtered.length]);
 
+  const toggleAllStatuses = () => {
+    if (allStatusesSelected) {
+      setAllStatusesSelected(false);
+      onAllStatusesDeselect?.(activeCount);
+      return;
+    }
+    setStatus(new Set());
+    setAllStatusesSelected(true);
+    setVisibleFloorCount(floorBounds.min);
+    onClearFloors?.();
+    onAllStatusesSelect?.();
+  };
+
   const reset = () => {
     if (!interactive) return;
     setBhk(new Set());
     setStatus(new Set());
+    setAllStatusesSelected(false);
     setUserBlocks(new Set());
     setFacing(new Set());
     setMinSqft(sqftBounds.min);
-    setMinFloor(floorBounds.min);
+    setVisibleFloorCount(floorBounds.min);
     onBlockChange?.([]);
+    onClearFloors?.();
   };
 
   const noop = () => {};
 
   const sqftPct = ((minSqft - sqftBounds.min) / Math.max(1, sqftBounds.max - sqftBounds.min)) * 100;
-  const floorPct = ((minFloor - floorBounds.min) / Math.max(1, floorBounds.max - floorBounds.min)) * 100;
+  const floorPct =
+    ((visibleFloorCount - floorBounds.min) / Math.max(1, floorBounds.max - floorBounds.min)) * 100;
+
+  const handleFloorSliderChange = (value) => {
+    setVisibleFloorCount(value);
+    onClearFloors?.();
+  };
 
   return (
     <div className={`fp ${interactive ? "" : "fp--static"} ${className}`.trim()}>
@@ -302,8 +345,8 @@ export default function FilterPanel({
               <div className="fp-chips">
                 <Chip
                   disabled={!interactive}
-                  on={interactive && status.size === 0}
-                  onClick={interactive ? () => setStatus(new Set()) : noop}
+                  on={interactive && allStatusesSelected}
+                  onClick={interactive ? toggleAllStatuses : noop}
                 >
                   All
                 </Chip>
@@ -314,7 +357,7 @@ export default function FilterPanel({
                     cls={s.cls}
                     dot={s.dot}
                     on={interactive ? status.has(s.val) : false}
-                    onClick={interactive ? () => toggleIn(setStatus)(s.val) : noop}
+                    onClick={interactive ? () => toggleStatus(s.val) : noop}
                   >
                     {s.label}
                   </Chip>
@@ -385,9 +428,11 @@ export default function FilterPanel({
             <div className="fp-group fp-group--slider">
               <label className="fp-lbl">Floor</label>
               <div className="fp-slider-row">
-                <span className="fp-hint">Minimum</span>
+                <span className="fp-hint">Up to</span>
                 <span className="fp-val">
-                  {minFloor <= floorBounds.min ? "Any" : `Floor ${minFloor}+`}
+                  {visibleFloorCount <= floorBounds.min
+                    ? `Floor ${floorBounds.min}`
+                    : `Floors 1–${visibleFloorCount}`}
                 </span>
               </div>
               <div className="fp-slider-track">
@@ -396,10 +441,10 @@ export default function FilterPanel({
                   min={floorBounds.min}
                   max={floorBounds.max}
                   step={1}
-                  value={minFloor}
+                  value={visibleFloorCount}
                   disabled={!interactive}
                   style={{ "--fill": `${floorPct}%` }}
-                  onChange={(e) => interactive && setMinFloor(+e.target.value)}
+                  onChange={(e) => interactive && handleFloorSliderChange(+e.target.value)}
                 />
               </div>
             </div>
@@ -410,14 +455,6 @@ export default function FilterPanel({
               <b>{display}</b>
               <span className="fp-cap">homes match</span>
             </span>
-            <button
-              type="button"
-              className="fp-apply"
-              disabled={!interactive}
-              onClick={() => interactive && onApply?.(filtered)}
-            >
-              Show homes
-            </button>
           </div>
         </div>
       </section>

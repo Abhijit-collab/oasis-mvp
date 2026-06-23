@@ -8,7 +8,7 @@
  * 3. Your sheet tab must be named "Units" with a header row. First column header
  *    MUST be: Flat. Suggested columns:
  *
- *      Flat | Availability | price     | area | beds | baths | facing
+ *      Flat | Availability | price     | area | bedroomscount | baths | facing
  *      101  | Available    | ₹1.26 Cr  | 1880 | 3    | 2     | East
  *      102  | Sold         | ₹1.58 Cr  | 2300 | 4    | 3     | North-East
  *      ... (201, 202, 301, 302, 401, 402)

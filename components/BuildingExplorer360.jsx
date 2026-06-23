@@ -16,12 +16,13 @@ import usePreloadVideos from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
 import RotateButton from "@/components/RotateButton";
-import { ORBIT_STEP_ZONES } from "@/data/orbit360Zones";
+import { getOrbitStepZones, ORBIT_OVERLAY_SIZE } from "@/data/orbit360Zones";
 import { ORBIT_STEP_PRELOAD_URLS } from "@/lib/tourAssetPreload";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 import useLiveUnitsPoll from "@/hooks/useLiveUnitsPoll";
-
-const isUnitSold = (u) => u?.status === "sold";
+import { getOrbitStepScope, getVisibleOrbitFlats } from "@/lib/orbitStepScope";
+import { getFloorSliderRange } from "@/lib/floorSliderRange";
+import BlockFilterPrompt from "@/components/BlockFilterPrompt";
 
 const TOUR_REVEAL_MS = 900;
 const HOME_FADE_OUT_MS = 480;
@@ -48,6 +49,9 @@ export default function BuildingExplorer360({ liveUnits = null }) {
   const [hoverBlock, setHoverBlock] = useState(null);
   const [hoverFloor, setHoverFloor] = useState(null);
   const [hoverUnit, setHoverUnit] = useState(null);
+  const [matchingIds, setMatchingIds] = useState(() => new Set());
+  const [filtersActive, setFiltersActive] = useState(false);
+  const [maxVisibleFloor, setMaxVisibleFloor] = useState(1);
   const [holdResetKey, setHoldResetKey] = useState(0);
   const blockRef = useRef(null);
   blockRef.current = block;
@@ -228,6 +232,8 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     setHoverBlock(null);
     setHoverFloor(null);
     setHoverUnit(null);
+    setFiltersActive(false);
+    setMaxVisibleFloor(1);
   }, []);
 
   const pickFloor = useCallback((name) => {
@@ -243,12 +249,23 @@ export default function BuildingExplorer360({ liveUnits = null }) {
         setHoverUnit(null);
         return;
       }
+      const scope = getOrbitStepScope(stepRef.current);
+      if (!scope.unitIds.includes(id)) return;
       if (isUnitSold(units[id])) return;
       setUnit(id);
       if (!floor && units[id]?.floor) setFloor(units[id].floor);
     },
     [floor, units]
   );
+
+  const handleFilterStateChange = useCallback(({ matchingIds: ids, filtersActive: active }) => {
+    setMatchingIds(new Set(ids));
+    setFiltersActive(active);
+  }, []);
+
+  const handleFloorFilterChange = useCallback((maxFloor) => {
+    setMaxVisibleFloor(maxFloor);
+  }, []);
 
   const clearBlock = useCallback(() => {
     if (!blockRef.current) return;
@@ -259,10 +276,21 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     setHoverBlock(null);
     setHoverFloor(null);
     setHoverUnit(null);
+    setMaxVisibleFloor(null);
   }, []);
 
+  const floorSliderRange = useMemo(
+    () => getFloorSliderRange({ orbitStep: step, block }),
+    [step, block]
+  );
+
   useEffect(() => {
-    if (!ORBIT_STEP_ZONES[step]) {
+    const scope = getOrbitStepScope(step);
+    setMatchingIds(new Set(scope.unitIds));
+    setFiltersActive(false);
+    setMaxVisibleFloor(null);
+
+    if (!getOrbitStepZones(step)) {
       blockRef.current = null;
       setBlock(null);
       setFloor(null);
@@ -295,7 +323,24 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     setIsPlaying(false);
   };
 
-  const zoneConfig = ORBIT_STEP_ZONES[step];
+  const zoneConfig = getOrbitStepZones(step);
+  const stepScope = useMemo(() => getOrbitStepScope(step), [step]);
+  const visibleFlats = useMemo(
+    () =>
+      getVisibleOrbitFlats({
+        zones: zoneConfig,
+        block,
+        floor,
+        filtersActive,
+        matchingIds,
+        scopeUnitIds: stepScope.unitIds,
+      }),
+    [zoneConfig, block, floor, filtersActive, matchingIds, stepScope.unitIds]
+  );
+  const overlayFlats = useMemo(
+    () => (floor || filtersActive ? visibleFlats : []),
+    [floor, filtersActive, visibleFlats]
+  );
   const showPremiumChrome = tourRevealed && !homeResetting;
   const showZoneOverlay = Boolean(
     zoneConfig && mode === "hold" && !isPlaying && !homeResetting
@@ -304,10 +349,30 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     zoneConfig && !homeResetting && (showZoneOverlay || block || unit)
   );
 
+  const blockFilterPromptAnchor = useMemo(() => {
+    const block = zoneConfig?.blocks?.[0];
+    if (!block?.points?.length) return null;
+    const xs = block.points.map((p) => p[0]);
+    const ys = block.points.map((p) => p[1]);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const top = Math.min(...ys);
+    return {
+      leftPct: (cx / ORBIT_OVERLAY_SIZE.width) * 100,
+      topPct: (top / ORBIT_OVERLAY_SIZE.height) * 100,
+    };
+  }, [zoneConfig]);
+
+  const showBlockFilterPrompt = Boolean(
+    (step === 0 || step === 1) && showZoneOverlay && !block && tourRevealed && !homeResetting && blockFilterPromptAnchor
+  );
+  const filtersReady = Boolean(zoneConfig && block);
+
   const zoneHint = showZoneOverlay
     ? !block
-      ? "Select a block, or drag to explore"
-      : "Tap outside the block to go back, or use filters on the building"
+      ? showBlockFilterPrompt
+        ? "Drag left / right to explore the property"
+        : "Select a block or drag to explore"
+      : "Tap outside the block to go back — use filters to show available homes"
     : null;
 
   if (!mountTour) {
@@ -350,16 +415,21 @@ export default function BuildingExplorer360({ liveUnits = null }) {
               onHoldFrameReady={handleHoldFrameReady}
             />
 
+            {showBlockFilterPrompt && <BlockFilterPrompt anchor={blockFilterPromptAnchor} />}
+
             {showZonePicker && (
               <OrbitZoneOverlay
                 zones={zoneConfig}
                 block={block}
                 floor={floor}
                 unit={unit}
+                visibleFlats={overlayFlats}
+                filtersActive={filtersActive}
+                maxVisibleFloor={block ? maxVisibleFloor : null}
                 hoverBlock={hoverBlock}
                 hoverFloor={hoverFloor}
                 hoverUnit={hoverUnit}
-                unitSold={(id) => isUnitSold(units[id])}
+                unitStatus={(id) => units[id]?.status ?? "available"}
                 onPickBlock={pickBlock}
                 onPickFloor={pickFloor}
                 onPickUnit={pickUnit}
@@ -444,8 +514,12 @@ export default function BuildingExplorer360({ liveUnits = null }) {
           onPickBlock={pickBlock}
           onHoverBlock={setHoverBlock}
           onClearBlock={clearBlock}
-          filtersInteractive={false}
+          filtersInteractive={filtersReady}
           liveUnits={polledLiveUnits}
+          orbitStep={zoneConfig ? step : null}
+          onFilterStateChange={handleFilterStateChange}
+          onFloorFilterChange={handleFloorFilterChange}
+          floorSliderRange={floorSliderRange}
         />
         </div>
       </div>

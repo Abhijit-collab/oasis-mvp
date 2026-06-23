@@ -1,6 +1,8 @@
 "use client";
 
 import { ORBIT_OVERLAY_SIZE } from "@/data/orbit360Zones";
+import { floorLevelFromName } from "@/lib/floorLevel";
+import { isUnitSold, unitPolyClass } from "@/lib/unitStatus";
 
 const pts = (points) => points.map((p) => p.join(",")).join(" ");
 
@@ -12,10 +14,13 @@ export default function OrbitZoneOverlay({
   block = null,
   floor = null,
   unit = null,
+  visibleFlats = [],
+  filtersActive = false,
+  maxVisibleFloor = null,
   hoverBlock = null,
   hoverFloor = null,
   hoverUnit = null,
-  unitSold = () => false,
+  unitStatus = () => "available",
   onPickBlock,
   onPickFloor,
   onPickUnit,
@@ -26,10 +31,12 @@ export default function OrbitZoneOverlay({
 }) {
   if (!zones) return null;
 
-  const { blocks = [], floors = [], flats = [] } = zones;
-  const blockFloors = block ? floors.filter((f) => f.block === block) : [];
-  const floorFlats =
-    block && floor ? flats.filter((f) => f.block === block && f.floor === floor) : [];
+  const { blocks = [], floors = [] } = zones;
+  const blockFloors = block
+    ? floors
+        .filter((f) => f.block === block)
+        .sort((a, b) => floorLevelFromName(a.name) - floorLevelFromName(b.name))
+    : [];
 
   return (
     <svg
@@ -62,9 +69,13 @@ export default function OrbitZoneOverlay({
 
       {block &&
         blockFloors.map((f) => {
+          const level = floorLevelFromName(f.name);
+          if (maxVisibleFloor != null && level > maxVisibleFloor) return null;
+
           const isHover = hoverFloor === f.name;
           let floorCls = "poly floor";
           if (!floor) {
+            floorCls += " filter-on floor-reveal";
             if (isHover) floorCls += " on";
           } else if (isHover && f.name !== floor) {
             floorCls += " on-switch";
@@ -78,6 +89,7 @@ export default function OrbitZoneOverlay({
               key={f.name}
               points={pts(f.points)}
               className={floorCls}
+              style={{ animationDelay: `${(level - 1) * 0.08}s` }}
               onMouseEnter={() => onHoverFloor?.(f.name)}
               onMouseLeave={() => onHoverFloor?.(null)}
               onClick={() => onPickFloor?.(f.name)}
@@ -86,14 +98,17 @@ export default function OrbitZoneOverlay({
         })}
 
       {block &&
-        floor &&
-        floorFlats.map((flat) => {
-          const sold = unitSold(flat.id);
+        visibleFlats.map((flat) => {
+          const status = unitStatus(flat.id);
+          const sold = isUnitSold({ status });
           const isHover = hoverUnit === flat.id;
-          let cls = "poly unit " + (sold ? "sold" : "avail");
+          let cls = "poly unit " + unitPolyClass(status);
           if (!sold) {
             if (unit === flat.id) cls += " sel";
             else if (isHover) cls += " hov";
+            else if (filtersActive) cls += " all-on";
+          } else if (filtersActive) {
+            cls += " all-on";
           }
           return (
             <polygon

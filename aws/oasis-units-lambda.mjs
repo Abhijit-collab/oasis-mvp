@@ -39,7 +39,7 @@ const json = (statusCode, body) => ({
   body: JSON.stringify(body),
 });
 
-const NUMERIC_FIELDS = new Set(["beds", "baths", "area"]);
+const NUMERIC_FIELDS = new Set(["bedroomscount", "beds", "baths", "area"]);
 
 function normalizeRow(row) {
   const out = {};

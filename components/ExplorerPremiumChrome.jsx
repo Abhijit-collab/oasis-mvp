@@ -7,8 +7,9 @@ import FilterPanel from "@/components/FilterPanel";
 import UnitGallery from "@/components/UnitGallery";
 import { buildFilterPanelUnits } from "@/lib/filterPanelUnits";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
-
-const isUnitSold = (u) => u.status === "sold";
+import { getOrbitStepScope } from "@/lib/orbitStepScope";
+import { getFloorSliderRange } from "@/lib/floorSliderRange";
+import { isUnitSold, unitBadgeClass, unitBadgeLabel } from "@/lib/unitStatus";
 
 /**
  * Premium filter column, unit panel, and enquiry modal — shared with the main explorer.
@@ -26,6 +27,10 @@ export default function ExplorerPremiumChrome({
   onClearBlock,
   filtersInteractive = true,
   liveUnits = null,
+  orbitStep = null,
+  onFilterStateChange,
+  onFloorFilterChange,
+  floorSliderRange: floorSliderRangeProp = null,
 }) {
   const router = useRouter();
   const unitPanelRef = useRef(null);
@@ -38,10 +43,30 @@ export default function ExplorerPremiumChrome({
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
   const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
+  const [filtersActive, setFiltersActive] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
   const units = useMemo(() => mergeLiveUnits(liveUnits), [liveUnits]);
-  const panelUnits = useMemo(() => buildFilterPanelUnits(units), [units]);
+  const stepScope = useMemo(
+    () => (orbitStep != null ? getOrbitStepScope(orbitStep) : null),
+    [orbitStep]
+  );
+  const scopedUnitIds = stepScope?.unitIds ?? Object.keys(units);
+
+  const panelUnits = useMemo(() => {
+    const all = buildFilterPanelUnits(units);
+    if (!stepScope?.unitIds.length) return all;
+    const allowed = new Set(stepScope.unitIds);
+    return all.filter((u) => allowed.has(u.id));
+  }, [units, stepScope]);
+
+  useEffect(() => {
+    if (orbitStep == null) return;
+    const next = new Set(stepScope.unitIds);
+    setMatchingIds(next);
+    setFiltersActive(false);
+    onFilterStateChange?.({ matchingIds: next, filtersActive: false });
+  }, [orbitStep, stepScope.unitIds.join("\0")]);
   const selectedBlocks = useMemo(
     () => (block ? [block.replace(/^Block\s+/i, "")] : []),
     [block]
@@ -54,16 +79,40 @@ export default function ExplorerPremiumChrome({
   const curFloor = floor ? FLOORS.find((f) => f.name === floor) : null;
   const curUnit = unit ? units[unit] : null;
 
+  const floorSliderRange = useMemo(() => {
+    if (floorSliderRangeProp) return floorSliderRangeProp;
+    return getFloorSliderRange({ orbitStep, block });
+  }, [floorSliderRangeProp, orbitStep, block]);
+
   const handleFilterChange = useCallback((filtered) => {
     const ids = filtered.map((u) => u.id);
     setMatchingIds((prev) => {
-      if (prev.size === ids.length && ids.every((id) => prev.has(id))) return prev;
-      return new Set(ids);
+      const next = new Set(ids);
+      if (prev.size === next.size && ids.every((id) => prev.has(id))) return prev;
+      return next;
     });
   }, []);
 
+  const handleActiveChange = useCallback((count) => {
+    setFiltersActive(count > 0);
+  }, []);
+
+  const handleAllStatusesSelect = useCallback(() => {
+    setFiltersActive(true);
+  }, []);
+
+  const handleAllStatusesDeselect = useCallback((remainingActiveCount = 0) => {
+    setFiltersActive(remainingActiveCount > 0);
+  }, []);
+
+  useEffect(() => {
+    if (!onFilterStateChange) return;
+    onFilterStateChange({ matchingIds, filtersActive });
+  }, [matchingIds, filtersActive, onFilterStateChange]);
+
   const handleBlockChange = useCallback(
     (blocks) => {
+      if (!filtersInteractive || orbitStep != null) return;
       if (blocks.length === 1) {
         const name = `Block ${blocks[0]}`;
         if (blockRef.current !== name) onPickBlock?.(name);
@@ -71,7 +120,7 @@ export default function ExplorerPremiumChrome({
       }
       if (blocks.length === 0 && blockRef.current) onClearBlock?.();
     },
-    [onPickBlock, onClearBlock]
+    [onPickBlock, onClearBlock, filtersInteractive, orbitStep]
   );
 
   useEffect(() => {
@@ -81,6 +130,19 @@ export default function ExplorerPremiumChrome({
   useEffect(() => {
     if (controlledUnit === undefined && !block) setInternalUnit(null);
   }, [block, controlledUnit]);
+
+  useEffect(() => {
+    if (orbitStep == null || !block) return;
+    setFiltersActive(false);
+  }, [block, orbitStep]);
+
+  useEffect(() => {
+    if (orbitStep == null || block) return;
+    const next = new Set(stepScope?.unitIds ?? []);
+    setFiltersActive(false);
+    setMatchingIds(next);
+    onFilterStateChange?.({ matchingIds: next, filtersActive: false });
+  }, [block, orbitStep, stepScope?.unitIds.join("\0"), onFilterStateChange]);
 
   const pickUnit = (id) => {
     if (isUnitSold(units[id])) return;
@@ -109,8 +171,9 @@ export default function ExplorerPremiumChrome({
 
   const filteredFloorUnits = useMemo(() => {
     if (!curFloor) return [];
-    return curFloor.units.filter((id) => matchingIds.has(id));
-  }, [curFloor, matchingIds]);
+    const allowed = new Set(scopedUnitIds);
+    return curFloor.units.filter((id) => allowed.has(id) && matchingIds.has(id));
+  }, [curFloor, matchingIds, scopedUnitIds]);
 
   if (!visible) return null;
 
@@ -123,7 +186,14 @@ export default function ExplorerPremiumChrome({
           open={filtersOpen}
           onOpenChange={setFiltersOpen}
           onChange={filtersInteractive ? handleFilterChange : undefined}
+          onActiveChange={filtersInteractive ? handleActiveChange : undefined}
+          onAllStatusesSelect={filtersInteractive ? handleAllStatusesSelect : undefined}
+          onAllStatusesDeselect={filtersInteractive ? handleAllStatusesDeselect : undefined}
           onBlockChange={filtersInteractive ? handleBlockChange : undefined}
+          onClearFloors={filtersInteractive ? () => onPickFloor?.(null) : undefined}
+          onFloorFilterChange={filtersInteractive ? onFloorFilterChange : undefined}
+          floorSliderRange={filtersInteractive ? floorSliderRange : null}
+          applyMapBlocksToFilter={orbitStep == null}
           selectedBlocks={filtersInteractive ? selectedBlocks : []}
         />
       </div>
@@ -147,6 +217,7 @@ export default function ExplorerPremiumChrome({
           <div className="be-cards">
             {filteredFloorUnits.map((id) => {
               const u = units[id];
+              const status = u.status ?? "available";
               const sold = isUnitSold(u);
               return (
                 <button
@@ -160,8 +231,8 @@ export default function ExplorerPremiumChrome({
                 >
                   <div className="be-card-top">
                     <span className="be-card-name">{u.label}</span>
-                    <span className={"be-badge " + (sold ? "b-sold" : "b-avail")}>
-                      {sold ? "Sold" : "Available"}
+                    <span className={"be-badge " + unitBadgeClass(status)}>
+                      {unitBadgeLabel(status)}
                     </span>
                   </div>
                   <div className="be-card-sub">

@@ -82,8 +82,10 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
 .be-preload-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-bright));transition:width .25s ease}
 .be-preload-pct{margin-top:10px;font-size:12px;font-weight:600;letter-spacing:.08em;color:rgba(216,182,90,.75)}
 .be-ovl{position:absolute;inset:0;width:100%;height:100%;z-index:3}
-.be-ovl.be-ovl--360{z-index:4;pointer-events:none}
+.be-ovl.be-ovl--360{z-index:6;pointer-events:none}
 .be-ovl.be-ovl--360 .poly{pointer-events:auto}
+.be-ovl.be-ovl--360 .be-scrim-r{pointer-events:auto;cursor:default}
+.be-ovl .be-scrim-r{pointer-events:auto;cursor:default}
 .be-ovl.be-ovl--pass{pointer-events:none}
 .be-ovl.be-ovl--pass .poly{pointer-events:auto}
 .scrim-top{position:absolute;top:0;left:0;right:0;height:130px;z-index:2;

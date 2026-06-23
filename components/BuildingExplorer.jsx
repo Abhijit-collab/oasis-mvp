@@ -12,6 +12,8 @@ import Video360 from "@/components/Video360";
 import { VIDEO_360_URL } from "@/data/assets";
 import { prefetchVideo } from "@/hooks/usePreloadVideos";
 import { buildFilterPanelUnits } from "@/lib/filterPanelUnits";
+import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
+import useLiveUnitsPoll from "@/hooks/useLiveUnitsPoll";
 
 const pts = (a) => a.map((p) => p.join(",")).join(" ");
 
@@ -71,17 +73,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     if (VIDEO_360_URL) prefetchVideo(VIDEO_360_URL);
   }, []);
 
-  const units = useMemo(() => {
-    if (!Array.isArray(liveUnits) || liveUnits.length === 0) return UNITS;
-    const merged = {};
-    for (const id of Object.keys(UNITS)) merged[id] = { ...UNITS[id] };
-    for (const row of liveUnits) {
-      if (row && row.unitId && merged[row.unitId]) {
-        merged[row.unitId] = { ...merged[row.unitId], ...row };
-      }
-    }
-    return merged;
-  }, [liveUnits]);
+  const polledLiveUnits = useLiveUnitsPoll(liveUnits);
+  const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
 
   const panelUnits = useMemo(() => buildFilterPanelUnits(units), [units]);
   const selectedBlocks = useMemo(
@@ -164,6 +157,16 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setMatchingIds(new Set(Object.keys(units)));
   };
 
+  const dismissToBlocks = useCallback(() => {
+    setBlock(null);
+    setFloor(null);
+    setUnit(null);
+    setHoverBlock(null);
+    setHoverFloor(null);
+    setHoverUnit(null);
+    setFiltersActive(false);
+  }, []);
+
   const back = () => {
     if (unit) setUnit(null);
     else if (floor) setFloor(null);
@@ -198,13 +201,14 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     if (!unit) return;
     const onPointerDown = (e) => {
       if (unitPanelRef.current?.contains(e.target)) return;
-      if (e.target.closest?.(".poly.unit")) return;
-      setUnit(null);
-      setHoverUnit(null);
+      if (e.target.closest?.(".poly")) return;
+      if (e.target.closest?.(".be-filter-column")) return;
+      if (e.target.closest?.(".fp")) return;
+      dismissToBlocks();
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [unit]);
+  }, [unit, dismissToBlocks]);
 
   // Count available (unsold) residences across a set of floors.
   const availIn = (floorNames) =>
@@ -282,7 +286,16 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               />
             ))}
 
-          {block && <rect x="0" y="0" width="100" height="100" className="be-scrim-r" />}
+          {block && (
+            <rect
+              x="0"
+              y="0"
+              width="100"
+              height="100"
+              className="be-scrim-r"
+              onClick={dismissToBlocks}
+            />
+          )}
 
           {block &&
             blockFloors.map((f) => {

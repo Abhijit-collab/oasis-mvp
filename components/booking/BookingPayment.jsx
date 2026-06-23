@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { UNITS } from "@/data/building";
+import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 
 const BOOKING_ADVANCE = 250000;
 
@@ -66,12 +66,13 @@ function CardPreview({ form }) {
   );
 }
 
-export default function BookingPayment() {
+export default function BookingPayment({ liveUnits = null }) {
   const router = useRouter();
   const params = useSearchParams();
   const unitId = params.get("unit") || "";
   const block = params.get("block") || "Block A";
-  const unit = UNITS[unitId];
+  const units = useMemo(() => mergeLiveUnits(liveUnits), [liveUnits]);
+  const unit = units[unitId];
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(emptyForm);
@@ -107,10 +108,13 @@ export default function BookingPayment() {
   const summary = useMemo(() => {
     if (!unit) return null;
     const tower = block.replace(/^Block\s/i, "Tower ");
+    const areaLabel =
+      unit.area != null ? `${Number(unit.area).toLocaleString("en-IN")} sq.ft` : "—";
+    const typeLabel = unit.type || "—";
     return {
-      unitLabel: unit.label.replace(/^Flat\s/i, "Unit ") || `Unit ${unitId}`,
-      meta: `${unit.type} · ${unit.area.toLocaleString("en-IN")} sq.ft · ${tower}, Floor ${floorNum(unit.floor)}`,
-      price: unit.price,
+      unitLabel: unit.label?.replace(/^Flat\s/i, "Unit ") || `Unit ${unitId}`,
+      meta: `${typeLabel} · ${areaLabel} · ${tower}, Floor ${floorNum(unit.floor)}`,
+      price: unit.price || "—",
       advance: formatInr(BOOKING_ADVANCE),
       available: unit.status !== "sold",
     };

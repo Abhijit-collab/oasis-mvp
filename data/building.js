@@ -177,18 +177,16 @@ export const FLOORS = [
   }
 ];
 
+/**
+ * Unit map geometry + block/floor layout only (polygons for the explorer).
+ * Live fields (price, status, facing, beds, baths, area, type) come from DynamoDB
+ * via Flat — see lib/normalizeLiveUnit.js and lib/mergeLiveUnits.js.
+ */
 export const UNITS = {
   "401": {
-    "type": "3 BHK",
-    "beds": 3,
-    "baths": 3,
-    "area": 1860,
-    "facing": "East",
-    "price": "₹1.46 Cr",
-    "status": "available",
     "id": "401",
-    "label": "Flat 401",
     "floor": "Floor 4",
+    "block": "Block A",
     "points": [
       [37.69, 32.72],
       [44.03, 29.69],
@@ -203,16 +201,9 @@ export const UNITS = {
     "centroid": [52.95, 40.45]
   },
   "402": {
-    "type": "4 BHK",
-    "beds": 4,
-    "baths": 4,
-    "area": 2280,
-    "facing": "North-East",
-    "price": "₹1.82 Cr",
-    "status": "available",
     "id": "402",
-    "label": "Flat 402",
     "floor": "Floor 4",
+    "block": "Block A",
     "points": [
       [75.39, 42.41],
       [91.9, 50.02],
@@ -222,16 +213,9 @@ export const UNITS = {
     "centroid": [83.62, 50.18]
   },
   "301": {
-    "type": "3 BHK",
-    "beds": 3,
-    "baths": 2,
-    "area": 1820,
-    "facing": "East",
-    "price": "₹1.30 Cr",
-    "status": "sold",
     "id": "301",
-    "label": "Flat 301",
     "floor": "Floor 3",
+    "block": "Block A",
     "points": [
       [37.76, 43.69],
       [44.1, 41.61],
@@ -247,16 +231,9 @@ export const UNITS = {
     "centroid": [54.54, 51.14]
   },
   "302": {
-    "type": "4 BHK",
-    "beds": 4,
-    "baths": 4,
-    "area": 2240,
-    "facing": "North-East",
-    "price": "₹1.66 Cr",
-    "status": "available",
     "id": "302",
-    "label": "Flat 302",
     "floor": "Floor 3",
+    "block": "Block A",
     "points": [
       [75.35, 51.46],
       [91.83, 56.83],
@@ -266,16 +243,9 @@ export const UNITS = {
     "centroid": [83.63, 58.09]
   },
   "201": {
-    "type": "3 BHK",
-    "beds": 3,
-    "baths": 2,
-    "area": 1820,
-    "facing": "East",
-    "price": "₹1.20 Cr",
-    "status": "available",
     "id": "201",
-    "label": "Flat 201",
     "floor": "Floor 2",
+    "block": "Block A",
     "points": [
       [37.9, 55.28],
       [44.03, 54.15],
@@ -291,16 +261,9 @@ export const UNITS = {
     "centroid": [54.53, 61.92]
   },
   "202": {
-    "type": "4 BHK",
-    "beds": 4,
-    "baths": 3,
-    "area": 2240,
-    "facing": "North-East",
-    "price": "₹1.54 Cr",
-    "status": "available",
     "id": "202",
-    "label": "Flat 202",
     "floor": "Floor 2",
+    "block": "Block A",
     "points": [
       [75.52, 60.01],
       [91.81, 64.08],
@@ -310,16 +273,9 @@ export const UNITS = {
     "centroid": [83.68, 65.91]
   },
   "101": {
-    "type": "3 BHK",
-    "beds": 3,
-    "baths": 2,
-    "area": 1880,
-    "facing": "East",
-    "price": "₹1.26 Cr",
-    "status": "available",
     "id": "101",
-    "label": "Flat 101",
     "floor": "Floor 1",
+    "block": "Block A",
     "points": [
       [38.01, 66.45],
       [43.99, 66.07],
@@ -342,16 +298,9 @@ export const UNITS = {
     "centroid": [48.45, 69.68]
   },
   "102": {
-    "type": "4 BHK",
-    "beds": 4,
-    "baths": 3,
-    "area": 2300,
-    "facing": "North-East",
-    "price": "₹1.58 Cr",
-    "status": "sold",
     "id": "102",
-    "label": "Flat 102",
     "floor": "Floor 1",
+    "block": "Block A",
     "points": [
       [75.56, 69.07],
       [91.84, 70.5],

@@ -8,7 +8,7 @@
 //              Requires header  x-sync-secret: <SYNC_SECRET>
 //
 // Environment variables:
-//   TABLE_NAME   (default "OasisUnits")  - DynamoDB table, partition key: unitId (String)
+//   TABLE_NAME   (default "OasisUnits")  - DynamoDB table, partition key: Flat (String)
 //   SYNC_SECRET                          - shared secret the Apps Script must send on POST
 //
 // The @aws-sdk/* packages are bundled with the Node.js 20 Lambda runtime,
@@ -47,6 +47,8 @@ function normalizeRow(row) {
     if (v === "" || v === null || v === undefined) continue;
     out[k] = NUMERIC_FIELDS.has(k) ? Number(v) : v;
   }
+  if (!out.Flat && out.unitId) out.Flat = String(out.unitId).trim();
+  if (!out.unitId && out.Flat) out.unitId = String(out.Flat).trim();
   return out;
 }
 
@@ -77,7 +79,7 @@ export const handler = async (event) => {
 
       const payload = JSON.parse(event.body || "[]");
       const rows = (Array.isArray(payload) ? payload : [])
-        .filter((r) => r && r.unitId)
+        .filter((r) => r && (r.Flat || r.unitId))
         .map(normalizeRow);
 
       // DynamoDB BatchWrite handles max 25 items per request.

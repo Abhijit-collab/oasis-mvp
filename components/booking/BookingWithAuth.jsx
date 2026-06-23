@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import AuthGate from "@/components/auth/AuthGate";
 import BookingPayment from "@/components/booking/BookingPayment";
 
-export default function BookingWithAuth() {
+export default function BookingWithAuth({ liveUnits = null }) {
   return (
     <AuthGate>
       <Suspense
@@ -16,7 +16,7 @@ export default function BookingWithAuth() {
           </div>
         }
       >
-        <BookingPayment />
+        <BookingPayment liveUnits={liveUnits} />
       </Suspense>
     </AuthGate>
   );

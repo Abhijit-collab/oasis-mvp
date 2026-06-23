@@ -5,23 +5,31 @@ import { ORBIT_OVERLAY_SIZE } from "@/data/orbit360Zones";
 const pts = (points) => points.map((p) => p.join(",")).join(" ");
 
 /**
- * Block / floor polygon overlay aligned to 1920×1080 transition stills (object-fit:fill).
+ * Block / floor / flat polygon overlay aligned to 1920×1080 transition stills (object-fit:fill).
  */
 export default function OrbitZoneOverlay({
   zones,
   block = null,
   floor = null,
+  unit = null,
   hoverBlock = null,
   hoverFloor = null,
+  hoverUnit = null,
+  unitSold = () => false,
   onPickBlock,
   onPickFloor,
+  onPickUnit,
   onHoverBlock,
   onHoverFloor,
+  onHoverUnit,
+  onDismiss,
 }) {
   if (!zones) return null;
 
-  const { blocks = [], floors = [] } = zones;
+  const { blocks = [], floors = [], flats = [] } = zones;
   const blockFloors = block ? floors.filter((f) => f.block === block) : [];
+  const floorFlats =
+    block && floor ? flats.filter((f) => f.block === block && f.floor === floor) : [];
 
   return (
     <svg
@@ -48,6 +56,7 @@ export default function OrbitZoneOverlay({
           width={ORBIT_OVERLAY_SIZE.width}
           height={ORBIT_OVERLAY_SIZE.height}
           className="be-scrim-r"
+          onClick={() => onDismiss?.()}
         />
       )}
 
@@ -72,6 +81,28 @@ export default function OrbitZoneOverlay({
               onMouseEnter={() => onHoverFloor?.(f.name)}
               onMouseLeave={() => onHoverFloor?.(null)}
               onClick={() => onPickFloor?.(f.name)}
+            />
+          );
+        })}
+
+      {block &&
+        floor &&
+        floorFlats.map((flat) => {
+          const sold = unitSold(flat.id);
+          const isHover = hoverUnit === flat.id;
+          let cls = "poly unit " + (sold ? "sold" : "avail");
+          if (!sold) {
+            if (unit === flat.id) cls += " sel";
+            else if (isHover) cls += " hov";
+          }
+          return (
+            <polygon
+              key={flat.id}
+              points={pts(flat.points)}
+              className={cls}
+              onMouseEnter={() => !sold && onHoverUnit?.(flat.id)}
+              onMouseLeave={() => onHoverUnit?.(null)}
+              onClick={() => !sold && onPickUnit?.(flat.id)}
             />
           );
         })}

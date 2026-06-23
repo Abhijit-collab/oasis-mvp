@@ -6,6 +6,7 @@ import { BLOCKS, FLOORS, UNITS, getUnitBrochureUrl, getUnitImages } from "@/data
 import FilterPanel from "@/components/FilterPanel";
 import UnitGallery from "@/components/UnitGallery";
 import { buildFilterPanelUnits } from "@/lib/filterPanelUnits";
+import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 
 const isUnitSold = (u) => u.status === "sold";
 
@@ -16,16 +17,21 @@ export default function ExplorerPremiumChrome({
   visible = false,
   block,
   floor,
+  unit: controlledUnit = undefined,
+  onPickUnit,
   hoverBlock,
   onPickBlock,
   onPickFloor,
   onHoverBlock,
   onClearBlock,
   filtersInteractive = true,
+  liveUnits = null,
 }) {
   const router = useRouter();
   const unitPanelRef = useRef(null);
-  const [unit, setUnit] = useState(null);
+  const [internalUnit, setInternalUnit] = useState(null);
+  const unit = controlledUnit !== undefined ? controlledUnit : internalUnit;
+  const setUnit = onPickUnit ?? setInternalUnit;
   const [hoverUnit, setHoverUnit] = useState(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [modal, setModal] = useState(null);
@@ -34,7 +40,7 @@ export default function ExplorerPremiumChrome({
   const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
   const [filtersOpen, setFiltersOpen] = useState(true);
 
-  const units = UNITS;
+  const units = useMemo(() => mergeLiveUnits(liveUnits), [liveUnits]);
   const panelUnits = useMemo(() => buildFilterPanelUnits(units), [units]);
   const selectedBlocks = useMemo(
     () => (block ? [block.replace(/^Block\s+/i, "")] : []),
@@ -69,12 +75,12 @@ export default function ExplorerPremiumChrome({
   );
 
   useEffect(() => {
-    setUnit(null);
-  }, [floor]);
+    if (controlledUnit === undefined) setInternalUnit(null);
+  }, [floor, controlledUnit]);
 
   useEffect(() => {
-    if (!block) setUnit(null);
-  }, [block]);
+    if (controlledUnit === undefined && !block) setInternalUnit(null);
+  }, [block, controlledUnit]);
 
   const pickUnit = (id) => {
     if (isUnitSold(units[id])) return;

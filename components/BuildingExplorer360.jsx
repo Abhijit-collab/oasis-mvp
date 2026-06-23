@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import {
   ORBIT_STEP_CLIPS,
   ORBIT_STEP_CLIPS_REVERSE,
@@ -18,6 +18,10 @@ import TourPreloadScreen from "@/components/TourPreloadScreen";
 import RotateButton from "@/components/RotateButton";
 import { ORBIT_STEP_ZONES } from "@/data/orbit360Zones";
 import { ORBIT_STEP_PRELOAD_URLS } from "@/lib/tourAssetPreload";
+import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
+import useLiveUnitsPoll from "@/hooks/useLiveUnitsPoll";
+
+const isUnitSold = (u) => u?.status === "sold";
 
 const TOUR_REVEAL_MS = 900;
 const HOME_FADE_OUT_MS = 480;
@@ -29,7 +33,7 @@ const MAIN_GATE_CLIP = ORBIT_STEP_CLIPS[0];
  * Back uses pre-encoded *-rev.mp4 files played forward.
  * ← from 1/8 wraps to 7/8 (T7-rev → T6 last frame), then 6/8, 5/8, … each at last frame.
  */
-export default function BuildingExplorer360() {
+export default function BuildingExplorer360({ liveUnits = null }) {
   const { logout } = useAuth() || {};
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -40,8 +44,10 @@ export default function BuildingExplorer360() {
   const [landAfterPlay, setLandAfterPlay] = useState(null);
   const [block, setBlock] = useState(null);
   const [floor, setFloor] = useState(null);
+  const [unit, setUnit] = useState(null);
   const [hoverBlock, setHoverBlock] = useState(null);
   const [hoverFloor, setHoverFloor] = useState(null);
+  const [hoverUnit, setHoverUnit] = useState(null);
   const [holdResetKey, setHoldResetKey] = useState(0);
   const blockRef = useRef(null);
   blockRef.current = block;
@@ -71,6 +77,8 @@ export default function BuildingExplorer360() {
 
   const { ready: assetsReady, progress: loadProgress } = usePreloadVideos(ORBIT_STEP_PRELOAD_URLS);
   const { gateOpen, displayProgress } = useTourPreloadGate(assetsReady, loadProgress);
+  const polledLiveUnits = useLiveUnitsPoll(liveUnits);
+  const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
   const [tourRevealed, setTourRevealed] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
 
@@ -121,8 +129,10 @@ export default function BuildingExplorer360() {
     blockRef.current = null;
     setBlock(null);
     setFloor(null);
+    setUnit(null);
     setHoverBlock(null);
     setHoverFloor(null);
+    setHoverUnit(null);
     setHoldResetKey(Date.now());
     homeAwaitHoldRef.current = true;
   };
@@ -214,21 +224,41 @@ export default function BuildingExplorer360() {
     blockRef.current = name;
     setBlock(name);
     setFloor(null);
+    setUnit(null);
     setHoverBlock(null);
     setHoverFloor(null);
+    setHoverUnit(null);
   }, []);
 
   const pickFloor = useCallback((name) => {
     setFloor((prev) => (prev === name ? prev : name || null));
+    setUnit(null);
+    setHoverUnit(null);
   }, []);
+
+  const pickUnit = useCallback(
+    (id) => {
+      if (id == null) {
+        setUnit(null);
+        setHoverUnit(null);
+        return;
+      }
+      if (isUnitSold(units[id])) return;
+      setUnit(id);
+      if (!floor && units[id]?.floor) setFloor(units[id].floor);
+    },
+    [floor, units]
+  );
 
   const clearBlock = useCallback(() => {
     if (!blockRef.current) return;
     blockRef.current = null;
     setBlock(null);
     setFloor(null);
+    setUnit(null);
     setHoverBlock(null);
     setHoverFloor(null);
+    setHoverUnit(null);
   }, []);
 
   useEffect(() => {
@@ -236,8 +266,10 @@ export default function BuildingExplorer360() {
       blockRef.current = null;
       setBlock(null);
       setFloor(null);
+      setUnit(null);
       setHoverBlock(null);
       setHoverFloor(null);
+      setHoverUnit(null);
     }
   }, [step]);
 
@@ -268,14 +300,14 @@ export default function BuildingExplorer360() {
   const showZoneOverlay = Boolean(
     zoneConfig && mode === "hold" && !isPlaying && !homeResetting
   );
-  const showZonePicker = Boolean(zoneConfig && !homeResetting && (showZoneOverlay || block));
+  const showZonePicker = Boolean(
+    zoneConfig && !homeResetting && (showZoneOverlay || block || unit)
+  );
 
   const zoneHint = showZoneOverlay
     ? !block
-      ? "Select a block to begin"
-      : !floor
-      ? "Open filters or click a floor on the building"
-      : "Select a residence from the panel"
+      ? "Select a block, or drag to explore"
+      : "Tap outside the block to go back, or use filters on the building"
     : null;
 
   if (!mountTour) {
@@ -311,7 +343,7 @@ export default function BuildingExplorer360() {
               onComplete={onClipDone}
               onDragForward={goNext}
               onDragBack={goPrev}
-              dragDisabled={showZoneOverlay || !tourRevealed || homeResetting}
+              dragDisabled={(showZoneOverlay && Boolean(block)) || !tourRevealed || homeResetting}
               holdResetKey={holdResetKey}
               prepareHomeClip={homePhase === "out" ? MAIN_GATE_CLIP : null}
               onPrepareHomeReady={handlePrepareHomeReady}
@@ -323,12 +355,18 @@ export default function BuildingExplorer360() {
                 zones={zoneConfig}
                 block={block}
                 floor={floor}
+                unit={unit}
                 hoverBlock={hoverBlock}
                 hoverFloor={hoverFloor}
+                hoverUnit={hoverUnit}
+                unitSold={(id) => isUnitSold(units[id])}
                 onPickBlock={pickBlock}
                 onPickFloor={pickFloor}
+                onPickUnit={pickUnit}
                 onHoverBlock={setHoverBlock}
                 onHoverFloor={setHoverFloor}
+                onHoverUnit={setHoverUnit}
+                onDismiss={clearBlock}
               />
             )}
           </div>
@@ -399,12 +437,15 @@ export default function BuildingExplorer360() {
           visible={showPremiumChrome}
           block={block}
           floor={floor}
+          unit={unit}
+          onPickUnit={pickUnit}
+          onPickFloor={pickFloor}
           hoverBlock={hoverBlock}
           onPickBlock={pickBlock}
-          onPickFloor={pickFloor}
           onHoverBlock={setHoverBlock}
           onClearBlock={clearBlock}
           filtersInteractive={false}
+          liveUnits={polledLiveUnits}
         />
         </div>
       </div>

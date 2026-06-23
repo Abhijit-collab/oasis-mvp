@@ -6,16 +6,16 @@
  * 2. Fill in FUNCTION_URL (the Lambda Function URL) and SYNC_SECRET (must match
  *    the Lambda's SYNC_SECRET env var) below.
  * 3. Your sheet tab must be named "Units" with a header row. First column header
- *    MUST be: unitId. Suggested columns:
+ *    MUST be: Flat. Suggested columns:
  *
- *      unitId | status    | price     | area | beds | baths | facing
- *      101    | available | ₹1.26 Cr  | 1880 | 3    | 2     | East
- *      102    | sold      | ₹1.58 Cr  | 2300 | 4    | 3     | North-East
+ *      Flat | Availability | price     | area | beds | baths | facing
+ *      101  | Available    | ₹1.26 Cr  | 1880 | 3    | 2     | East
+ *      102  | Sold         | ₹1.58 Cr  | 2300 | 4    | 3     | North-East
  *      ... (201, 202, 301, 302, 401, 402)
  *
  *    Only include the columns you want to control from the sheet; anything you
- *    omit keeps its value from data/building.js. `status` must be exactly
- *    "available" or "sold" (that's what drives the colors on the site).
+ *    omit keeps its value from data/building.js. `Availability` should be
+ *    Available, Sold, or Reserved (case-insensitive).
  *
  * 4. Add a trigger so edits sync automatically:
  *    Triggers (clock icon) > Add Trigger > function: syncToAWS
@@ -53,9 +53,11 @@ function syncToAWS() {
         if (typeof v === "string") v = v.trim();
         obj[h] = v;
       });
-      obj.unitId = String(obj.unitId).trim();
+      obj.Flat = String(obj.Flat ?? obj.unitId ?? "").trim();
+      if (!obj.Flat) return null;
       return obj;
-    });
+    })
+    .filter(Boolean);
 
   var res = UrlFetchApp.fetch(FUNCTION_URL, {
     method: "post",

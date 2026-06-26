@@ -74,7 +74,7 @@ export default function LoginPage({ onSubmit, error }) {
               />
             </div>
             {error && <p className="login-error">{error}</p>}
-            <button type="submit" className="login-btn" onMouseDown={keepTapOnButton}>
+            <button type="button" className="login-btn" onClick={submitLogin} onMouseDown={keepTapOnButton}>
               Unlock premium access
             </button>
           </form>

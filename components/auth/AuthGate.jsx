@@ -12,11 +12,6 @@ const IDLE_TIMEOUT_MS = 60 * 1000;
 
 const IDLE_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
 
-function isPageReload() {
-  const nav = performance.getEntriesByType?.("navigation")?.[0];
-  return nav?.type === "reload" || performance.navigation?.type === 1;
-}
-
 export default function AuthGate({ children, deferUntilWelcome = true, preloadTourAfterLogin = false }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState(null);
@@ -25,12 +20,6 @@ export default function AuthGate({ children, deferUntilWelcome = true, preloadTo
 
   useEffect(() => {
     try {
-      if (isPageReload()) {
-        sessionStorage.removeItem(STORAGE_KEY);
-        setReady(true);
-        return;
-      }
-
       const raw = sessionStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -75,7 +64,7 @@ export default function AuthGate({ children, deferUntilWelcome = true, preloadTo
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || showWelcome) return;
 
     const timeoutRef = { id: null };
 
@@ -93,7 +82,7 @@ export default function AuthGate({ children, deferUntilWelcome = true, preloadTo
       clearTimeout(timeoutRef.id);
       IDLE_EVENTS.forEach((event) => window.removeEventListener(event, onActivity));
     };
-  }, [session, logout]);
+  }, [session, showWelcome, logout]);
 
   if (!ready) {
     return (

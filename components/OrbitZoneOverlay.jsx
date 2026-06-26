@@ -74,13 +74,18 @@ export default function OrbitZoneOverlay({
 
           const isHover = hoverFloor === f.name;
           let floorCls = "poly floor";
-          if (!floor) {
+          if (unit) {
+            floorCls += " silent";
+          } else if (maxVisibleFloor != null && !floor) {
             floorCls += " filter-on floor-reveal";
+            if (isHover) floorCls += " on";
+          } else if (!floor) {
             if (isHover) floorCls += " on";
           } else if (isHover && f.name !== floor) {
             floorCls += " on-switch";
           } else if (f.name === floor) {
             floorCls += " sel";
+            if (visibleFlats.length) floorCls += " floor-pick-done";
           } else {
             floorCls += " silent";
           }
@@ -89,7 +94,11 @@ export default function OrbitZoneOverlay({
               key={f.name}
               points={pts(f.points)}
               className={floorCls}
-              style={{ animationDelay: `${(level - 1) * 0.08}s` }}
+              style={
+                maxVisibleFloor != null && !floor
+                  ? { animationDelay: `${(level - 1) * 0.08}s` }
+                  : undefined
+              }
               onMouseEnter={() => onHoverFloor?.(f.name)}
               onMouseLeave={() => onHoverFloor?.(null)}
               onClick={() => onPickFloor?.(f.name)}
@@ -105,9 +114,14 @@ export default function OrbitZoneOverlay({
           let cls = "poly unit " + unitPolyClass(status);
           if (!sold) {
             if (unit === flat.id) cls += " sel";
-            else if (isHover) cls += " hov";
-            else if (filtersActive) cls += " all-on";
-          } else if (filtersActive) {
+            else if (unit) {
+              cls += " muted";
+              if (isHover) cls += " hov";
+            } else if (isHover) cls += " hov";
+            else if (filtersActive || floor) cls += " all-on";
+          } else if (unit) {
+            cls += " muted";
+          } else if (filtersActive || floor) {
             cls += " all-on";
           }
           return (

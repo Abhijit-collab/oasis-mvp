@@ -2,12 +2,25 @@
 export const ORBIT_OVERLAY_SIZE = { width: 1920, height: 1080 };
 
 /**
+ * Block A angle mappings (one per orbit hold frame):
+ *   Block A-1 — step 0, T1 first frame (Main Gate)
+ *   Block A-2 — step 1, T1 last frame
+ *   Block A-3 — step 2, T2 last frame
+ */
+export const ORBIT_BLOCK_A_MAPPINGS = {
+  "Block A-1": 0,
+  "Block A-2": 1,
+  "Block A-3": 2,
+};
+
+/**
  * Interactive zones per orbit stop (shown on hold after that transition ends).
  * Coordinates are in 1920×1080 space; SVG uses preserveAspectRatio="none" to match object-fit:fill video.
  */
 export const ORBIT_STEP_ZONES = {
-  /** T1 first frame (Main Gate) — Block A + floors + left-column flats. */
+  /** Block A-1 — T1 first frame (Main Gate). */
   0: {
+    mappingId: "Block A-1",
     blocks: [
       {
         name: "Block A",
@@ -127,21 +140,51 @@ export const ORBIT_STEP_ZONES = {
     ],
   },
 
-  /** After T2 (Block A) — block + floor picker on Block A. */
-  2: {
+  /** Block A-2 — T1 last frame. */
+  1: {
+    mappingId: "Block A-2",
     blocks: [
       {
         name: "Block A",
         points: [
-          [125.8, 324.6],
-          [814.7, 328.6],
-          [850.8, 289.9],
-          [931, 318],
-          [1815.2, 335.3],
-          [1875.5, 372.8],
-          [1855.3, 660.4],
-          [64.1, 633.6],
-          [34.8, 364.7],
+          [122.9, 414.2],
+          [143.6, 380.3],
+          [262.3, 404.1],
+          [295.1, 400.1],
+          [303.4, 409.3],
+          [298.6, 410.6],
+          [326, 416.6],
+          [361.9, 410.9],
+          [426, 400.8],
+          [723.6, 352.2],
+          [734.2, 343.7],
+          [754.9, 346.5],
+          [846, 332],
+          [847.9, 330.2],
+          [843.8, 329.2],
+          [853.2, 322.2],
+          [879.6, 325.4],
+          [1148.5, 281.1],
+          [1164.7, 305.2],
+          [1163.1, 308],
+          [1147.4, 309.1],
+          [1141.1, 608.1],
+          [914.7, 692.1],
+          [914.9, 699.5],
+          [831.7, 729.5],
+          [820, 726],
+          [795.8, 734.8],
+          [796, 742.4],
+          [716.7, 771.2],
+          [703.7, 767.2],
+          [338.5, 895.4],
+          [266.5, 864.1],
+          [263.6, 861],
+          [264.4, 851.8],
+          [236, 838.4],
+          [228.5, 839.2],
+          [171.3, 815.4],
+          [139, 418.2],
         ],
       },
     ],
@@ -150,22 +193,337 @@ export const ORBIT_STEP_ZONES = {
         name: "Floor 1",
         block: "Block A",
         points: [
-          [40.1, 375.5],
-          [1875.5, 387.5],
-          [1871.4, 454.4],
-          [50.9, 443.7],
+          [166.5, 727.7],
+          [331.4, 785.6],
+          [386.9, 770.6],
+          [1143.4, 542.6],
+          [1142.2, 611.2],
+          [339.6, 894.6],
+          [170.1, 815.6],
+        ],
+      },
+      {
+        name: "Floor 2",
+        block: "Block A",
+        points: [
+          [157.2, 627.5],
+          [323.1, 680.7],
+          [380.5, 666.7],
+          [1144.5, 467.6],
+          [1143.4, 542.6],
+          [331.4, 785.6],
+          [166.5, 727.7],
+        ],
+      },
+      {
+        name: "Floor 3",
+        block: "Block A",
+        points: [
+          [149.4, 524.3],
+          [315.5, 570.9],
+          [372.1, 557.9],
+          [1145.7, 393.6],
+          [1144.5, 467.6],
+          [323.1, 680.7],
+          [157.1, 626.8],
+        ],
+      },
+      {
+        name: "Floor 4",
+        block: "Block A",
+        points: [
+          [142.8, 428.8],
+          [308.4, 466.7],
+          [364, 458],
+          [1146.6, 316.2],
+          [1145.7, 393.6],
+          [315.5, 570.9],
+          [149.4, 524.3],
+        ],
+      },
+    ],
+    flats: [
+      {
+        id: "101",
+        floor: "Floor 1",
+        block: "Block A",
+        points: [
+          [166.7, 726.3],
+          [329.7, 786.8],
+          [385.3, 770.5],
+          [788.9, 646.9],
+          [794.3, 737.2],
+          [339.5, 895.6],
+          [170.3, 816],
+        ],
+      },
+      {
+        id: "102",
+        floor: "Floor 1",
+        block: "Block A",
+        points: [
+          [831.6, 635.9],
+          [1142.2, 541.8],
+          [1141.4, 609.1],
+          [831.6, 722.4],
+        ],
+      },
+      {
+        id: "201",
+        floor: "Floor 2",
+        block: "Block A",
+        points: [
+          [158.4, 628.3],
+          [322.9, 681],
+          [381.1, 665.1],
+          [787.6, 561.7],
+          [788.9, 646.9],
+          [329.7, 786.8],
+          [166.7, 726.3],
+        ],
+      },
+      {
+        id: "202",
+        floor: "Floor 2",
+        block: "Block A",
+        points: [
+          [829.1, 547.7],
+          [1145.5, 467.3],
+          [1142.2, 541.8],
+          [831.6, 635.9],
+        ],
+      },
+      {
+        id: "301",
+        floor: "Floor 3",
+        block: "Block A",
+        points: [
+          [148.8, 527],
+          [148.8, 525.5],
+          [312.2, 568.5],
+          [372.9, 556.2],
+          [786, 469.8],
+          [787.6, 561.7],
+          [322.9, 681],
+          [158.4, 628.3],
+        ],
+      },
+      {
+        id: "302",
+        floor: "Floor 3",
+        block: "Block A",
+        points: [
+          [827.1, 459.5],
+          [1146.6, 391],
+          [1145.5, 467.3],
+          [829.1, 547.7],
+        ],
+      },
+      {
+        id: "401",
+        floor: "Floor 4",
+        block: "Block A",
+        points: [
+          [140.4, 424.2],
+          [309.1, 464.3],
+          [364, 455.3],
+          [783.9, 382.8],
+          [786, 469.8],
+          [312.2, 568.5],
+          [148.8, 525.5],
+        ],
+      },
+      {
+        id: "402",
+        floor: "Floor 4",
+        block: "Block A",
+        points: [
+          [826.6, 375.1],
+          [1147.2, 316.5],
+          [1146.6, 391],
+          [827.1, 459.5],
+        ],
+      },
+    ],
+  },
+
+  /** Block A-3 — T2 last frame. */
+  2: {
+    mappingId: "Block A-3",
+    blocks: [
+      {
+        name: "Block A",
+        points: [
+          [23, 378.8],
+          [40.3, 345],
+          [69.1, 345],
+          [128.3, 325.3],
+          [816, 330.2],
+          [815.2, 303],
+          [849.8, 289.9],
+          [891.8, 299.7],
+          [885.1, 311.3],
+          [886.8, 331],
+          [911.6, 329.4],
+          [911.6, 306.3],
+          [945.2, 294.8],
+          [982.3, 306.3],
+          [977.3, 319.5],
+          [977.3, 332.6],
+          [1811.3, 335.1],
+          [1881.2, 365.6],
+          [1894.3, 391.1],
+          [1879.5, 390.2],
+          [1852.4, 656.7],
+          [60.1, 639.3],
+          [39.6, 378.4],
+        ],
+      },
+    ],
+    floors: [
+      {
+        name: "Floor 1",
+        block: "Block A",
+        points: [
+          [58.4, 575.1],
+          [1857.4, 589],
+          [1850.7, 656.5],
+          [61.6, 635.9],
+        ],
+      },
+      {
+        name: "Floor 2",
+        block: "Block A",
+        points: [
+          [54.3, 512],
+          [1861.4, 529],
+          [1857.4, 589],
+          [58.4, 575.1],
+        ],
+      },
+      {
+        name: "Floor 3",
+        block: "Block A",
+        points: [
+          [47.8, 445.1],
+          [1868.4, 461.6],
+          [1861.4, 529],
+          [54.3, 512],
+        ],
+      },
+      {
+        name: "Floor 4",
+        block: "Block A",
+        points: [
+          [44.4, 379.8],
+          [1875.6, 390.7],
+          [1868.4, 461.6],
+          [47.8, 445.1],
+        ],
+      },
+    ],
+    flats: [
+      {
+        id: "101",
+        floor: "Floor 1",
+        block: "Block A",
+        points: [
+          [59.5, 572.8],
+          [427.2, 575.1],
+          [430.5, 642.5],
+          [64.5, 633.7],
+        ],
+      },
+      {
+        id: "201",
+        floor: "Floor 2",
+        block: "Block A",
+        points: [
+          [52, 509.5],
+          [424.7, 510.3],
+          [427.2, 575.1],
+          [59.5, 572.8],
+        ],
+      },
+      {
+        id: "301",
+        floor: "Floor 3",
+        block: "Block A",
+        points: [
+          [46.3, 445.4],
+          [422.8, 446.7],
+          [424.7, 510.3],
+          [52, 509.5],
+        ],
+      },
+      {
+        id: "401",
+        floor: "Floor 4",
+        block: "Block A",
+        points: [
+          [39, 381.2],
+          [421.2, 387],
+          [422.8, 446.7],
+          [46.3, 445.4],
+        ],
+      },
+      {
+        id: "102",
+        floor: "Floor 1",
+        block: "Block A",
+        points: [
+          [467.5, 576.2],
+          [881.3, 582.8],
+          [881.3, 642],
+          [468.3, 638.7],
+        ],
+      },
+      {
+        id: "202",
+        floor: "Floor 2",
+        block: "Block A",
+        points: [
+          [464.3, 510.3],
+          [883, 517.8],
+          [881.3, 582.8],
+          [467.5, 576.2],
+        ],
+      },
+      {
+        id: "302",
+        floor: "Floor 3",
+        block: "Block A",
+        points: [
+          [460.2, 446.1],
+          [883, 456.8],
+          [883, 517.8],
+          [464.3, 510.3],
+        ],
+      },
+      {
+        id: "402",
+        floor: "Floor 4",
+        block: "Block A",
+        points: [
+          [455.2, 382],
+          [881.9, 389.1],
+          [883, 456.8],
+          [460.2, 446.1],
         ],
       },
     ],
   },
 };
 
-/** Resolve overlay zones for an orbit stop (step 1 = end of T1, reuses gate mapping). */
+/** Overlay zones for an orbit stop. */
 export function getOrbitStepZones(step) {
-  if (ORBIT_STEP_ZONES[step]) return ORBIT_STEP_ZONES[step];
-  if (step === 1 && ORBIT_STEP_ZONES[0]) return ORBIT_STEP_ZONES[0];
-  return null;
+  return ORBIT_STEP_ZONES[step] ?? null;
 }
 
-/** Steps that show a block/floor overlay (extend as you add more zone sets). */
+/** Human-readable mapping label for a step (e.g. "Block A-2"). */
+export function getOrbitMappingId(step) {
+  return ORBIT_STEP_ZONES[step]?.mappingId ?? null;
+}
+
+/** Steps that show a block/floor overlay. */
 export const ORBIT_OVERLAY_STEPS = Object.keys(ORBIT_STEP_ZONES).map(Number);

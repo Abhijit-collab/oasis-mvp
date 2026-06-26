@@ -1,9 +1,13 @@
 "use client";
 
 /**
- * Compact callout anchored above the block overlay on the first transition hold frame.
+ * Compact callout anchored above an overlay zone (block, floor, or unit).
  */
-export default function BlockFilterPrompt({ anchor }) {
+export default function BlockFilterPrompt({
+  anchor,
+  title = "Select the block to filter",
+  subtitle = "Tap a block to unlock filters",
+}) {
   if (!anchor) return null;
 
   return (
@@ -14,8 +18,8 @@ export default function BlockFilterPrompt({ anchor }) {
       aria-live="polite"
     >
       <div className="be-block-filter-prompt__copy">
-        <strong>Select the block to filter</strong>
-        <span>Tap a block to unlock filters</span>
+        <strong>{title}</strong>
+        <span>{subtitle}</span>
       </div>
     </div>
   );

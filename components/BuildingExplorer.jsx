@@ -16,6 +16,7 @@ import { floorLevelFromName } from "@/lib/floorLevel";
 import { getFloorSliderRange } from "@/lib/floorSliderRange";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 import useLiveUnitsPoll from "@/hooks/useLiveUnitsPoll";
+import { useFilterPanelSelectionSync } from "@/hooks/useFilterPanelSelectionSync";
 import {
   isUnitSold,
   unitPolyClass,
@@ -72,7 +73,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
   const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
   const [filtersActive, setFiltersActive] = useState(false);
-  const [maxVisibleFloor, setMaxVisibleFloor] = useState(1);
+  const [maxVisibleFloor, setMaxVisibleFloor] = useState(null);
   const unitPanelRef = useRef(null);
   const blockRef = useRef(block);
   blockRef.current = block;
@@ -80,6 +81,16 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   useEffect(() => {
     if (VIDEO_360_URL) prefetchVideo(VIDEO_360_URL);
   }, []);
+
+  const [filtersOpen, setFiltersOpen] = useState(true);
+
+  useFilterPanelSelectionSync({
+    block,
+    floor,
+    unit,
+    setOpen: setFiltersOpen,
+    enabled: Boolean(block),
+  });
 
   const polledLiveUnits = useLiveUnitsPoll(liveUnits);
   const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
@@ -123,7 +134,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setHoverFloor(null);
     setHoverUnit(null);
     setFiltersActive(false);
-    setMaxVisibleFloor(1);
+    setMaxVisibleFloor(null);
+    setFiltersOpen(true);
   }, []);
 
   const handleBlockChange = useCallback((blocks) => {
@@ -195,9 +207,30 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setFiltersActive(false);
   }, []);
 
+  const dismissOverlay = useCallback(() => {
+    if (unit) {
+      setUnit(null);
+      setHoverUnit(null);
+      if (block) setFiltersOpen(true);
+      return;
+    }
+    if (floor) {
+      setFloor(null);
+      setHoverFloor(null);
+      setUnit(null);
+      setHoverUnit(null);
+      return;
+    }
+    dismissToBlocks();
+  }, [unit, floor, block, dismissToBlocks]);
+
   const back = () => {
-    if (unit) setUnit(null);
-    else if (floor) setFloor(null);
+    if (unit) {
+      setUnit(null);
+      if (block) setFiltersOpen(true);
+      return;
+    }
+    if (floor) setFloor(null);
     else if (block) {
       setBlock(null);
       setFloor(null);
@@ -210,6 +243,11 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
     setHoverFloor(null);
   };
   const pickUnit = (id) => {
+    if (id == null) {
+      setUnit(null);
+      setHoverUnit(null);
+      return;
+    }
     if (isUnitSold(units[id])) return;
     setUnit(id);
     if (!floor) setFloor(units[id].floor);
@@ -221,7 +259,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
   };
   const goToBooking = () => {
     if (!unit) return;
-    const params = new URLSearchParams({ unit, block: block || "Block A" });
+    const params = new URLSearchParams({ unit, block: block || "Block A", returnTo: "/" });
     router.push(`/booking?${params}`);
   };
 
@@ -232,11 +270,13 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
       if (e.target.closest?.(".poly")) return;
       if (e.target.closest?.(".be-filter-column")) return;
       if (e.target.closest?.(".fp")) return;
-      dismissToBlocks();
+      setUnit(null);
+      setHoverUnit(null);
+      if (block) setFiltersOpen(true);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [unit, dismissToBlocks]);
+  }, [unit, block]);
 
   // Count available (unsold) residences across a set of floors.
   const availIn = (floorNames) =>
@@ -322,19 +362,21 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               width="100"
               height="100"
               className="be-scrim-r"
-              onClick={dismissToBlocks}
+              onClick={dismissOverlay}
             />
           )}
 
           {block &&
             blockFloors.map((f) => {
               const level = floorLevelFromName(f.name);
-              if (level > maxVisibleFloor) return null;
+              if (maxVisibleFloor != null && level > maxVisibleFloor) return null;
 
               const isHover = hoverFloor === f.name;
               let floorCls = "poly floor";
-              if (!floor) {
+              if (maxVisibleFloor != null && !floor) {
                 floorCls += " filter-on floor-reveal";
+                if (isHover) floorCls += " on";
+              } else if (!floor) {
                 if (isHover) floorCls += " on";
               } else if (isHover && f.name !== floor) {
                 floorCls += " on-switch";
@@ -348,7 +390,11 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
                 key={f.name}
                 points={pts(f.points)}
                 className={floorCls}
-                style={{ animationDelay: `${(level - 1) * 0.08}s` }}
+                style={
+                  maxVisibleFloor != null && !floor
+                    ? { animationDelay: `${(level - 1) * 0.08}s` }
+                    : undefined
+                }
                 onMouseEnter={() => setHoverFloor(f.name)}
                 onMouseLeave={() => setHoverFloor(null)}
                 onClick={() => pickFloor(f.name)}
@@ -447,6 +493,8 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
         <div className="be-filter-column">
           <FilterPanel
             units={panelUnits}
+            open={filtersOpen}
+            onOpenChange={setFiltersOpen}
             onChange={handleFilterChange}
             onActiveChange={handleActiveChange}
             onAllStatusesSelect={handleAllStatusesSelect}
@@ -570,9 +618,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
                 <span className="be-unit-bar" aria-hidden />
                 <div>
                   <h3 className="be-unit-title">{curUnit.label}</h3>
-                  <p className="be-unit-meta">
-                    {curUnit.type} Residence &middot; {curUnit.facing} facing
-                  </p>
+                  <p className="be-unit-meta">{curUnit.type} Residence</p>
                 </div>
               </div>
               <div className="be-unit-stats-block">

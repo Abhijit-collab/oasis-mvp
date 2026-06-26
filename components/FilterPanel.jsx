@@ -2,19 +2,7 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 
-const FACING_LABELS = {
-  N: "North",
-  E: "East",
-  S: "South",
-  W: "West",
-  NE: "North-East",
-  NW: "North-West",
-  SE: "South-East",
-  SW: "South-West",
-};
-
-const STATUS_OPTIONS = [
-  { val: "available", label: "Available", cls: "s-available", dot: "available" },
+const STATUS_OPTIONS = [  { val: "available", label: "Available", cls: "s-available", dot: "available" },
   { val: "sold", label: "Sold", cls: "s-sold", dot: "sold" },
   { val: "reserved", label: "Reserved", cls: "s-reserved", dot: "reserved" },
 ];
@@ -73,10 +61,6 @@ export default function FilterPanel({
     () => [...new Set(units.map((u) => u.block))].filter(Boolean).sort(),
     [units]
   );
-  const facingOptions = useMemo(
-    () => [...new Set(units.map((u) => u.facing))].filter(Boolean),
-    [units]
-  );
   const sqftBounds = useMemo(() => {
     const xs = units.map((u) => u.sqft).filter((n) => typeof n === "number");
     if (!xs.length) return { min: 400, max: 2400 };
@@ -102,19 +86,20 @@ export default function FilterPanel({
   const open = isOpenControlled ? openProp : openInternal;
   const setOpen = useCallback(
     (updater) => {
-      const next = typeof updater === "function" ? updater(open) : updater;
-      if (!isOpenControlled) setOpenInternal(next);
-      onOpenChange?.(next);
+      if (isOpenControlled) {
+        onOpenChange?.(updater);
+        return;
+      }
+      setOpenInternal(updater);
     },
-    [isOpenControlled, open, onOpenChange]
+    [isOpenControlled, onOpenChange]
   );
   const [bhk, setBhk] = useState(() => new Set());
   const [status, setStatus] = useState(() => new Set());
   const [allStatusesSelected, setAllStatusesSelected] = useState(false);
   const [userBlocks, setUserBlocks] = useState(() => new Set());
-  const [facing, setFacing] = useState(() => new Set());
   const [minSqft, setMinSqft] = useState(sqftBounds.min);
-  const [visibleFloorCount, setVisibleFloorCount] = useState(floorBounds.min);
+  const [visibleFloorCount, setVisibleFloorCount] = useState(0);
 
   const userBlockKey = [...userBlocks].sort().join("\0");
   const queryBlocks = useMemo(() => {
@@ -126,8 +111,8 @@ export default function FilterPanel({
 
   useEffect(() => setMinSqft(sqftBounds.min), [sqftBounds.min]);
   useEffect(() => {
-    setVisibleFloorCount(floorBounds.min);
-  }, [floorBounds.min, floorBounds.max, blockKey]);
+    setVisibleFloorCount(0);
+  }, [floorBounds.max, blockKey]);
 
   useEffect(() => {
     if (!interactive || blockKey === "") setUserBlocks(new Set());
@@ -180,17 +165,15 @@ export default function FilterPanel({
           (bhk.size === 0 || bhk.has(String(u.bhk))) &&
           (status.size === 0 || status.has(u.status)) &&
           (queryBlocks.size === 0 || queryBlocks.has(u.block)) &&
-          (facing.size === 0 || facing.has(u.facing)) &&
           (u.sqft == null || u.sqft >= minSqft)
       ),
-    [units, bhk, status, queryBlocks, facing, minSqft]
+    [units, bhk, status, queryBlocks, minSqft]
   );
 
   const activeCount =
     bhk.size +
     status.size +
     queryBlocks.size +
-    facing.size +
     (minSqft > sqftBounds.min ? 1 : 0);
 
   const onChangeRef = useRef(onChange);
@@ -224,7 +207,7 @@ export default function FilterPanel({
 
   useEffect(() => {
     if (!interactive) return;
-    onFloorFilterChange?.(visibleFloorCount);
+    onFloorFilterChange?.(visibleFloorCount > 0 ? visibleFloorCount : null);
   }, [visibleFloorCount, interactive, onFloorFilterChange]);
 
   const [display, setDisplay] = useState(filtered.length);
@@ -256,7 +239,7 @@ export default function FilterPanel({
     }
     setStatus(new Set());
     setAllStatusesSelected(true);
-    setVisibleFloorCount(floorBounds.min);
+    setVisibleFloorCount(0);
     onClearFloors?.();
     onAllStatusesSelect?.();
   };
@@ -267,9 +250,8 @@ export default function FilterPanel({
     setStatus(new Set());
     setAllStatusesSelected(false);
     setUserBlocks(new Set());
-    setFacing(new Set());
     setMinSqft(sqftBounds.min);
-    setVisibleFloorCount(floorBounds.min);
+    setVisibleFloorCount(0);
     onBlockChange?.([]);
     onClearFloors?.();
   };
@@ -277,8 +259,7 @@ export default function FilterPanel({
   const noop = () => {};
 
   const sqftPct = ((minSqft - sqftBounds.min) / Math.max(1, sqftBounds.max - sqftBounds.min)) * 100;
-  const floorPct =
-    ((visibleFloorCount - floorBounds.min) / Math.max(1, floorBounds.max - floorBounds.min)) * 100;
+  const floorPct = (visibleFloorCount / Math.max(1, floorBounds.max)) * 100;
 
   const handleFloorSliderChange = (value) => {
     setVisibleFloorCount(value);
@@ -291,6 +272,7 @@ export default function FilterPanel({
         type="button"
         className={`fp-toggle ${open ? "open" : ""}`}
         aria-expanded={open}
+        aria-label={open ? "Collapse filters" : "Expand filters"}
         onClick={() => setOpen((o) => !o)}
       >
         <svg className="fp-toggle-ico" viewBox="0 0 24 24" aria-hidden>
@@ -302,6 +284,9 @@ export default function FilterPanel({
         <span className={`fp-toggle-count ${interactive && activeCount > 0 ? "show" : ""}`}>
           {activeCount}
         </span>
+        <svg className="fp-toggle-chevron" viewBox="0 0 24 24" aria-hidden>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </button>
 
       <section className={`fp-panel ${open ? "open" : ""}`} aria-hidden={!open}>
@@ -381,22 +366,6 @@ export default function FilterPanel({
               </div>
             </div>
 
-            <div className="fp-group">
-              <label className="fp-lbl">Facing</label>
-              <div className="fp-chips">
-                {facingOptions.map((v) => (
-                  <Chip
-                    key={v}
-                    disabled={!interactive}
-                    on={interactive ? facing.has(v) : false}
-                    onClick={interactive ? () => toggleIn(setFacing)(v) : noop}
-                  >
-                    {FACING_LABELS[v] || v}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-
             <div className="fp-group fp-group--slider">
               <label className="fp-lbl">Carpet area</label>
               <div className="fp-slider-row">
@@ -430,15 +399,17 @@ export default function FilterPanel({
               <div className="fp-slider-row">
                 <span className="fp-hint">Up to</span>
                 <span className="fp-val">
-                  {visibleFloorCount <= floorBounds.min
-                    ? `Floor ${floorBounds.min}`
-                    : `Floors 1–${visibleFloorCount}`}
+                  {visibleFloorCount === 0
+                    ? "—"
+                    : visibleFloorCount === 1
+                      ? "Floor 1"
+                      : `Floors 1–${visibleFloorCount}`}
                 </span>
               </div>
               <div className="fp-slider-track">
                 <input
                   type="range"
-                  min={floorBounds.min}
+                  min={0}
                   max={floorBounds.max}
                   step={1}
                   value={visibleFloorCount}

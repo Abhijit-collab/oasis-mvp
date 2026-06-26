@@ -10,6 +10,7 @@ import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 import { getOrbitStepScope } from "@/lib/orbitStepScope";
 import { getFloorSliderRange } from "@/lib/floorSliderRange";
 import { isUnitSold, unitBadgeClass, unitBadgeLabel } from "@/lib/unitStatus";
+import { useFilterPanelSelectionSync } from "@/hooks/useFilterPanelSelectionSync";
 
 /**
  * Premium filter column, unit panel, and enquiry modal — shared with the main explorer.
@@ -31,6 +32,10 @@ export default function ExplorerPremiumChrome({
   onFilterStateChange,
   onFloorFilterChange,
   floorSliderRange: floorSliderRangeProp = null,
+  filtersOpen: filtersOpenProp,
+  onFiltersOpenChange,
+  bookingReturnTo = "/",
+  bookingPath = "/booking",
 }) {
   const router = useRouter();
   const unitPanelRef = useRef(null);
@@ -44,7 +49,19 @@ export default function ExplorerPremiumChrome({
   const [form, setForm] = useState({ name: "", phone: "", email: "" });
   const [matchingIds, setMatchingIds] = useState(() => new Set(Object.keys(UNITS)));
   const [filtersActive, setFiltersActive] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpenInternal, setFiltersOpenInternal] = useState(true);
+  const filtersOpenControlled = filtersOpenProp !== undefined;
+  const filtersOpen = filtersOpenControlled ? filtersOpenProp : filtersOpenInternal;
+  const setFiltersOpen = useCallback(
+    (updater) => {
+      if (filtersOpenControlled) {
+        onFiltersOpenChange?.(updater);
+        return;
+      }
+      setFiltersOpenInternal(updater);
+    },
+    [filtersOpenControlled, onFiltersOpenChange]
+  );
 
   const units = useMemo(() => mergeLiveUnits(liveUnits), [liveUnits]);
   const stepScope = useMemo(
@@ -61,12 +78,12 @@ export default function ExplorerPremiumChrome({
   }, [units, stepScope]);
 
   useEffect(() => {
-    if (orbitStep == null) return;
+    if (orbitStep == null || !stepScope) return;
     const next = new Set(stepScope.unitIds);
     setMatchingIds(next);
     setFiltersActive(false);
     onFilterStateChange?.({ matchingIds: next, filtersActive: false });
-  }, [orbitStep, stepScope.unitIds.join("\0")]);
+  }, [orbitStep, stepScope, onFilterStateChange]);
   const selectedBlocks = useMemo(
     () => (block ? [block.replace(/^Block\s+/i, "")] : []),
     [block]
@@ -112,13 +129,16 @@ export default function ExplorerPremiumChrome({
 
   const handleBlockChange = useCallback(
     (blocks) => {
-      if (!filtersInteractive || orbitStep != null) return;
+      if (!filtersInteractive) return;
+      if (blocks.length === 0) {
+        if (blockRef.current) onClearBlock?.();
+        return;
+      }
+      if (orbitStep != null) return;
       if (blocks.length === 1) {
         const name = `Block ${blocks[0]}`;
         if (blockRef.current !== name) onPickBlock?.(name);
-        return;
       }
-      if (blocks.length === 0 && blockRef.current) onClearBlock?.();
     },
     [onPickBlock, onClearBlock, filtersInteractive, orbitStep]
   );
@@ -142,18 +162,29 @@ export default function ExplorerPremiumChrome({
     setFiltersActive(false);
     setMatchingIds(next);
     onFilterStateChange?.({ matchingIds: next, filtersActive: false });
-  }, [block, orbitStep, stepScope?.unitIds.join("\0"), onFilterStateChange]);
+  }, [block, orbitStep, stepScope, onFilterStateChange]);
+
+  useFilterPanelSelectionSync({
+    block,
+    floor,
+    unit,
+    setOpen: setFiltersOpen,
+    enabled: filtersInteractive && !filtersOpenControlled,
+  });
 
   const pickUnit = (id) => {
     if (isUnitSold(units[id])) return;
     setUnit(id);
-    setFiltersOpen(false);
     if (!floor) onPickFloor?.(units[id].floor);
   };
 
   const back = () => {
-    if (unit) setUnit(null);
-    else if (floor) onPickFloor?.(null);
+    if (unit) {
+      onPickUnit?.(null);
+      if (block) onFiltersOpenChange?.(true);
+      return;
+    }
+    if (floor) onPickFloor?.(null);
     else if (block) onClearBlock?.();
   };
 
@@ -165,8 +196,12 @@ export default function ExplorerPremiumChrome({
 
   const goToBooking = () => {
     if (!unit) return;
-    const params = new URLSearchParams({ unit, block: block || "Block A" });
-    router.push(`/booking?${params}`);
+    const params = new URLSearchParams({
+      unit,
+      block: block || "Block A",
+      returnTo: bookingReturnTo,
+    });
+    router.push(`${bookingPath}?${params}`);
   };
 
   const filteredFloorUnits = useMemo(() => {
@@ -236,9 +271,8 @@ export default function ExplorerPremiumChrome({
                     </span>
                   </div>
                   <div className="be-card-sub">
-                    {u.type} &middot; {u.area} Sqft &middot; {u.facing} facing
+                    {u.type} &middot; {u.area} Sqft
                   </div>
-                  <div className="be-card-price">{u.price}</div>
                 </button>
               );
             })}
@@ -268,9 +302,7 @@ export default function ExplorerPremiumChrome({
                 <span className="be-unit-bar" aria-hidden />
                 <div>
                   <h3 className="be-unit-title">{curUnit.label}</h3>
-                  <p className="be-unit-meta">
-                    {curUnit.type} Residence &middot; {curUnit.facing} facing
-                  </p>
+                  <p className="be-unit-meta">{curUnit.type} Residence</p>
                 </div>
               </div>
               <div className="be-unit-stats-block">

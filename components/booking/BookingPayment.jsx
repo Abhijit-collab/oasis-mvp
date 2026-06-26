@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 
 const BOOKING_ADVANCE = 250000;
@@ -68,9 +68,11 @@ function CardPreview({ form }) {
 
 export default function BookingPayment({ liveUnits = null }) {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useSearchParams();
   const unitId = params.get("unit") || "";
   const block = params.get("block") || "Block A";
+  const returnTo = params.get("returnTo") || (pathname?.startsWith("/test") ? "/test" : "/");
   const units = useMemo(() => mergeLiveUnits(liveUnits), [liveUnits]);
   const unit = units[unitId];
 
@@ -82,7 +84,7 @@ export default function BookingPayment({ liveUnits = null }) {
 
   const leaveExplorer = () => {
     if (step === 3) {
-      router.push("/");
+      router.push(returnTo);
       return;
     }
     setExitConfirm(true);
@@ -134,7 +136,7 @@ export default function BookingPayment({ liveUnits = null }) {
     return (
       <div className="bk-page">
         <header className="bk-top">
-          <Link href="/" className="bk-logo">
+          <Link href={returnTo} className="bk-logo">
             The Oasis
           </Link>
           <span className="bk-badge">Reserve · Test mode</span>
@@ -143,7 +145,7 @@ export default function BookingPayment({ liveUnits = null }) {
           <div className="bk-panel bk-panel--narrow">
             <h1 className="bk-hero-title">Unit not found</h1>
             <p className="bk-hero-copy">Select a residence from the explorer to reserve.</p>
-            <Link href="/" className="bk-pay-btn">
+            <Link href={returnTo} className="bk-pay-btn">
               Go to explorer
             </Link>
           </div>
@@ -156,7 +158,7 @@ export default function BookingPayment({ liveUnits = null }) {
     return (
       <div className="bk-page">
         <header className="bk-top">
-          <Link href="/" className="bk-logo">
+          <Link href={returnTo} className="bk-logo">
             The Oasis
           </Link>
           <span className="bk-badge">Reserve · Test mode</span>
@@ -165,7 +167,7 @@ export default function BookingPayment({ liveUnits = null }) {
           <div className="bk-panel bk-panel--narrow">
             <h1 className="bk-hero-title">Not available</h1>
             <p className="bk-hero-copy">{unit.label} is sold. Please choose another residence.</p>
-            <Link href="/" className="bk-pay-btn">
+            <Link href={returnTo} className="bk-pay-btn">
               Go to explorer
             </Link>
           </div>
@@ -372,7 +374,7 @@ export default function BookingPayment({ liveUnits = null }) {
               <button type="button" className="bk-ghost-btn" onClick={() => setExitConfirm(false)}>
                 Stay on page
               </button>
-              <button type="button" className="bk-pay-btn" onClick={() => router.push("/")}>
+              <button type="button" className="bk-pay-btn" onClick={() => router.push(returnTo)}>
                 Leave anyway
               </button>
             </div>

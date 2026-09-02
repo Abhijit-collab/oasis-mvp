@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 function shouldShowRotatePrompt() {
   if (typeof window === "undefined") return false;
@@ -15,6 +16,8 @@ function shouldShowRotatePrompt() {
 }
 
 export default function RotatePhonePrompt() {
+  const pathname = usePathname();
+  const label = pathname?.startsWith("/HOK") ? "House of Krishna" : "The Oasis";
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -65,7 +68,7 @@ export default function RotatePhonePrompt() {
           Rotate your phone
         </h1>
         <p className="rotate-prompt-copy">
-          Turn off screen rotation lock, then hold your phone horizontally to explore The Oasis.
+          Turn off screen rotation lock, then hold your phone horizontally to explore {label}.
         </p>
 
         <ol className="rotate-prompt-steps">

@@ -4,7 +4,15 @@ import { useCallback, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
 
-export default function LoginPage({ onSubmit, error }) {
+export default function LoginPage({
+  onSubmit,
+  error,
+  eyebrow = "Metro Group",
+  title = "THE",
+  accent = "OASIS",
+  codePlaceholder = "e.g. OASIS-VIP",
+  backgroundVideo = null,
+}) {
   const [name, setName] = useState("");
   const [coupon, setCoupon] = useState("");
 
@@ -22,7 +30,19 @@ export default function LoginPage({ onSubmit, error }) {
 
   return (
     <div className="login-page">
-      <div className="login-bg" aria-hidden />
+      <div className={"login-bg" + (backgroundVideo ? " login-bg--video" : "")} aria-hidden>
+        {backgroundVideo ? (
+          <video
+            className="login-bg-video"
+            src={backgroundVideo}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+          />
+        ) : null}
+      </div>
       <div className="login-premium-ribbon">
         <span>By invitation only</span>
       </div>
@@ -31,9 +51,9 @@ export default function LoginPage({ onSubmit, error }) {
         <header className="login-header">
           <span className="login-crown">&#10022;</span>
           <div>
-            <p className="login-eyebrow">Metro Group</p>
+            {eyebrow ? <p className="login-eyebrow">{eyebrow}</p> : null}
             <h1 className="login-brand">
-              THE <span>OASIS</span>
+              {title} {accent ? <span>{accent}</span> : null}
             </h1>
           </div>
         </header>
@@ -69,7 +89,7 @@ export default function LoginPage({ onSubmit, error }) {
                 id="login-coupon"
                 value={coupon}
                 onChange={(e) => setCoupon(e.target.value)}
-                placeholder="e.g. OASIS-VIP"
+                placeholder={codePlaceholder}
                 autoComplete="off"
               />
             </div>

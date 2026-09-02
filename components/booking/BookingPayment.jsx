@@ -66,13 +66,15 @@ function CardPreview({ form }) {
   );
 }
 
-export default function BookingPayment({ liveUnits = null }) {
+export default function BookingPayment({ liveUnits = null, productName = "The Oasis" }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const unitId = params.get("unit") || "";
   const block = params.get("block") || "Block A";
-  const returnTo = params.get("returnTo") || (pathname?.startsWith("/test") ? "/test" : "/");
+  const returnTo =
+    params.get("returnTo") ||
+    (pathname?.startsWith("/test") ? "/test" : pathname?.startsWith("/HOK") ? "/HOK" : "/");
   const units = useMemo(() => mergeLiveUnits(liveUnits), [liveUnits]);
   const unit = units[unitId];
 
@@ -137,7 +139,7 @@ export default function BookingPayment({ liveUnits = null }) {
       <div className="bk-page">
         <header className="bk-top">
           <Link href={returnTo} className="bk-logo">
-            The Oasis
+            {productName}
           </Link>
           <span className="bk-badge">Reserve · Test mode</span>
         </header>
@@ -159,7 +161,7 @@ export default function BookingPayment({ liveUnits = null }) {
       <div className="bk-page">
         <header className="bk-top">
           <Link href={returnTo} className="bk-logo">
-            The Oasis
+            {productName}
           </Link>
           <span className="bk-badge">Reserve · Test mode</span>
         </header>
@@ -180,7 +182,7 @@ export default function BookingPayment({ liveUnits = null }) {
     <div className="bk-page">
       <header className="bk-top">
         <button type="button" className="bk-logo" onClick={leaveExplorer}>
-          The Oasis
+          {productName}
         </button>
         <span className="bk-badge">Reserve · Test mode</span>
       </header>

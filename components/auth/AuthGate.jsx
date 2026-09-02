@@ -5,14 +5,30 @@ import LoginPage from "@/components/auth/LoginPage";
 import WelcomeModal from "@/components/auth/WelcomeModal";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import { AuthContext } from "@/components/auth/AuthContext";
-import { preloadEntranceImage, preloadTourAssetsAfterLogin, preloadWelcomeBackgroundIdle } from "@/lib/tourAssetPreload";
+import { preloadEntranceImage as defaultPreloadEntranceImage, preloadTourAssetsAfterLogin as defaultPreloadTourAssetsAfterLogin, preloadWelcomeBackgroundIdle as defaultPreloadWelcomeBackgroundIdle } from "@/lib/tourAssetPreload";
+import { ENTRANCE_IMAGE as DEFAULT_ENTRANCE_IMAGE } from "@/data/assets";
 
 const STORAGE_KEY = "oasis_access";
 const IDLE_TIMEOUT_MS = 60 * 1000;
 
 const IDLE_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
 
-export default function AuthGate({ children, deferUntilWelcome = true, preloadTourAfterLogin = false }) {
+export default function AuthGate({
+  children,
+  deferUntilWelcome = true,
+  preloadTourAfterLogin = false,
+  tourPreload = null,
+  entranceImage = DEFAULT_ENTRANCE_IMAGE,
+  showWhatsApp = true,
+  loginBrand = null,
+  welcomeProduct = "The Oasis",
+  loginBackgroundVideo = null,
+}) {
+  const preloadEntranceImage = tourPreload?.preloadEntranceImage ?? defaultPreloadEntranceImage;
+  const preloadTourAssetsAfterLogin =
+    tourPreload?.preloadTourAssetsAfterLogin ?? defaultPreloadTourAssetsAfterLogin;
+  const preloadWelcomeBackgroundIdle =
+    tourPreload?.preloadWelcomeBackgroundIdle ?? defaultPreloadWelcomeBackgroundIdle;
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -93,7 +109,17 @@ export default function AuthGate({ children, deferUntilWelcome = true, preloadTo
   }
 
   if (!session) {
-    return <LoginPage onSubmit={handleLogin} error={loginError} />;
+    return (
+      <LoginPage
+        onSubmit={handleLogin}
+        error={loginError}
+        eyebrow={loginBrand?.eyebrow}
+        title={loginBrand?.title}
+        accent={loginBrand?.accent}
+        codePlaceholder={loginBrand?.codePlaceholder}
+        backgroundVideo={loginBackgroundVideo}
+      />
+    );
   }
 
   const showApp = !deferUntilWelcome || !showWelcome;
@@ -101,8 +127,16 @@ export default function AuthGate({ children, deferUntilWelcome = true, preloadTo
   return (
     <AuthContext.Provider value={{ logout, session }}>
       {showApp && children}
-      <WhatsAppButton />
-      {showWelcome && <WelcomeModal name={session.name} onContinue={dismissWelcome} />}
+      {showWhatsApp && <WhatsAppButton />}
+      {showWelcome && (
+        <WelcomeModal
+          name={session.name}
+          onContinue={dismissWelcome}
+          entranceImage={entranceImage}
+          preloadEntranceImage={preloadEntranceImage}
+          productName={welcomeProduct}
+        />
+      )}
     </AuthContext.Provider>
   );
 }

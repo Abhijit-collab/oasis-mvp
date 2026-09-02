@@ -2,9 +2,9 @@
 
 import { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import {
-  ORBIT_STEP_CLIPS,
-  ORBIT_STEP_CLIPS_REVERSE,
-  ORBIT_STEP_COUNT,
+  ORBIT_STEP_CLIPS as DEFAULT_STEP_CLIPS,
+  ORBIT_STEP_CLIPS_REVERSE as DEFAULT_STEP_CLIPS_REVERSE,
+  ORBIT_STEP_COUNT as DEFAULT_STEP_COUNT,
 } from "@/data/assets";
 import OrbitClipStage from "@/components/OrbitClipStage";
 import OrbitZoneOverlay from "@/components/OrbitZoneOverlay";
@@ -16,8 +16,8 @@ import usePreloadVideos from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
 import RotateButton from "@/components/RotateButton";
-import { getOrbitStepZones } from "@/data/orbit360Zones";
-import { ORBIT_STEP_PRELOAD_URLS } from "@/lib/tourAssetPreload";
+import { getOrbitStepZones as defaultGetOrbitStepZones } from "@/data/orbit360Zones";
+import { ORBIT_STEP_PRELOAD_URLS as DEFAULT_PRELOAD_URLS } from "@/lib/tourAssetPreload";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
 import useLiveUnitsPoll from "@/hooks/useLiveUnitsPoll";
 import { getOrbitStepScope, getVisibleOrbitFlats } from "@/lib/orbitStepScope";
@@ -30,14 +30,46 @@ import { useFilterPanelSelectionSync } from "@/hooks/useFilterPanelSelectionSync
 const TOUR_REVEAL_MS = 900;
 const HOME_FADE_OUT_MS = 480;
 const HOME_FADE_IN_MS = 480;
-const MAIN_GATE_CLIP = ORBIT_STEP_CLIPS[0];
+const START_STILL_FADE_MS = 480;
+/** Soft dissolve Seq9 end → start still (should feel almost invisible). */
+const START_STILL_FADE_IN_MS = 900;
+
+const DEFAULT_TOUR = {
+  stepCount: DEFAULT_STEP_COUNT,
+  stepClips: DEFAULT_STEP_CLIPS,
+  stepClipsReverse: DEFAULT_STEP_CLIPS_REVERSE,
+  preloadUrls: DEFAULT_PRELOAD_URLS,
+  mainGateClip: DEFAULT_STEP_CLIPS[0],
+  getOrbitStepZones: defaultGetOrbitStepZones,
+  brand: { prefix: "THE", name: "OASIS", badge: "Premium Experience" },
+  booking: { returnTo: "/test", path: "/test/booking" },
+  showFilters: true,
+  startImage: null,
+  mediaFit: "fill",
+  mediaPosition: "center center",
+  preloadDepth: "metadata",
+};
 
 /**
- * /test — left / right arrows play individual T1–T7 clips.
+ * Left / right arrows play individual transition clips.
  * Back uses pre-encoded *-rev.mp4 files played forward.
- * ← from 1/8 wraps to 7/8 (T7-rev → T6 last frame), then 6/8, 5/8, … each at last frame.
  */
-export default function BuildingExplorer360({ liveUnits = null }) {
+export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_TOUR }) {
+  const {
+    stepCount: ORBIT_STEP_COUNT,
+    stepClips: ORBIT_STEP_CLIPS,
+    stepClipsReverse: ORBIT_STEP_CLIPS_REVERSE,
+    preloadUrls: ORBIT_STEP_PRELOAD_URLS,
+    mainGateClip: MAIN_GATE_CLIP,
+    getOrbitStepZones,
+    brand,
+    booking,
+    showFilters = true,
+    startImage = null,
+    mediaFit = "fill",
+    mediaPosition = "center center",
+    preloadDepth = "metadata",
+  } = tour;
   const { logout } = useAuth() || {};
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -61,6 +93,11 @@ export default function BuildingExplorer360({ liveUnits = null }) {
   blockRef.current = block;
   /** null | "out" (fade current) | "wait" (frame swap) | "in" (fade reveal) */
   const [homePhase, setHomePhase] = useState(null);
+  /** "enter" | "in" | "out" | "hidden" — crossfade start still ↔ first clip (HOK). */
+  const [startStillPhase, setStartStillPhase] = useState(startImage ? "in" : "hidden");
+  /** While dissolving back to the gate, keep the last clip's end frame under the still. */
+  const [holdAtOverride, setHoldAtOverride] = useState(null);
+  const loopFadeTimerRef = useRef(null);
   const stepRef = useRef(0);
   const homeOutTimerRef = useRef(null);
   const homeInTimerRef = useRef(null);
@@ -75,16 +112,22 @@ export default function BuildingExplorer360({ liveUnits = null }) {
 
   /** ← from 1/8 wraps to 7/8; step 1 is T1 end (no overlay), step 2 is Block A after T2. */
   const prevStep = (s) => (s === 0 ? ORBIT_STEP_COUNT - 1 : s - 1);
-  const nextStepForward = (from) => (from >= ORBIT_STEP_COUNT ? 0 : from + 1);
+  const nextStepForward = (from) => {
+    // After the last clip, return to Main Gate (step 0) — one more → plays Seq 1.
+    if (from >= ORBIT_STEP_COUNT - 1) return 0;
+    return from + 1;
+  };
   const reverseClipIndexForBack = (fromStep) =>
     fromStep === 0 ? ORBIT_STEP_COUNT - 1 : fromStep - 1;
   const forwardClipAtStep = (s) => ORBIT_STEP_CLIPS[s >= ORBIT_STEP_COUNT ? 0 : s];
-  const backClipAtStep = (s) => ORBIT_STEP_CLIPS_REVERSE[reverseClipIndexForBack(s)];
+  const backClipAtStep = (s) => ORBIT_STEP_CLIPS_REVERSE[reverseClipIndexForBack(s)] ?? null;
   const holdClipForStep = (s) => (s === 0 ? ORBIT_STEP_CLIPS[0] : ORBIT_STEP_CLIPS[s - 1]);
   const holdAtForStep = (s) => (s === 0 ? "start" : "end");
   const landHoldAtForBack = (landStep) => (landStep === 0 ? "start" : "end");
+  const hasReverseClips = ORBIT_STEP_CLIPS_REVERSE.length === ORBIT_STEP_COUNT;
 
-  const { ready: assetsReady, progress: loadProgress } = usePreloadVideos(ORBIT_STEP_PRELOAD_URLS);
+  const { ready: assetsReady, progress: loadProgress, failedCount, total: preloadTotal } =
+    usePreloadVideos(ORBIT_STEP_PRELOAD_URLS, { depth: preloadDepth });
   const { gateOpen, displayProgress } = useTourPreloadGate(assetsReady, loadProgress);
   const polledLiveUnits = useLiveUnitsPoll(liveUnits);
   const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
@@ -109,8 +152,36 @@ export default function BuildingExplorer360({ liveUnits = null }) {
       clearTimeout(homeOutTimerRef.current);
       clearTimeout(homeInTimerRef.current);
       clearTimeout(homePrepFallbackRef.current);
+      clearTimeout(loopFadeTimerRef.current);
     };
   }, []);
+
+  /** Soft-enter start still when returning to Main Gate (don't snap opaque). */
+  useEffect(() => {
+    if (!startImage) return;
+    if (step === 0 && mode === "hold" && !isPlaying && !homeResetting) {
+      setStartStillPhase((prev) => {
+        if (prev === "in" || prev === "enter") return prev;
+        return "enter";
+      });
+    }
+  }, [startImage, step, mode, isPlaying, homeResetting]);
+
+  /** enter (opacity 0) → in (fade up) on next frame so CSS transition runs. */
+  useEffect(() => {
+    if (startStillPhase !== "enter") return undefined;
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setStartStillPhase("in"));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [startStillPhase]);
+
+  /** After fade-out completes, unmount the still. */
+  useEffect(() => {
+    if (startStillPhase !== "out") return undefined;
+    const timer = setTimeout(() => setStartStillPhase("hidden"), START_STILL_FADE_MS);
+    return () => clearTimeout(timer);
+  }, [startStillPhase]);
 
   const tryHomeSwap = () => {
     if (!homeOutDoneRef.current || !homePrepDoneRef.current || homeSwapDoneRef.current) return;
@@ -135,6 +206,8 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     setLandAfterPlay(null);
     setPlayToken(0);
     setIsPlaying(false);
+    setHoldAtOverride(null);
+    clearTimeout(loopFadeTimerRef.current);
     blockRef.current = null;
     setBlock(null);
     setFloor(null);
@@ -163,19 +236,27 @@ export default function BuildingExplorer360({ liveUnits = null }) {
   const handlePlayingChange = (playing) => {
     setIsPlaying(playing);
     if (!playing) pendingRef.current = false;
+    // Crossfade still → video once playback has actually started (matches /test gate feel).
+    if (playing && startImage && stepRef.current === 0) {
+      setStartStillPhase("out");
+    }
   };
 
-  const canPrev = !isPlaying && !pendingRef.current && !homeResetting;
+  const canPrev =
+    hasReverseClips && !isPlaying && !pendingRef.current && !homeResetting;
   const canNext = !isPlaying && !pendingRef.current && !homeResetting;
-  const holdAt = holdAtForStep(step);
+  const holdAt = holdAtOverride ?? holdAtForStep(step);
+  const clipsFailed = assetsReady && preloadTotal > 0 && failedCount >= preloadTotal;
 
   const goNext = () => {
     if (!canNext) return;
+    const fromStep = stepRef.current;
+
+    clearTimeout(loopFadeTimerRef.current);
+    setHoldAtOverride(null);
     pendingRef.current = true;
     setLandAfterPlay(null);
-    const fromStep = stepRef.current;
-    const clipIndex = fromStep >= ORBIT_STEP_COUNT ? 0 : fromStep;
-    setClipSrc(ORBIT_STEP_CLIPS[clipIndex]);
+    setClipSrc(ORBIT_STEP_CLIPS[fromStep >= ORBIT_STEP_COUNT ? 0 : fromStep]);
     setPlayDirection("forward");
     setMode("play");
     setPlayToken(Date.now());
@@ -187,6 +268,10 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     const fromStep = stepRef.current;
     const landStep = prevStep(fromStep);
     const reverseClip = ORBIT_STEP_CLIPS_REVERSE[reverseClipIndexForBack(fromStep)];
+    if (!reverseClip) {
+      pendingRef.current = false;
+      return;
+    }
 
     setLandAfterPlay({
       clipSrc: holdClipForStep(landStep),
@@ -335,13 +420,33 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     let newStep = stepRef.current;
 
     if (direction === "back") {
+      clearTimeout(loopFadeTimerRef.current);
+      setHoldAtOverride(null);
       newStep = prevStep(stepRef.current);
       setStep(newStep);
       setClipSrc(holdClipForStep(newStep));
     } else {
       newStep = nextStepForward(stepRef.current);
       setStep(newStep);
-      setClipSrc(holdClipForStep(newStep));
+
+      // Full orbit → soft dissolve last frame into start still (no hard cut).
+      if (newStep === 0 && startImage) {
+        const lastClip = ORBIT_STEP_CLIPS[ORBIT_STEP_COUNT - 1];
+        setClipSrc(lastClip);
+        setHoldAtOverride("end");
+        setStartStillPhase("enter");
+        clearTimeout(loopFadeTimerRef.current);
+        loopFadeTimerRef.current = setTimeout(() => {
+          // Under the opaque still, ready Seq1 at start for the next → click.
+          setClipSrc(ORBIT_STEP_CLIPS[0]);
+          setHoldAtOverride(null);
+          setHoldResetKey(Date.now());
+        }, START_STILL_FADE_IN_MS);
+      } else {
+        clearTimeout(loopFadeTimerRef.current);
+        setHoldAtOverride(null);
+        setClipSrc(holdClipForStep(newStep));
+      }
     }
 
     stepRef.current = newStep;
@@ -370,7 +475,9 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     () => (floor || filtersActive ? visibleFlats : []),
     [floor, filtersActive, visibleFlats]
   );
-  const showPremiumChrome = tourRevealed && !homeResetting;
+  const showStartImage =
+    Boolean(startImage) && startStillPhase !== "hidden" && !homeResetting;
+  const showPremiumChrome = showFilters && tourRevealed && !homeResetting;
   const showZoneOverlay = Boolean(
     zoneConfig && mode === "hold" && !isPlaying && !homeResetting
   );
@@ -430,17 +537,42 @@ export default function BuildingExplorer360({ liveUnits = null }) {
     : null;
 
   if (!mountTour) {
-    return <TourPreloadScreen progress={displayProgress} />;
+    return <TourPreloadScreen progress={displayProgress} brandPrefix={brand.prefix} brandName={brand.name} />;
+  }
+
+  if (clipsFailed) {
+    return (
+      <div className="be-root be-preload">
+        <p className="be-preload-title">Tour videos unavailable</p>
+        <p className="be-preload-label">
+          Could not load clips from the CDN (often HTTP 403). Check that the
+          Sequence files are public on CloudFront, then refresh.
+        </p>
+      </div>
+    );
   }
 
   return (
     <div
-      className={"be-root" + (isPlaying ? " be-transitioning" : "")}
+      className={
+        "be-root" +
+        (isPlaying ? " be-transitioning" : "") +
+        (mediaFit === "cover" || mediaFit === "contain" ? ` be-root--${mediaFit}` : "")
+      }
       style={{
         "--filter-w": showPremiumChrome ? "400px" : "0px",
+        ...(mediaFit === "cover" || mediaFit === "contain"
+          ? { "--be-media-position": mediaPosition }
+          : null),
       }}
     >
-      <div className={"be-tour-reveal" + (tourRevealed ? " be-tour-reveal--in" : "")}>
+      <div
+        className={
+          "be-tour-reveal" +
+          (tourRevealed ? " be-tour-reveal--in" : "") +
+          (mediaFit === "cover" || mediaFit === "contain" ? " be-tour-reveal--sharp" : "")
+        }
+      >
         <div className="be-stage">
           <div
             className={
@@ -458,6 +590,7 @@ export default function BuildingExplorer360({ liveUnits = null }) {
               playDirection={playDirection}
               landAfterPlay={landAfterPlay}
               prefetchBack={backClipAtStep(step)}
+              prefetchNext={forwardClipAtStep(step)}
               onPlayingChange={handlePlayingChange}
               onComplete={onClipDone}
               onDragForward={goNext}
@@ -468,6 +601,20 @@ export default function BuildingExplorer360({ liveUnits = null }) {
               onPrepareHomeReady={handlePrepareHomeReady}
               onHoldFrameReady={handleHoldFrameReady}
             />
+
+            {showStartImage && (
+              <img
+                src={startImage}
+                alt=""
+                className={
+                  "be-start-still" +
+                  (startStillPhase === "in" ? " be-start-still--in" : "") +
+                  (startStillPhase === "out" ? " be-start-still--out" : "")
+                }
+                aria-hidden
+                draggable={false}
+              />
+            )}
 
             {showBlockFilterPrompt && <BlockFilterPrompt anchor={blockPromptAnchor} />}
 
@@ -524,9 +671,15 @@ export default function BuildingExplorer360({ liveUnits = null }) {
             <span className="be-crown">&#9819;</span>
             <div className="be-bk">
               <span className="be-brand-name">
-                THE <b>OASIS</b>
+                {brand.prefix ? (
+                  <>
+                    {brand.prefix} <b>{brand.name}</b>
+                  </>
+                ) : (
+                  <b>{brand.name}</b>
+                )}
               </span>
-              <PremiumBadge label="Premium Experience" size="sm" />
+              <PremiumBadge label={brand.badge} size="sm" />
             </div>
           </div>
           <div className="be-links">
@@ -573,33 +726,40 @@ export default function BuildingExplorer360({ liveUnits = null }) {
           />
         </div>
 
-        <ExplorerPremiumChrome
-          visible={showPremiumChrome}
-          block={block}
-          floor={floor}
-          unit={unit}
-          onPickUnit={pickUnit}
-          onPickFloor={pickFloor}
-          hoverBlock={hoverBlock}
-          onPickBlock={pickBlock}
-          onHoverBlock={setHoverBlock}
-          onClearBlock={clearBlock}
-          filtersInteractive={filtersReady}
-          filtersOpen={filtersOpen}
-          onFiltersOpenChange={setFiltersOpen}
-          liveUnits={polledLiveUnits}
-          orbitStep={zoneConfig ? step : null}
-          onFilterStateChange={handleFilterStateChange}
-          onFloorFilterChange={handleFloorFilterChange}
-          floorSliderRange={floorSliderRange}
-          bookingReturnTo="/test"
-          bookingPath="/test/booking"
-        />
+        {showFilters && (
+          <ExplorerPremiumChrome
+            visible={showPremiumChrome}
+            block={block}
+            floor={floor}
+            unit={unit}
+            onPickUnit={pickUnit}
+            onPickFloor={pickFloor}
+            hoverBlock={hoverBlock}
+            onPickBlock={pickBlock}
+            onHoverBlock={setHoverBlock}
+            onClearBlock={clearBlock}
+            filtersInteractive={filtersReady}
+            filtersOpen={filtersOpen}
+            onFiltersOpenChange={setFiltersOpen}
+            liveUnits={polledLiveUnits}
+            orbitStep={zoneConfig ? step : null}
+            onFilterStateChange={handleFilterStateChange}
+            onFloorFilterChange={handleFloorFilterChange}
+            floorSliderRange={floorSliderRange}
+            bookingReturnTo={booking.returnTo}
+            bookingPath={booking.path}
+          />
+        )}
         </div>
       </div>
 
       {showPreload && (
-        <TourPreloadScreen progress={displayProgress} exiting={gateOpen && tourRevealed} />
+        <TourPreloadScreen
+          progress={displayProgress}
+          exiting={gateOpen && tourRevealed}
+          brandPrefix={brand.prefix}
+          brandName={brand.name}
+        />
       )}
     </div>
   );

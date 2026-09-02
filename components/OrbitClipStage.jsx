@@ -80,6 +80,7 @@ export default function OrbitClipStage({
   playDirection = "forward",
   landAfterPlay = null,
   prefetchBack = null,
+  prefetchNext = null,
   onComplete,
   onPlayingChange,
   onDragForward,
@@ -148,13 +149,15 @@ export default function OrbitClipStage({
     setActive(activeIdx.current);
   };
 
-  /** Promote a buffer to the top only after it has a painted frame. */
+  /** Promote a buffer to the top only after it has a painted frame; hide the other. */
   const revealBuffer = async (el) => {
     if (!el) return;
     await waitForPaint(el);
     const idx = bufIndex(el);
     markBufReady(idx, true);
     if (idx !== activeIdx.current) swapActive();
+    // Prevent stacked/ghost frames (both buffers at opacity 1).
+    markBufReady(1 - idx, false);
     markHasFrame(true);
   };
 
@@ -247,19 +250,28 @@ export default function OrbitClipStage({
       if (cancelled) return;
       await notifyHoldFrameReady(activeEl().current);
 
-      // Pre-load the next reverse clip on the hidden buffer so ← starts instantly.
-      if (cancelled || !prefetchBack) return;
+      // Warm next → clip only when it's a different file (same URL on two buffers = duplicate downloads).
+      const warmSrc = prefetchNext || prefetchBack;
+      if (cancelled || !warmSrc) return;
+      if (sameClip(warmSrc, clipSrc)) return;
       const warmEl = inactiveEl().current;
-      if (!warmEl || sameClip(warmEl.currentSrc || warmEl.src, prefetchBack)) return;
-      const warmed = await loadClip(warmEl, prefetchBack, { markReady: false });
+      if (!warmEl) return;
+      markBufReady(bufIndex(warmEl), false);
+      if (sameClip(warmEl.currentSrc || warmEl.src, warmSrc)) {
+        await freezeAtHold(warmEl, "start");
+        markBufReady(bufIndex(warmEl), false);
+        return;
+      }
+      const warmed = await loadClip(warmEl, warmSrc, { markReady: false });
       if (cancelled || !warmed) return;
       await freezeAtHold(warmEl, "start");
+      markBufReady(bufIndex(warmEl), false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [mode, clipSrc, holdAt, holdResetKey, prefetchBack]);
+  }, [mode, clipSrc, holdAt, holdResetKey, prefetchBack, prefetchNext]);
 
   /** Warm Main Gate on the hidden buffer while the home fade-out runs. */
   useEffect(() => {

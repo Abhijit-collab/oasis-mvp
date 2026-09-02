@@ -3,17 +3,23 @@
 import { useEffect, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
-import { ENTRANCE_IMAGE } from "@/data/assets";
-import { preloadEntranceImage } from "@/lib/tourAssetPreload";
+import { ENTRANCE_IMAGE as DEFAULT_ENTRANCE_IMAGE } from "@/data/assets";
+import { preloadEntranceImage as defaultPreloadEntranceImage } from "@/lib/tourAssetPreload";
 
-export default function WelcomeModal({ name, onContinue }) {
+export default function WelcomeModal({
+  name,
+  onContinue,
+  entranceImage = DEFAULT_ENTRANCE_IMAGE,
+  preloadEntranceImage = defaultPreloadEntranceImage,
+  productName = "The Oasis",
+}) {
   const guest = name || "Premium Member";
   const [bgReady, setBgReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const probe = new Image();
-    probe.src = ENTRANCE_IMAGE;
+    probe.src = entranceImage;
     if (probe.complete && probe.naturalWidth > 0) {
       setBgReady(true);
       return undefined;
@@ -24,12 +30,12 @@ export default function WelcomeModal({ name, onContinue }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [entranceImage, preloadEntranceImage]);
 
   return (
     <div className="login-welcome-bg">
       <img
-        src={ENTRANCE_IMAGE}
+        src={entranceImage}
         alt=""
         className={"login-welcome-bg-image" + (bgReady ? " login-welcome-bg-image--in" : "")}
         aria-hidden
@@ -49,7 +55,7 @@ export default function WelcomeModal({ name, onContinue }) {
         <h2 className="login-welcome-title">Your private tour awaits</h2>
         <p className="login-welcome-copy">
           Thank you for being part of our <strong>premium circle</strong>. You now have exclusive access to
-          explore every floor, residence, and detail of <strong>The Oasis</strong> — before the public
+          explore every floor, residence, and detail of <strong>{productName}</strong> — before the public
           launch.
         </p>
         <PremiumPerks

@@ -33,7 +33,12 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
 .be-stage-video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:2;
   user-select:none;pointer-events:none;background:transparent;opacity:0}
 .be-stage-video.on{z-index:3;opacity:1}
-.be-stage-video.hold{z-index:3}
+.be-start-still{position:absolute;inset:0;z-index:4;pointer-events:none;
+  display:block;width:100%;height:100%;object-fit:fill;
+  user-select:none;-webkit-user-drag:none;opacity:0;
+  transition:opacity .9s cubic-bezier(.4,0,.2,1)}
+.be-start-still--in{opacity:1}
+.be-start-still--out{opacity:0;transition:opacity .48s cubic-bezier(.33,1,.68,1)}
 .be-stage-media{position:absolute;inset:0;z-index:1;transform:translateZ(0);backface-visibility:hidden}
 .be-stage-media--home-out{
   pointer-events:none;
@@ -66,6 +71,25 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
 .be-tour-reveal{position:absolute;inset:0;opacity:0;transform:scale(1.045);pointer-events:none;
   transition:opacity 1s cubic-bezier(.22,1,.36,1),transform 1.15s cubic-bezier(.22,1,.36,1)}
 .be-tour-reveal--in{opacity:1;transform:scale(1);pointer-events:auto}
+/* Cover fit: no upscale blur on open — keeps start still + video sharp */
+.be-tour-reveal--sharp{transform:none}
+.be-tour-reveal--sharp.be-tour-reveal--in{transform:none}
+.be-root--cover .be-stage img,
+.be-root--cover .be-stage-video,
+.be-root--cover .be-start-still{
+  object-fit:cover;object-position:var(--be-media-position,center top);
+  -webkit-backface-visibility:hidden;backface-visibility:hidden;
+  transform:translateZ(0)}
+.be-root--cover .be-stage-media{transform:none}
+.be-root--contain .be-stage img,
+.be-root--contain .be-stage-video,
+.be-root--contain .be-start-still{
+  object-fit:contain;object-position:center center;
+  -webkit-backface-visibility:hidden;backface-visibility:hidden;
+  transform:translateZ(0)}
+.be-root--contain .be-stage,
+.be-root--contain .be-stage-media{background:#06070a}
+.be-root--contain .be-stage-media{transform:none}
 .be-tour-reveal .be-top,.be-tour-reveal .be-cta-hint{
   opacity:0;transform:translateY(10px);
   transition:opacity .7s ease .45s,transform .7s cubic-bezier(.22,1,.36,1) .45s}
@@ -757,7 +781,11 @@ html:has(.login-page),body:has(.login-page){overflow:hidden;height:100%;padding:
 .login-loading{color:var(--muted);font-size:14px;letter-spacing:.06em}
 .login-bg{position:absolute;inset:0;background:url(/oasis-elevation.jpg) center/cover no-repeat;
   filter:blur(4px) brightness(.5);transform:scale(1.06);pointer-events:none}
+.login-bg--video{background:none;filter:none;transform:none;overflow:hidden}
+.login-bg-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  pointer-events:none;filter:brightness(.55)}
 .login-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(165deg,rgba(5,6,8,.58) 0%,rgba(5,6,8,.78) 55%,rgba(5,6,8,.88) 100%)}
+.login-bg--video::after{background:linear-gradient(165deg,rgba(5,6,8,.45) 0%,rgba(5,6,8,.62) 50%,rgba(5,6,8,.82) 100%);z-index:1}
 .login-shell{position:relative;z-index:1;width:100%;max-width:440px;display:flex;flex-direction:column;gap:28px;
   animation:login-rise .55s cubic-bezier(.2,.7,.2,1)}
 @keyframes login-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}

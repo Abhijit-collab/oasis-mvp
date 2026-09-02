@@ -1,5 +1,11 @@
 /** Full-screen tour buffering — shown after "Enter your private tour". */
-export default function TourPreloadScreen({ progress = 0, exiting = false, label }) {
+export default function TourPreloadScreen({
+  progress = 0,
+  exiting = false,
+  label,
+  brandPrefix = "THE",
+  brandName = "OASIS",
+}) {
   const pct = Math.min(100, Math.max(0, Math.round(progress)));
   const message = label ?? (exiting ? "Opening your private tour\u2026" : "Preparing your private tour\u2026");
 
@@ -7,7 +13,13 @@ export default function TourPreloadScreen({ progress = 0, exiting = false, label
     <div className={"be-root be-preload be-preload-overlay" + (exiting ? " be-preload--exit" : "")}>
       <span className="be-crown be-preload-crown">&#9819;</span>
       <p className="be-preload-title">
-        THE <b>OASIS</b>
+        {brandPrefix ? (
+          <>
+            {brandPrefix} <b>{brandName}</b>
+          </>
+        ) : (
+          <b>{brandName}</b>
+        )}
       </p>
       <p className="be-preload-label">{message}</p>
       <div

@@ -10,6 +10,7 @@ import OrbitClipStage from "@/components/OrbitClipStage";
 import OrbitZoneOverlay from "@/components/OrbitZoneOverlay";
 import ExplorerPremiumChrome from "@/components/ExplorerPremiumChrome";
 import ExplorerNavMenu from "@/components/ExplorerNavMenu";
+import FullscreenButton from "@/components/FullscreenButton";
 import PremiumBadge from "@/components/PremiumBadge";
 import { useAuth } from "@/components/auth/AuthContext";
 import usePreloadVideos from "@/hooks/usePreloadVideos";
@@ -769,8 +770,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           ) : (
             <div />
           )}
-          <ExplorerNavMenu onHome={goHome} onLogout={handleLogout} onOpenChange={setNavOpen} />
+          <div className="be-top-actions">
+            <ExplorerNavMenu onHome={goHome} onLogout={handleLogout} onOpenChange={setNavOpen} />
+          </div>
         </div>
+
+        <FullscreenButton />
 
         <div className="be-cta-hint">
           {homeResetting ? (

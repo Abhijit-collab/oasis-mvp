@@ -232,6 +232,44 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
 /* topbar */
 .be-top{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;justify-content:space-between;
   align-items:center;padding:18px 26px}
+.be-top-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.be-fs-btn{
+  position:absolute;right:max(72px,calc(env(safe-area-inset-right,0px) + 64px));
+  bottom:72px;
+  z-index:7;display:grid;place-items:center;width:56px;height:56px;padding:0;
+  border-radius:50%;cursor:pointer;color:#f7e7b0;
+  background:rgba(12,14,18,.42);border:1px solid rgba(216,182,90,.45);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12);
+  -webkit-tap-highlight-color:transparent;transition:background .15s,border-color .15s,transform .15s;
+  animation:be-fs-pulse 2.2s ease-in-out infinite}
+.be-fs-btn::after{
+  content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(242,210,126,.45);
+  animation:be-fs-ring 2.2s ease-out infinite;pointer-events:none}
+.be-fs-btn svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.9;fill:none;
+  stroke-linecap:round;stroke-linejoin:round;position:relative;z-index:1}
+.be-fs-btn:hover,.be-fs-btn:active{
+  background:rgba(216,182,90,.2);border-color:rgba(242,210,126,.7);transform:translateY(-1px);
+  animation:none}
+.be-fs-btn:hover::after,.be-fs-btn.on::after{animation:none;opacity:0}
+.be-fs-btn.on{
+  color:#1a1405;background:linear-gradient(180deg,#f0cf72,#c9a44e);
+  border-color:rgba(255,235,174,.7);animation:none}
+@media(max-width:1024px),(pointer:coarse),(hover:none){
+  .be-fs-btn{
+    left:max(16px,calc(env(safe-area-inset-left,0px) + 10px));
+    right:auto;
+    bottom:max(20px,calc(env(safe-area-inset-bottom,0px) + 16px))}
+}
+@keyframes be-fs-pulse{
+  0%,100%{transform:scale(1);box-shadow:0 8px 24px rgba(0,0,0,.35),0 0 0 0 rgba(216,182,90,.0)}
+  50%{transform:scale(1.08);box-shadow:0 10px 28px rgba(0,0,0,.4),0 0 22px 4px rgba(216,182,90,.4)}}
+@keyframes be-fs-ring{
+  0%{transform:scale(.92);opacity:.8}
+  100%{transform:scale(1.28);opacity:0}}
+@media(prefers-reduced-motion:reduce){
+  .be-fs-btn,.be-fs-btn::after{animation:none}
+}
 .be-brand{display:flex;align-items:center;gap:13px}
 @media(max-width:1024px),(pointer:coarse),(hover:none){
   .be-brand{display:none!important}

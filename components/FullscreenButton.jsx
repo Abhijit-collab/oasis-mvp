@@ -6,47 +6,89 @@ function getFullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
 
-function canFullscreen() {
+function getTourVideo() {
+  return (
+    document.querySelector(".be-stage-video.on") ||
+    document.querySelector(".be-stage-video") ||
+    document.querySelector("video")
+  );
+}
+
+function isVideoFullscreen(video) {
   return Boolean(
-    document.fullscreenEnabled ||
-      document.webkitFullscreenEnabled ||
-      document.documentElement.requestFullscreen ||
-      document.documentElement.webkitRequestFullscreen
+    video && (video.webkitDisplayingFullscreen || document.webkitFullscreenElement === video)
   );
 }
 
 export default function FullscreenButton() {
   const [active, setActive] = useState(false);
-  const [supported, setSupported] = useState(true);
 
   useEffect(() => {
-    setSupported(canFullscreen());
-    const sync = () => setActive(Boolean(getFullscreenElement()));
+    const sync = () => {
+      const video = getTourVideo();
+      setActive(Boolean(getFullscreenElement()) || isVideoFullscreen(video) || document.documentElement.classList.contains("be-immersive"));
+    };
     sync();
     document.addEventListener("fullscreenchange", sync);
     document.addEventListener("webkitfullscreenchange", sync);
+    const video = getTourVideo();
+    video?.addEventListener("webkitbeginfullscreen", sync);
+    video?.addEventListener("webkitendfullscreen", sync);
     return () => {
       document.removeEventListener("fullscreenchange", sync);
       document.removeEventListener("webkitfullscreenchange", sync);
+      video?.removeEventListener("webkitbeginfullscreen", sync);
+      video?.removeEventListener("webkitendfullscreen", sync);
     };
   }, []);
 
   const toggle = useCallback(async () => {
     const root = document.documentElement;
+    const video = getTourVideo();
+
     try {
-      if (getFullscreenElement()) {
+      if (getFullscreenElement() || isVideoFullscreen(video) || root.classList.contains("be-immersive")) {
         if (document.exitFullscreen) await document.exitFullscreen();
         else document.webkitExitFullscreen?.();
+        video?.webkitExitFullscreen?.();
+        root.classList.remove("be-immersive");
+        setActive(false);
         return;
       }
-      if (root.requestFullscreen) await root.requestFullscreen();
-      else root.webkitRequestFullscreen?.();
+
+      if (root.requestFullscreen) {
+        await root.requestFullscreen();
+        setActive(true);
+        return;
+      }
+      if (root.webkitRequestFullscreen) {
+        root.webkitRequestFullscreen();
+        setActive(true);
+        return;
+      }
+      if (video?.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen();
+        setActive(true);
+        return;
+      }
+
+      root.classList.add("be-immersive");
+      setActive(true);
     } catch {
-      /* browser blocked fullscreen */
+      const v = getTourVideo();
+      if (v?.webkitEnterFullscreen) {
+        try {
+          v.webkitEnterFullscreen();
+          setActive(true);
+          return;
+        } catch {
+          /* ignore */
+        }
+      }
+      root.classList.add("be-immersive");
+      setActive(true);
     }
   }, []);
-
-  if (!supported) return null;
 
   return (
     <button

@@ -215,14 +215,15 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   }, [mediaFit]);
 
   useEffect(() => {
-    if (!gateOpen || tourRevealed) return;
-    const frame = requestAnimationFrame(() => setTourRevealed(true));
+    if (!gateOpen) return undefined;
+    if (!tourRevealed) {
+      const frame = requestAnimationFrame(() => setTourRevealed(true));
+      return () => cancelAnimationFrame(frame);
+    }
+    if (preloadHidden) return undefined;
     const timer = setTimeout(() => setPreloadHidden(true), TOUR_REVEAL_MS);
-    return () => {
-      cancelAnimationFrame(frame);
-      clearTimeout(timer);
-    };
-  }, [gateOpen, tourRevealed]);
+    return () => clearTimeout(timer);
+  }, [gateOpen, tourRevealed, preloadHidden]);
 
   useEffect(() => {
     return () => {
@@ -775,8 +776,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           </div>
         </div>
 
-        <FullscreenButton />
-
         <div className="be-cta-hint">
           {homeResetting ? (
             <>Returning to Main Gate&hellip;</>
@@ -857,6 +856,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         )}
         </div>
       </div>
+
+      {tourRevealed && <FullscreenButton />}
 
       {showPreload && (
         <TourPreloadScreen

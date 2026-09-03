@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BLOCKS, FLOORS, UNITS, PROJECT, getUnitImages, getUnitBrochureUrl } from "@/data/building";
 import FilterPanel from "@/components/FilterPanel";
-import DownloadMenu from "@/components/DownloadMenu";
+import ExplorerNavMenu from "@/components/ExplorerNavMenu";
 import UnitGallery from "@/components/UnitGallery";
 import { useAuth } from "@/components/auth/AuthContext";
 import PremiumBadge from "@/components/PremiumBadge";
@@ -468,20 +468,7 @@ export default function BuildingExplorer({ src = "/oasis-elevation.jpg", liveUni
               <PremiumBadge label="Premium Experience" size="sm" />
             </div>
           </div>
-          <div className="be-links">
-            <span className="be-link" onClick={reset} role="button" style={{ cursor: "pointer" }}>
-              Home
-            </span>
-            <DownloadMenu />
-            {["Location Map", "Gallery"].map((l) => (
-              <span key={l} className="be-link">
-                {l}
-              </span>
-            ))}
-            <span className="be-link" onClick={() => logout?.()} role="button" style={{ cursor: "pointer" }}>
-              Log out
-            </span>
-          </div>
+          <ExplorerNavMenu onHome={reset} onLogout={() => logout?.()} />
         </div>
 
         {ctaText && (

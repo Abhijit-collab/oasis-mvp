@@ -15,6 +15,15 @@ export default function WelcomeModal({
 }) {
   const guest = name || "Premium Member";
   const [bgReady, setBgReady] = useState(false);
+  const [isPhone, setIsPhone] = useState(true);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1024px), (pointer: coarse)");
+    const sync = () => setIsPhone(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,18 +63,18 @@ export default function WelcomeModal({
         <p className="login-welcome-kicker">Welcome, {guest}</p>
         <h2 className="login-welcome-title">Your private tour awaits</h2>
         <p className="login-welcome-copy">
-          Thank you for being part of our <strong>premium circle</strong>. You now have exclusive access to
-          explore every floor, residence, and detail of <strong>{productName}</strong> — before the public
-          launch.
+          Exclusive access to <strong>{productName}</strong> is now unlocked.
         </p>
-        <PremiumPerks
-          compact
-          items={[
-            "Full building explorer unlocked",
-            "Priority reservation pathway",
-            "Personal concierge on WhatsApp",
-          ]}
-        />
+        {!isPhone && (
+          <PremiumPerks
+            compact
+            items={[
+              "Full building explorer unlocked",
+              "Priority reservation pathway",
+              "Personal concierge on WhatsApp",
+            ]}
+          />
+        )}
         <p className="login-welcome-tagline">Crafted for those who expect more.</p>
         <button
           type="button"

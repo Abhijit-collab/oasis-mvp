@@ -12,13 +12,11 @@ export default function HOKLayout({ children }) {
       entranceImage={ENTRANCE_IMAGE}
       showWhatsApp={false}
       loginBrand={{
-        eyebrow: BRAND.loginEyebrow,
-        title: BRAND.loginTitle,
-        accent: BRAND.loginAccent,
         codePlaceholder: "e.g. HOK-VIP",
       }}
       welcomeProduct={BRAND.welcomeProduct}
       loginBackgroundVideo={LOGIN_BG_VIDEO}
+      loginMinimal
     >
       {children}
     </AuthGate>

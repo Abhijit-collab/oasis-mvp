@@ -23,6 +23,7 @@ export default function AuthGate({
   loginBrand = null,
   welcomeProduct = "The Oasis",
   loginBackgroundVideo = null,
+  loginMinimal = false,
 }) {
   const preloadEntranceImage = tourPreload?.preloadEntranceImage ?? defaultPreloadEntranceImage;
   const preloadTourAssetsAfterLogin =
@@ -118,6 +119,7 @@ export default function AuthGate({
         accent={loginBrand?.accent}
         codePlaceholder={loginBrand?.codePlaceholder}
         backgroundVideo={loginBackgroundVideo}
+        minimal={loginMinimal}
       />
     );
   }

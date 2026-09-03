@@ -16,6 +16,12 @@ const sans = Hanken_Grotesk({
   display: "swap",
 });
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export const metadata = {
   title: "The Oasis · Explorer",
   description: "Interactive property explorer for The Oasis residences.",

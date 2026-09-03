@@ -9,7 +9,7 @@ import {
 import OrbitClipStage from "@/components/OrbitClipStage";
 import OrbitZoneOverlay from "@/components/OrbitZoneOverlay";
 import ExplorerPremiumChrome from "@/components/ExplorerPremiumChrome";
-import DownloadMenu from "@/components/DownloadMenu";
+import ExplorerNavMenu from "@/components/ExplorerNavMenu";
 import PremiumBadge from "@/components/PremiumBadge";
 import { useAuth } from "@/components/auth/AuthContext";
 import usePreloadVideos from "@/hooks/usePreloadVideos";
@@ -28,6 +28,39 @@ import { isUnitSold } from "@/lib/unitStatus";
 import { useFilterPanelSelectionSync } from "@/hooks/useFilterPanelSelectionSync";
 
 const TOUR_REVEAL_MS = 900;
+
+function OrbitSideChevron({ dir = "r" }) {
+  const id = `be-orbit-grad-${dir}`;
+  return (
+    <svg className="be-orbit-arw-icon" viewBox="0 0 48 48" aria-hidden>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f7d56a" />
+          <stop offset="55%" stopColor="#ee9a28" />
+          <stop offset="100%" stopColor="#e06a12" />
+        </linearGradient>
+      </defs>
+      <g transform={dir === "l" ? "translate(48 0) scale(-1 1)" : undefined}>
+        <polyline
+          points="13 9 25 24 13 39"
+          fill="none"
+          stroke={`url(#${id})`}
+          strokeWidth="3.4"
+          strokeLinejoin="miter"
+          strokeLinecap="butt"
+        />
+        <polyline
+          points="25 9 37 24 25 39"
+          fill="none"
+          stroke={`url(#${id})`}
+          strokeWidth="3.4"
+          strokeLinejoin="miter"
+          strokeLinecap="butt"
+        />
+      </g>
+    </svg>
+  );
+}
 const HOME_FADE_OUT_MS = 480;
 const HOME_FADE_IN_MS = 480;
 const START_STILL_FADE_MS = 480;
@@ -48,6 +81,7 @@ const DEFAULT_TOUR = {
   mediaFit: "fill",
   mediaPosition: "center center",
   preloadDepth: "metadata",
+  showBrand: true,
 };
 
 /**
@@ -69,8 +103,13 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     mediaFit = "fill",
     mediaPosition = "center center",
     preloadDepth = "metadata",
+    showBrand = true,
+    preloadVariant = "bar",
   } = tour;
   const { logout } = useAuth() || {};
+  /** cover vs contain — always keeps original aspect; picks based on the device viewport. */
+  const [adaptiveFit, setAdaptiveFit] = useState(mediaFit === "fill" ? "fill" : "contain");
+  const [navOpen, setNavOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState("hold");
@@ -136,6 +175,43 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const showPreload = !preloadHidden;
   const mountTour = assetsReady;
+  const displayFit = mediaFit === "fill" ? "fill" : adaptiveFit;
+
+  useEffect(() => {
+    if (mediaFit === "fill") {
+      setAdaptiveFit("fill");
+      return undefined;
+    }
+    if (mediaFit === "contain") {
+      setAdaptiveFit("contain");
+      return undefined;
+    }
+
+    const VIDEO_AR = 16 / 9;
+    const isSmallDevice = () =>
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 900px)").matches;
+
+    const update = () => {
+      if (!isSmallDevice()) {
+        setAdaptiveFit("cover");
+        return;
+      }
+      const w = window.innerWidth;
+      const h = window.innerHeight || 1;
+      const viewAR = w / h;
+      const coverCrop = viewAR > VIDEO_AR ? 1 - VIDEO_AR / viewAR : 1 - viewAR / VIDEO_AR;
+      setAdaptiveFit(coverCrop <= 0.05 ? "cover" : "contain");
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, [mediaFit]);
 
   useEffect(() => {
     if (!gateOpen || tourRevealed) return;
@@ -537,7 +613,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     : null;
 
   if (!mountTour) {
-    return <TourPreloadScreen progress={displayProgress} brandPrefix={brand.prefix} brandName={brand.name} />;
+    return (
+      <TourPreloadScreen
+        progress={displayProgress}
+        brandPrefix={brand.prefix}
+        brandName={brand.name}
+        variant={preloadVariant}
+      />
+    );
   }
 
   if (clipsFailed) {
@@ -557,12 +640,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       className={
         "be-root" +
         (isPlaying ? " be-transitioning" : "") +
-        (mediaFit === "cover" || mediaFit === "contain" ? ` be-root--${mediaFit}` : "")
+        (displayFit === "cover" || displayFit === "contain" ? ` be-root--${displayFit}` : "")
       }
       style={{
         "--filter-w": showPremiumChrome ? "400px" : "0px",
-        ...(mediaFit === "cover" || mediaFit === "contain"
-          ? { "--be-media-position": mediaPosition }
+        ...(displayFit === "cover" || displayFit === "contain"
+          ? { "--be-media-position": displayFit === "cover" ? mediaPosition : "center center" }
           : null),
       }}
     >
@@ -570,7 +653,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         className={
           "be-tour-reveal" +
           (tourRevealed ? " be-tour-reveal--in" : "") +
-          (mediaFit === "cover" || mediaFit === "contain" ? " be-tour-reveal--sharp" : "")
+          (displayFit === "cover" || displayFit === "contain" ? " be-tour-reveal--sharp" : "")
         }
       >
         <div className="be-stage">
@@ -662,45 +745,31 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         <div className="scrim-bot" />
 
         <div className="be-top">
-          <div
-            className="be-brand"
-            onClick={goHome}
-            style={{ cursor: homeResetting ? "default" : "pointer" }}
-            title="Return to Main Gate"
-          >
-            <span className="be-crown">&#9819;</span>
-            <div className="be-bk">
-              <span className="be-brand-name">
-                {brand.prefix ? (
-                  <>
-                    {brand.prefix} <b>{brand.name}</b>
-                  </>
-                ) : (
-                  <b>{brand.name}</b>
-                )}
-              </span>
-              <PremiumBadge label={brand.badge} size="sm" />
-            </div>
-          </div>
-          <div className="be-links">
-            <span
-              className="be-link"
+          {showBrand ? (
+            <div
+              className="be-brand"
               onClick={goHome}
-              role="button"
               style={{ cursor: homeResetting ? "default" : "pointer" }}
+              title="Return to Main Gate"
             >
-              Home
-            </span>
-            <DownloadMenu />
-            {["Location Map", "Gallery"].map((l) => (
-              <span key={l} className="be-link">
-                {l}
-              </span>
-            ))}
-            <span className="be-link" onClick={handleLogout} role="button" style={{ cursor: "pointer" }}>
-              Log out
-            </span>
-          </div>
+              <span className="be-crown">&#9819;</span>
+              <div className="be-bk">
+                <span className="be-brand-name">
+                  {brand.prefix ? (
+                    <>
+                      {brand.prefix} <b>{brand.name}</b>
+                    </>
+                  ) : (
+                    <b>{brand.name}</b>
+                  )}
+                </span>
+                <PremiumBadge label={brand.badge} size="sm" />
+              </div>
+            </div>
+          ) : (
+            <div />
+          )}
+          <ExplorerNavMenu onHome={goHome} onLogout={handleLogout} onOpenChange={setNavOpen} />
         </div>
 
         <div className="be-cta-hint">
@@ -725,6 +794,37 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
             inactiveRight={!canNext}
           />
         </div>
+
+        <button
+          type="button"
+          className={
+            "be-orbit-arw be-orbit-arw--l" +
+            (!canPrev ? " be-orbit-arw--inactive" : "") +
+            (navOpen ? " be-orbit-arw--hidden" : "")
+          }
+          aria-label="Rotate left"
+          onClick={() => {
+            if (!canPrev) return;
+            goPrev();
+          }}
+        >
+          <OrbitSideChevron dir="l" />
+        </button>
+        <button
+          type="button"
+          className={
+            "be-orbit-arw be-orbit-arw--r" +
+            (!canNext ? " be-orbit-arw--inactive" : "") +
+            (navOpen ? " be-orbit-arw--hidden" : "")
+          }
+          aria-label="Rotate right"
+          onClick={() => {
+            if (!canNext) return;
+            goNext();
+          }}
+        >
+          <OrbitSideChevron dir="r" />
+        </button>
 
         {showFilters && (
           <ExplorerPremiumChrome
@@ -759,6 +859,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           exiting={gateOpen && tourRevealed}
           brandPrefix={brand.prefix}
           brandName={brand.name}
+          variant={preloadVariant}
         />
       )}
     </div>

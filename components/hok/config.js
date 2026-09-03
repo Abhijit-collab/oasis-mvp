@@ -22,9 +22,11 @@ export const HOK_TOUR_CONFIG = {
   booking: BOOKING,
   showFilters: SHOW_FILTERS,
   startImage: START_IMAGE,
-  /** Fill screen; crop excess from the bottom (keep skyline / top of building). */
-  mediaFit: "cover",
+  showBrand: true,
+  /** Desktop: cover (original). Phones: keep aspect, contain if the screen is far from 16:9. */
+  mediaFit: "adapt",
   mediaPosition: "center top",
   /** Buffer every clip fully before the tour opens — avoids click lag on large Sequence files. */
   preloadDepth: "full",
+  preloadVariant: "feather",
 };

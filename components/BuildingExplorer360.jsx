@@ -111,6 +111,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   /** cover vs contain — always keeps original aspect; picks based on the device viewport. */
   const [adaptiveFit, setAdaptiveFit] = useState(mediaFit === "fill" ? "fill" : "contain");
   const [navOpen, setNavOpen] = useState(false);
+  const [viewH, setViewH] = useState(null);
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState("hold");
@@ -188,7 +189,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       return undefined;
     }
 
-    const VIDEO_AR = 16 / 9;
     const isSmallDevice = () =>
       window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
       window.matchMedia("(max-width: 900px)").matches;
@@ -196,21 +196,24 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     const update = () => {
       if (!isSmallDevice()) {
         setAdaptiveFit("cover");
+        setViewH(null);
         return;
       }
-      const w = window.innerWidth;
-      const h = window.innerHeight || 1;
-      const viewAR = w / h;
-      const coverCrop = viewAR > VIDEO_AR ? 1 - VIDEO_AR / viewAR : 1 - viewAR / VIDEO_AR;
-      setAdaptiveFit(coverCrop <= 0.05 ? "cover" : "contain");
+      setAdaptiveFit("contain");
+      const h = window.visualViewport?.height || window.innerHeight;
+      setViewH(Math.round(h));
     };
 
     update();
     window.addEventListener("resize", update);
     window.addEventListener("orientationchange", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
     return () => {
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
     };
   }, [mediaFit]);
 
@@ -646,6 +649,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       }
       style={{
         "--filter-w": showPremiumChrome ? "400px" : "0px",
+        ...(viewH ? { height: `${viewH}px`, maxHeight: `${viewH}px` } : null),
         ...(displayFit === "cover" || displayFit === "contain"
           ? { "--be-media-position": displayFit === "cover" ? mediaPosition : "center center" }
           : null),

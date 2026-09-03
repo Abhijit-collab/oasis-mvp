@@ -98,9 +98,17 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
 /* Phones: real viewport height; 360 chrome stays above the home indicator */
 @media(hover:none) and (pointer:coarse),(max-width:900px){
   .be-root{
-    top:0;right:0;left:0;bottom:auto;
-    width:100%;height:100dvh;max-height:100dvh;
+    top:0;right:0;bottom:0;left:0;
+    width:100%;height:100svh;max-height:100svh;
     background:#06070a}
+  .be-root--cover .be-stage img,
+  .be-root--cover .be-stage-video,
+  .be-root--cover .be-start-still,
+  .be-stage img,
+  .be-stage-video,
+  .be-start-still{
+    object-fit:contain!important;object-position:center center!important}
+  .be-stage,.be-stage-media{background:#06070a}
   .be-rotate-wrap{display:none}
   .be-orbit-arw{
     display:flex;align-items:center;justify-content:center;

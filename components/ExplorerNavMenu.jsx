@@ -9,14 +9,47 @@ const DOWNLOAD_ITEMS = [
   { label: "Architectural Plan", href: "#" },
 ];
 
+const PHONE_CLASS = "be-phone";
+
+/** True for phones/tablets — including Android “Desktop site” where CSS media alone fails. */
+function isPhoneLikeDevice() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPod|iPad|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+    return true;
+  }
+  const touch = navigator.maxTouchPoints > 0;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const noHover = window.matchMedia("(hover: none)").matches;
+  const narrow = window.matchMedia("(max-width: 1200px)").matches;
+  // iPadOS 13+ can report as Mac with touch
+  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+  return touch && (coarse || noHover || narrow);
+}
+
 /**
  * Desktop: horizontal nav links.
- * Mobile: top-right hamburger that opens a dropdown.
+ * Phones (iOS + Android): top-right hamburger that opens a dropdown.
  */
 export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange }) {
   const [open, setOpen] = useState(false);
   const [downloadsOpen, setDownloadsOpen] = useState(false);
   const rootRef = useRef(null);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => {
+      root.classList.toggle(PHONE_CLASS, isPhoneLikeDevice());
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+      root.classList.remove(PHONE_CLASS);
+    };
+  }, []);
 
   useEffect(() => {
     onOpenChange?.(open);

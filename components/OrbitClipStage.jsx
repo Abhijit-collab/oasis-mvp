@@ -4,7 +4,9 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { isSlowNetwork } from "@/hooks/usePreloadVideos";
 
 const END_HOLD_PAD = 0.05;
-const END_HOLD_PAD_ANDROID = 0.15;
+const END_HOLD_PAD_ANDROID = 0.18;
+/** Finish Android forward before true EOS — EOS seek/tear breaks the next → tap. */
+const ANDROID_SOFT_END_PAD = 0.25;
 const DRAG_THRESHOLD = 12;
 const DATA_TIMEOUT_MS = 12000;
 const PAINT_TIMEOUT_MS = 1200;
@@ -254,10 +256,14 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   const onPrepareHomeReadyRef = useRef(onPrepareHomeReady);
   const holdFrameReadySentRef = useRef(false);
   const endedHandlerRef = useRef(null);
+  const softEndHandlerRef = useRef(null);
   const playElRef = useRef(null);
   const stallTimerRef = useRef(null);
   const stallListenersRef = useRef(null);
-
+  const finishingRef = useRef(false);
+  const holdCanvasRef = useRef(null);
+  const holdStillOnRef = useRef(false);
+  const [holdStillOn, setHoldStillOn] = useState(false);
   const [active, setActive] = useState(0);
   const [hasFrame, setHasFrame] = useState(false);
   const [bufReady, setBufReady] = useState([false, false]);
@@ -271,6 +277,39 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   onDragBackRef.current = onDragBack;
   onHoldFrameReadyRef.current = onHoldFrameReady;
   onPrepareHomeReadyRef.current = onPrepareHomeReady;
+
+  const clearHoldStill = () => {
+    holdStillOnRef.current = false;
+    const canvas = holdCanvasRef.current;
+    if (canvas) {
+      canvas.style.opacity = "0";
+      canvas.style.visibility = "hidden";
+    }
+    setHoldStillOn(false);
+  };
+
+  const paintHoldStill = (el) => {
+    if (!isAndroidClient() || !el) return false;
+    const canvas = holdCanvasRef.current;
+    if (!canvas) return false;
+    const w = el.videoWidth;
+    const h = el.videoHeight;
+    if (!w || !h) return false;
+    try {
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) return false;
+      ctx.drawImage(el, 0, 0, w, h);
+      holdStillOnRef.current = true;
+      canvas.style.opacity = "1";
+      canvas.style.visibility = "visible";
+      setHoldStillOn(true);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   const markHasFrame = (value) => {
     hasFrameRef.current = value;
@@ -312,7 +351,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     markHasFrame(true);
   };
 
-  const freezeAtHold = async (el, at) => {
+  const freezeAtHold = async (el, at, { fromPlayEnd = false } = {}) => {
     if (!el) return;
     if (!Number.isFinite(el.duration) || el.duration <= 0) {
       await waitForData(el);
@@ -325,18 +364,21 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       if (el.currentTime > 0.02) {
         await seekAndWait(el, 0);
       }
+    } else if (fromPlayEnd && isAndroidClient()) {
+      // After forward play: never seek — EOS/post-ended seek tears and breaks the next →.
+      await waitForPaint(el);
+      paintHoldStill(el);
+      return;
     } else {
-      // Android Chrome often tears / flashes on the true EOS frame — hold slightly earlier.
       const pad = isAndroidClient() ? END_HOLD_PAD_ANDROID : END_HOLD_PAD;
       const target = Math.max(0, el.duration - pad);
-      const delta = Math.abs((el.currentTime || 0) - target);
-      // Always re-settle on Android after `ended` (currentTime ≈ duration tears).
-      if (isAndroidClient() || delta > 0.03) {
+      if (Math.abs((el.currentTime || 0) - target) > 0.03) {
         await seekAndWait(el, target);
       }
     }
 
     await waitForPaint(el);
+    if (isAndroidClient() && at === "end") paintHoldStill(el);
   };
 
   const loadClip = async (el, src, { markReady = true } = {}) => {
@@ -363,8 +405,11 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   const clearEndedHandler = () => {
     const el = playElRef.current;
     const handler = endedHandlerRef.current;
+    const soft = softEndHandlerRef.current;
     if (el && handler) el.removeEventListener("ended", handler);
+    if (el && soft) el.removeEventListener("timeupdate", soft);
     endedHandlerRef.current = null;
+    softEndHandlerRef.current = null;
   };
 
   const clearStallWatch = () => {
@@ -384,8 +429,10 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
 
   const abortPlaySession = (session) => {
     if (playSessionRef.current !== session) return;
+    finishingRef.current = false;
     clearStallWatch();
     clearEndedHandler();
+    clearHoldStill();
     const el = playElRef.current;
     try {
       el?.pause();
@@ -399,14 +446,20 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   const attachStallWatch = (playEl, session) => {
     clearStallWatch();
     let lastTime = playEl.currentTime || 0;
-    let armed = false;
+
+    const nearEnd = () => {
+      const dur = playEl.duration;
+      const t = playEl.currentTime || 0;
+      return Number.isFinite(dur) && dur > 0 && t / dur >= 0.7;
+    };
 
     const arm = () => {
+      // Near the end, Slow 4G often waits for the last bytes — aborting here
+      // cancels forward and leaves the step stuck (reverse lands on another clip).
+      if (nearEnd()) return;
       if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
-      armed = true;
       stallTimerRef.current = setTimeout(() => {
-        if (playSessionRef.current !== session) return;
-        // One resume attempt, then unlock nav if still stuck.
+        if (playSessionRef.current !== session || nearEnd()) return;
         kickBuffer(playEl, { keepPlaying: true });
         try {
           const p = playEl.play();
@@ -414,7 +467,10 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         } catch {
           /* ignore */
         }
-        stallTimerRef.current = setTimeout(() => abortPlaySession(session), stallRetryMs());
+        stallTimerRef.current = setTimeout(() => {
+          if (nearEnd()) return;
+          abortPlaySession(session);
+        }, stallRetryMs());
       }, stallAbortMs());
     };
 
@@ -424,7 +480,6 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       arm();
     };
 
-    // Only clear stall when playback actually advances (Slow 4G can drip timeupdates).
     const onProgress = () => {
       if (playSessionRef.current !== session) return;
       const t = playEl.currentTime || 0;
@@ -434,15 +489,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         clearTimeout(stallTimerRef.current);
         stallTimerRef.current = null;
       }
-      armed = false;
     };
-
-    // If play never leaves the first frames, unlock anyway (common on Slow 4G Seq4).
-    stallTimerRef.current = setTimeout(() => {
-      if (playSessionRef.current !== session) return;
-      const t = playEl.currentTime || 0;
-      if (t < 0.35 && !armed) arm();
-    }, stallAbortMs());
 
     playEl.addEventListener("waiting", onWaiting);
     playEl.addEventListener("stalled", onWaiting);
@@ -451,55 +498,81 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     stallListenersRef.current = { el: playEl, onWaiting, onPlaying: onProgress };
   };
 
-  const attachEndedHandler = (playEl, session, isBack) => {
+  const completePlaySession = async (playEl, session, isBack) => {
+    if (playSessionRef.current !== session || finishingRef.current) return;
+    finishingRef.current = true;
+    clearStallWatch();
     clearEndedHandler();
-    playElRef.current = playEl;
 
-    const endedHandler = async () => {
-      if (playSessionRef.current !== session) return;
-      clearStallWatch();
+    try {
       playEl.pause();
+    } catch {
+      /* ignore */
+    }
 
-      const land = landAfterPlayRef.current;
-      if (isBack && land?.clipSrc) {
-        const landAt = land.holdAt ?? "end";
-        const playSrc = playEl.currentSrc || playEl.src;
+    const land = landAfterPlayRef.current;
+    if (isBack && land?.clipSrc) {
+      const landAt = land.holdAt ?? "end";
+      const playSrc = playEl.currentSrc || playEl.src;
 
-        if (sameClip(playSrc, land.clipSrc)) {
-          await freezeAtHold(playEl, landAt);
-          if (playSessionRef.current !== session) return;
-          onPlayingChangeRef.current?.(false);
-          onCompleteRef.current?.("back");
-          return;
-        }
-
-        const landEl = inactiveEl().current;
-        const landReady = landEl
-          ? await loadClip(landEl, land.clipSrc, { markReady: false })
-          : false;
-
+      if (sameClip(playSrc, land.clipSrc)) {
+        await freezeAtHold(playEl, landAt, { fromPlayEnd: true });
         if (playSessionRef.current !== session) return;
-
-        if (landReady && landEl) {
-          await freezeAtHold(landEl, landAt);
-          if (playSessionRef.current !== session) return;
-          await revealBuffer(landEl);
-        } else {
-          await freezeAtHold(playEl, "end");
-        }
-
         onPlayingChangeRef.current?.(false);
         onCompleteRef.current?.("back");
         return;
       }
 
-      await freezeAtHold(playEl, "end");
+      const landEl = inactiveEl().current;
+      const landReady = landEl
+        ? await loadClip(landEl, land.clipSrc, { markReady: false })
+        : false;
+
+      if (playSessionRef.current !== session) return;
+
+      if (landReady && landEl) {
+        await freezeAtHold(landEl, landAt);
+        if (playSessionRef.current !== session) return;
+        await revealBuffer(landEl);
+      } else {
+        await freezeAtHold(playEl, "end", { fromPlayEnd: true });
+      }
+
       onPlayingChangeRef.current?.(false);
-      onCompleteRef.current?.("forward");
+      onCompleteRef.current?.("back");
+      return;
+    }
+
+    await freezeAtHold(playEl, "end", { fromPlayEnd: true });
+    onPlayingChangeRef.current?.(false);
+    onCompleteRef.current?.("forward");
+  };
+
+  const attachEndedHandler = (playEl, session, isBack) => {
+    clearEndedHandler();
+    playElRef.current = playEl;
+    finishingRef.current = false;
+
+    const onEnded = () => {
+      completePlaySession(playEl, session, isBack);
     };
 
-    endedHandlerRef.current = endedHandler;
-    playEl.addEventListener("ended", endedHandler, { once: true });
+    // Android: finish before true EOS so we never hit a torn end frame (breaks next →).
+    const onSoftEnd = () => {
+      if (playSessionRef.current !== session || finishingRef.current) return;
+      if (!isAndroidClient()) return;
+      const dur = playEl.duration;
+      if (!Number.isFinite(dur) || dur <= 0) return;
+      if (playEl.currentTime < dur - ANDROID_SOFT_END_PAD) return;
+      completePlaySession(playEl, session, isBack);
+    };
+
+    endedHandlerRef.current = onEnded;
+    softEndHandlerRef.current = onSoftEnd;
+    playEl.addEventListener("ended", onEnded, { once: true });
+    if (isAndroidClient()) {
+      playEl.addEventListener("timeupdate", onSoftEnd);
+    }
   };
 
   /**
@@ -513,6 +586,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     playSessionRef.current = session;
     playDirectionRef.current = direction;
     if (land !== undefined) landAfterPlayRef.current = land;
+    finishingRef.current = false;
+    clearHoldStill();
     clearStallWatch();
     clearEndedHandler();
 
@@ -627,12 +702,18 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       const visibleHasClip = sameClip(visible.currentSrc || visible.src, clipSrc);
 
       if (visibleHasClip) {
-        kickBuffer(visible);
-        await waitForData(visible);
-        if (cancelled) return;
-        await freezeAtHold(visible, holdAt);
-        if (cancelled) return;
-        await revealBuffer(visible);
+        // Android already snapped a still after soft-end — don't kick/seek again (tears + overlap).
+        if (isAndroidClient() && holdStillOnRef.current && holdAt === "end") {
+          markBufReady(bufIndex(visible), true);
+          markHasFrame(true);
+        } else {
+          kickBuffer(visible);
+          await waitForData(visible);
+          if (cancelled) return;
+          await freezeAtHold(visible, holdAt);
+          if (cancelled) return;
+          await revealBuffer(visible);
+        }
       } else if (back) {
         const ok = await loadClip(back, clipSrc);
         if (cancelled || !ok) return;
@@ -703,7 +784,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
 
   const videoLayer = (videoRef, idx) => {
     const isActive = active === idx;
-    const show = bufReady[idx];
+    // Hide under Android hold canvas; during play always allow the active buffer.
+    const show = bufReady[idx] && (mode === "play" || !holdStillOn);
 
     return (
       <video
@@ -712,9 +794,11 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         muted
         playsInline
         preload="auto"
+        disablePictureInPicture
         style={{
-          zIndex: isActive ? 3 : 2,
+          zIndex: isActive ? 3 : 1,
           opacity: show ? 1 : 0,
+          visibility: show ? "visible" : "hidden",
         }}
       />
     );
@@ -724,6 +808,15 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     <>
       {videoLayer(refA, 0)}
       {videoLayer(refB, 1)}
+      <canvas
+        ref={holdCanvasRef}
+        className="be-stage-hold-still"
+        aria-hidden
+        style={{
+          opacity: holdStillOn ? 1 : 0,
+          visibility: holdStillOn ? "visible" : "hidden",
+        }}
+      />
       {dragEnabled && (
         <div
           ref={dragRef}

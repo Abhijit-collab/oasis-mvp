@@ -1,8 +1,81 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
+
+function clearInline(el, props) {
+  if (!el) return;
+  props.forEach((p) => el.style.removeProperty(p));
+}
+
+/** Match the visible Safari frame exactly (avoids post-360 zoom/crop). */
+function pinLoginFrame(root) {
+  if (typeof window === "undefined") return;
+
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+
+  const vv = window.visualViewport;
+  const top = Math.max(0, Math.round(vv?.offsetTop ?? 0));
+  const left = Math.max(0, Math.round(vv?.offsetLeft ?? 0));
+  const width = Math.max(1, Math.round(vv?.width ?? window.innerWidth ?? 0));
+  const height = Math.max(1, Math.round(vv?.height ?? window.innerHeight ?? 0));
+
+  const html = document.documentElement;
+  const body = document.body;
+  html.classList.add("login-lock");
+  body.classList.add("login-lock");
+
+  html.style.setProperty("overflow", "hidden");
+  html.style.setProperty("width", `${width}px`);
+  html.style.setProperty("height", `${height}px`);
+  body.style.setProperty("overflow", "hidden");
+  body.style.setProperty("width", `${width}px`);
+  body.style.setProperty("height", `${height}px`);
+  body.style.setProperty("margin", "0");
+  body.style.setProperty("padding", "0");
+  body.style.setProperty("position", "relative");
+
+  if (!root) return;
+  root.style.setProperty("position", "fixed");
+  root.style.setProperty("top", `${top}px`);
+  root.style.setProperty("left", `${left}px`);
+  root.style.setProperty("right", "auto");
+  root.style.setProperty("bottom", "auto");
+  root.style.setProperty("width", `${width}px`);
+  root.style.setProperty("height", `${height}px`);
+  root.style.setProperty("max-width", `${width}px`);
+  root.style.setProperty("max-height", `${height}px`);
+  root.style.setProperty("transform", "none");
+  root.style.setProperty("zoom", "1");
+}
+
+function unpinLoginFrame(root) {
+  if (typeof document === "undefined") return;
+  const props = [
+    "overflow",
+    "width",
+    "height",
+    "margin",
+    "padding",
+    "position",
+    "top",
+    "left",
+    "right",
+    "bottom",
+    "max-width",
+    "max-height",
+    "transform",
+    "zoom",
+  ];
+  clearInline(document.documentElement, props);
+  clearInline(document.body, props);
+  clearInline(root, props);
+  document.documentElement.classList.remove("login-lock");
+  document.body.classList.remove("login-lock");
+}
 
 export default function LoginPage({
   onSubmit,
@@ -19,6 +92,32 @@ export default function LoginPage({
   const [coupon, setCoupon] = useState("");
   /** Minimal mode: form hidden until user taps "Log in" in header */
   const [showForm, setShowForm] = useState(!minimal);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    document.documentElement.classList.remove("be-ios");
+    const root = rootRef.current;
+    const update = () => pinLoginFrame(root);
+
+    update();
+    const timers = [0, 50, 100, 250, 500].map((ms) => window.setTimeout(update, ms));
+
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    window.addEventListener("pageshow", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      window.removeEventListener("pageshow", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+      unpinLoginFrame(root);
+    };
+  }, []);
 
   const submitLogin = useCallback(() => {
     onSubmit({ name: name.trim(), coupon: coupon.trim() });
@@ -36,6 +135,7 @@ export default function LoginPage({
 
   return (
     <div
+      ref={rootRef}
       className={
         "login-page"
         + (minimal ? " login-page--minimal" : "")

@@ -14,7 +14,7 @@
 body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
 html:has(.be-root),body:has(.be-root){
   overflow:hidden!important;overscroll-behavior:none;touch-action:none;
-  height:100%;padding:0;width:100%;max-width:100%;position:fixed;inset:0}
+  height:100%;padding:0;width:100%;max-width:100%}
 .be-root{position:fixed;inset:0;width:100%;max-width:100%;height:auto;overflow:hidden;
   background:#000;-webkit-font-smoothing:antialiased;
   display:flex;align-items:center;justify-content:center;
@@ -137,7 +137,7 @@ html:has(.be-root),body:has(.be-root){
 /* iOS Safari landscape: keep full frame visible (no top/bottom crop) */
 html.be-ios,html.be-ios body{
   overflow:hidden!important;overscroll-behavior:none;touch-action:none;
-  width:100%;max-width:100%;position:fixed;inset:0}
+  width:100%;max-width:100%;height:100%}
 html.be-ios .be-root,
 html.be-ios .be-root--cover,
 html.be-ios .be-root--contain{
@@ -972,11 +972,15 @@ html.be-ios .be-orbit-arw--r{right:max(12px,env(safe-area-inset-right,0px))!impo
 }
 
 /* ---- Login / access gate ---- */
-html:has(.login-page),body:has(.login-page){
+html:has(.login-page),body:has(.login-page),
+html.login-lock,body.login-lock{
   overflow:hidden!important;overscroll-behavior:none;touch-action:none;
   height:100%;width:100%;max-width:100%;padding:0;margin:0}
-.login-page{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
-  padding:24px;background:#050608;overflow:hidden;box-sizing:border-box}
+.login-page{
+  position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:#050608;overflow:hidden;box-sizing:border-box;
+  width:100%;height:100%;max-width:100%;max-height:100%;
+  touch-action:none;overscroll-behavior:none}
 .login-page--loading{align-items:center;justify-content:center}
 .login-loading{color:var(--muted);font-size:14px;letter-spacing:.06em}
 .login-bg{position:absolute;inset:0;background:url(/oasis-elevation.jpg) center/cover no-repeat;
@@ -992,10 +996,13 @@ html:has(.login-page),body:has(.login-page){
   background:linear-gradient(180deg,rgba(5,6,8,.08) 0%,rgba(5,6,8,.18) 50%,rgba(5,6,8,.38) 100%)}
 .login-page--minimal,.login-page--teaser{padding:0}
 
-/* Teaser header bar */
+/* Teaser chrome — inset so Safari landscape never clips Log in / ribbon */
 .login-teaser-header{
   position:absolute;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;
-  justify-content:flex-end;padding:20px 158px 20px 28px;box-sizing:border-box;pointer-events:none}
+  justify-content:flex-end;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px 16px;
+  padding-right:max(128px,calc(env(safe-area-inset-right,0px) + 128px));
+  box-sizing:border-box;pointer-events:none}
 .login-teaser-header .login-teaser-btn{pointer-events:auto}
 .login-teaser-btn{
   position:relative;overflow:hidden;
@@ -1050,10 +1057,14 @@ html:has(.login-page),body:has(.login-page){
 .login-page--minimal .login-shell--hidden{display:none}
 
 @media(max-width:640px){
-  .login-teaser-header{padding:14px 142px 14px 16px}
+  .login-teaser-header{
+    padding:max(14px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 10px 12px;
+    padding-right:max(120px,calc(env(safe-area-inset-right,0px) + 120px))}
   .login-teaser-btn{padding:10px 18px 10px 38px;font-size:12px}
   .login-teaser-btn::before{left:16px}
   .login-page--minimal .login-shell{max-width:100%}
+  .login-premium-ribbon{width:120px;height:120px}
+  .login-premium-ribbon span{top:28px;right:-40px;width:180px;font-size:8px;padding:7px 0}
 }
 .login-shell{position:relative;z-index:1;width:100%;max-width:440px;display:flex;flex-direction:column;gap:28px;
   animation:login-rise .55s cubic-bezier(.2,.7,.2,1)}

@@ -76,13 +76,14 @@ export default function AuthGate({
   const logout = useCallback(() => {
     sessionStorage.removeItem(STORAGE_KEY);
     if (typeof document !== "undefined") {
-      document.documentElement.classList.remove("be-ios");
-      document.body.classList.remove("rotate-prompt-open");
+      document.documentElement.classList.remove("be-ios", "login-lock");
+      document.body.classList.remove("rotate-prompt-open", "login-lock");
     }
-    // Hard reload clears Safari viewport locks from the 360 tour so login
-    // matches a fresh page open exactly.
     if (typeof window !== "undefined") {
-      window.location.reload();
+      // Fresh navigation resets Safari layout viewport (reload alone can restore zoom).
+      const url = new URL(window.location.href);
+      url.searchParams.set("loggedout", String(Date.now()));
+      window.location.replace(url.pathname + url.search + url.hash);
       return;
     }
     setSession(null);

@@ -220,13 +220,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
       const vv = window.visualViewport;
       const h = Math.round(vv?.height || window.innerHeight || 0);
-      const w = Math.round(vv?.width || window.innerWidth || 0);
       const top = Math.round(vv?.offsetTop || 0);
-      const left = Math.round(vv?.offsetLeft || 0);
+      // Only pin height/top — never width/left (that caused post-logout crop on Safari).
       setViewH(h || null);
-      setViewW(w || null);
+      setViewW(null);
       setViewTop(top);
-      setViewLeft(left);
+      setViewLeft(0);
     };
 
     update();

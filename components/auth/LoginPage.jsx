@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
+import { isMobileTourDevice, isRotateOk } from "@/lib/rotateGate";
 
 function clearInline(el, props) {
   if (!el) return;
@@ -92,7 +93,9 @@ export default function LoginPage({
   const [coupon, setCoupon] = useState("");
   /** Minimal mode: form hidden until user taps "Log in" in header */
   const [showForm, setShowForm] = useState(!minimal);
+  const [videoReady, setVideoReady] = useState(false);
   const rootRef = useRef(null);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.classList.remove("be-ios");
@@ -119,6 +122,33 @@ export default function LoginPage({
     };
   }, []);
 
+  // Only mount/play teaser video after rotate gate clears (stable landscape on phones).
+  useEffect(() => {
+    const sync = () => {
+      const allow = !isMobileTourDevice() || isRotateOk();
+      setVideoReady(allow);
+      if (!allow && videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      }
+    };
+    sync();
+    window.addEventListener("oasis-rotate-gate", sync);
+    window.addEventListener("orientationchange", sync);
+    window.addEventListener("resize", sync);
+    return () => {
+      window.removeEventListener("oasis-rotate-gate", sync);
+      window.removeEventListener("orientationchange", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!videoReady || !videoRef.current) return;
+    const play = videoRef.current.play();
+    if (play?.catch) play.catch(() => {});
+  }, [videoReady]);
+
   const submitLogin = useCallback(() => {
     onSubmit({ name: name.trim(), coupon: coupon.trim() });
   }, [name, coupon, onSubmit]);
@@ -143,15 +173,16 @@ export default function LoginPage({
       }
     >
       <div className={"login-bg" + (backgroundVideo ? " login-bg--video" : "")} aria-hidden>
-        {backgroundVideo ? (
+        {backgroundVideo && videoReady ? (
           <video
+            ref={videoRef}
             className="login-bg-video"
             src={backgroundVideo}
             autoPlay
             muted
             loop
             playsInline
-            preload="auto"
+            preload="metadata"
           />
         ) : null}
       </div>

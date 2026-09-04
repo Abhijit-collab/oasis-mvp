@@ -1,48 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import {
+  isMobileTourDevice,
+  isStableLandscape,
+  setRotateOk,
+  ROTATE_SETTLE_MS,
+} from "@/lib/rotateGate";
 
-function shouldShowRotatePrompt() {
-  if (typeof window === "undefined") return false;
-
-  const mobile =
-    window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches ||
-    (window.matchMedia("(max-width: 820px)").matches && navigator.maxTouchPoints > 0);
-
-  const portrait = window.matchMedia("(orientation: portrait)").matches;
-
-  return mobile && portrait;
-}
-
+/**
+ * Shown via CSS on mobile portrait (no JS wait → no login flash).
+ * Stays up until landscape is stable for a short settle period, so a slight
+ * tilt cannot reveal / start the login video early.
+ */
 export default function RotatePhonePrompt() {
   const pathname = usePathname();
   const label = pathname?.startsWith("/HOK") ? "House of Krishna" : "The Oasis";
-  const [visible, setVisible] = useState(false);
+  const settleRef = useRef(null);
 
   useEffect(() => {
-    const update = () => setVisible(shouldShowRotatePrompt());
-    update();
+    const clearSettle = () => {
+      if (settleRef.current != null) {
+        window.clearTimeout(settleRef.current);
+        settleRef.current = null;
+      }
+    };
 
-    window.addEventListener("orientationchange", update);
-    window.addEventListener("resize", update);
+    const sync = () => {
+      if (!isMobileTourDevice()) {
+        clearSettle();
+        setRotateOk(true);
+        return;
+      }
 
-    const portraitMq = window.matchMedia("(orientation: portrait)");
-    portraitMq.addEventListener?.("change", update);
+      if (isStableLandscape()) {
+        if (settleRef.current != null) return;
+        settleRef.current = window.setTimeout(() => {
+          settleRef.current = null;
+          if (isStableLandscape()) setRotateOk(true);
+        }, ROTATE_SETTLE_MS);
+        return;
+      }
+
+      clearSettle();
+      setRotateOk(false);
+    };
+
+    sync();
+    window.addEventListener("orientationchange", sync);
+    window.addEventListener("resize", sync);
+    window.visualViewport?.addEventListener("resize", sync);
+    const landscapeMq = window.matchMedia("(orientation: landscape)");
+    landscapeMq.addEventListener?.("change", sync);
 
     return () => {
-      window.removeEventListener("orientationchange", update);
-      window.removeEventListener("resize", update);
-      portraitMq.removeEventListener?.("change", update);
+      clearSettle();
+      window.removeEventListener("orientationchange", sync);
+      window.removeEventListener("resize", sync);
+      window.visualViewport?.removeEventListener("resize", sync);
+      landscapeMq.removeEventListener?.("change", sync);
+      document.body.classList.remove("rotate-prompt-open");
     };
   }, []);
-
-  useEffect(() => {
-    document.body.classList.toggle("rotate-prompt-open", visible);
-    return () => document.body.classList.remove("rotate-prompt-open");
-  }, [visible]);
-
-  if (!visible) return null;
 
   return (
     <div className="rotate-prompt" role="dialog" aria-modal="true" aria-labelledby="rotate-prompt-title">

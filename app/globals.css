@@ -1184,12 +1184,27 @@ html:has(.login-welcome-bg),body:has(.login-welcome-bg){
 }
 
 /* ---- Mobile rotate-to-landscape prompt ---- */
+/* Visible on portrait immediately (CSS). Hidden only after html.rotate-ok (stable landscape). */
 body.rotate-prompt-open{overflow:hidden}
 .rotate-prompt{
-  position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;padding:28px 22px;
+  display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;padding:28px 22px;
   background:radial-gradient(ellipse 80% 60% at 50% 40%,rgba(216,182,90,.12),transparent 55%),
-    linear-gradient(180deg,#07090d 0%,#050608 100%);
-  animation:fade .25s ease}
+    linear-gradient(180deg,#07090d 0%,#050608 100%)}
+@media(max-width:900px) and (orientation:portrait),
+  (hover:none) and (pointer:coarse) and (orientation:portrait){
+  .rotate-prompt{display:flex!important}
+  body{overflow:hidden}
+}
+/* Keep covering during an unstable / partial tilt (landscape media alone is not enough). */
+@media(max-width:900px),(hover:none) and (pointer:coarse){
+  html:not(.rotate-ok) .rotate-prompt{display:flex!important}
+  html:not(.rotate-ok) .login-page,
+  html:not(.rotate-ok) .be-root{visibility:hidden;pointer-events:none}
+  html:not(.rotate-ok) body{overflow:hidden}
+}
+html.rotate-ok .rotate-prompt{display:none!important}
+html.rotate-ok .login-page,
+html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
 .rotate-prompt-inner{
   width:100%;max-width:360px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:0}
 .rotate-prompt-anim{
@@ -1233,6 +1248,3 @@ body.rotate-prompt-open{overflow:hidden}
   0%,18%{transform:rotate(0deg);opacity:.35}
   45%,55%{transform:rotate(90deg);opacity:1}
   82%,100%{transform:rotate(0deg);opacity:.35}}
-@media(orientation:landscape) and (max-width:900px){
-  .rotate-prompt{display:none!important}
-}

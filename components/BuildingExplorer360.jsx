@@ -112,7 +112,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const [adaptiveFit, setAdaptiveFit] = useState(mediaFit === "fill" ? "fill" : "contain");
   const [navOpen, setNavOpen] = useState(false);
   const [viewH, setViewH] = useState(null);
+  const [viewW, setViewW] = useState(null);
   const [viewTop, setViewTop] = useState(0);
+  const [viewLeft, setViewLeft] = useState(0);
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState("hold");
@@ -205,7 +207,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       if (!isSmallDevice()) {
         setAdaptiveFit("cover");
         setViewH(null);
+        setViewW(null);
         setViewTop(0);
+        setViewLeft(0);
         document.documentElement.classList.remove("be-ios");
         return;
       }
@@ -216,9 +220,13 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
       const vv = window.visualViewport;
       const h = Math.round(vv?.height || window.innerHeight || 0);
+      const w = Math.round(vv?.width || window.innerWidth || 0);
       const top = Math.round(vv?.offsetTop || 0);
+      const left = Math.round(vv?.offsetLeft || 0);
       setViewH(h || null);
+      setViewW(w || null);
       setViewTop(top);
+      setViewLeft(left);
     };
 
     update();
@@ -675,6 +683,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
               bottom: "auto",
             }
           : null),
+        ...(viewW
+          ? {
+              width: `${viewW}px`,
+              maxWidth: `${viewW}px`,
+              left: `${viewLeft}px`,
+              right: "auto",
+            }
+          : null),
         ...(displayFit === "cover" || displayFit === "contain"
           ? { "--be-media-position": displayFit === "cover" ? mediaPosition : "center center" }
           : null),
@@ -828,37 +844,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           />
         </div>
 
-        <button
-          type="button"
-          className={
-            "be-orbit-arw be-orbit-arw--l" +
-            (!canPrev ? " be-orbit-arw--inactive" : "") +
-            (navOpen ? " be-orbit-arw--hidden" : "")
-          }
-          aria-label="Rotate left"
-          onClick={() => {
-            if (!canPrev) return;
-            goPrev();
-          }}
-        >
-          <OrbitSideChevron dir="l" />
-        </button>
-        <button
-          type="button"
-          className={
-            "be-orbit-arw be-orbit-arw--r" +
-            (!canNext ? " be-orbit-arw--inactive" : "") +
-            (navOpen ? " be-orbit-arw--hidden" : "")
-          }
-          aria-label="Rotate right"
-          onClick={() => {
-            if (!canNext) return;
-            goNext();
-          }}
-        >
-          <OrbitSideChevron dir="r" />
-        </button>
-
         {showFilters && (
           <ExplorerPremiumChrome
             visible={showPremiumChrome}
@@ -885,6 +870,39 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         )}
         </div>
       </div>
+
+      <button
+        type="button"
+        className={
+          "be-orbit-arw be-orbit-arw--l" +
+          (!canPrev ? " be-orbit-arw--inactive" : "") +
+          (navOpen ? " be-orbit-arw--hidden" : "") +
+          (tourRevealed ? " be-orbit-arw--on" : "")
+        }
+        aria-label="Rotate left"
+        onClick={() => {
+          if (!canPrev) return;
+          goPrev();
+        }}
+      >
+        <OrbitSideChevron dir="l" />
+      </button>
+      <button
+        type="button"
+        className={
+          "be-orbit-arw be-orbit-arw--r" +
+          (!canNext ? " be-orbit-arw--inactive" : "") +
+          (navOpen ? " be-orbit-arw--hidden" : "") +
+          (tourRevealed ? " be-orbit-arw--on" : "")
+        }
+        aria-label="Rotate right"
+        onClick={() => {
+          if (!canNext) return;
+          goNext();
+        }}
+      >
+        <OrbitSideChevron dir="r" />
+      </button>
 
       {tourRevealed && <FullscreenButton />}
 

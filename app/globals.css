@@ -119,15 +119,18 @@ html:has(.be-root),body:has(.be-root){
   .be-rotate-wrap{display:none}
   .be-orbit-arw{
     display:flex;align-items:center;justify-content:center;
-    position:fixed;top:50%;z-index:40;
+    position:absolute;top:50%;z-index:40;
     width:52px;height:52px;margin-top:-26px;padding:0;
     border:none;background:transparent;cursor:pointer;
+    opacity:0;transition:opacity .7s ease .45s;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  .be-orbit-arw--on{opacity:1}
   .be-orbit-arw-icon{width:36px;height:36px;display:block;overflow:visible}
-  .be-orbit-arw--l{left:max(8px,env(safe-area-inset-left,0px));right:auto}
-  .be-orbit-arw--r{right:max(8px,env(safe-area-inset-right,0px));left:auto}
+  .be-orbit-arw--l{left:max(10px,env(safe-area-inset-left,0px));right:auto}
+  .be-orbit-arw--r{right:max(10px,env(safe-area-inset-right,0px));left:auto}
   .be-orbit-arw:active .be-orbit-arw-icon{opacity:.8}
-  .be-orbit-arw--inactive{opacity:.32;pointer-events:none}
+  .be-orbit-arw--inactive{pointer-events:none}
+  .be-orbit-arw--on.be-orbit-arw--inactive{opacity:.35}
   .be-orbit-arw--hidden{display:none!important}
   .be-cta-hint{bottom:max(6px,calc(env(safe-area-inset-bottom,0px) + 4px));padding:8px 14px;font-size:12px}
 }
@@ -138,8 +141,7 @@ html.be-ios,html.be-ios body{
 html.be-ios .be-root,
 html.be-ios .be-root--cover,
 html.be-ios .be-root--contain{
-  overflow:hidden;background:#06070a;overscroll-behavior:none;touch-action:none;
-  width:100%;max-width:100%;left:0;right:0}
+  overflow:hidden;background:#06070a;overscroll-behavior:none;touch-action:none}
 html.be-ios .be-stage img,
 html.be-ios .be-stage-video,
 html.be-ios .be-start-still,
@@ -148,9 +150,9 @@ html.be-ios .be-root--cover .be-stage-video,
 html.be-ios .be-root--cover .be-start-still{
   object-fit:contain!important;object-position:center center!important}
 html.be-ios .be-orbit-arw{
-  position:fixed!important;z-index:40;top:50%;margin-top:-26px}
-html.be-ios .be-orbit-arw--l{left:max(10px,env(safe-area-inset-left,0px))!important;right:auto!important}
-html.be-ios .be-orbit-arw--r{right:max(10px,env(safe-area-inset-right,0px))!important;left:auto!important}
+  position:absolute!important;z-index:40;top:50%;margin-top:-26px}
+html.be-ios .be-orbit-arw--l{left:max(12px,env(safe-area-inset-left,0px))!important;right:auto!important}
+html.be-ios .be-orbit-arw--r{right:max(12px,env(safe-area-inset-right,0px))!important;left:auto!important}
 .be-tour-reveal .be-top,.be-tour-reveal .be-cta-hint{
   opacity:0;transform:translateY(10px);
   transition:opacity .7s ease .45s,transform .7s cubic-bezier(.22,1,.36,1) .45s}
@@ -160,10 +162,6 @@ html.be-ios .be-orbit-arw--r{right:max(10px,env(safe-area-inset-right,0px))!impo
 .be-tour-reveal--in .be-top,.be-tour-reveal--in .be-cta-hint{
   opacity:1;transform:translateY(0)}
 .be-tour-reveal--in .be-rotate-wrap{opacity:1;transform:translate(-50%,0)}
-.be-tour-reveal .be-orbit-arw{
-  opacity:0;transition:opacity .7s ease .45s}
-.be-tour-reveal--in .be-orbit-arw{opacity:1}
-.be-tour-reveal--in .be-orbit-arw--inactive{opacity:.35}
 .be-preload-crown{font-size:28px;color:var(--gold);margin-bottom:10px}
 .be-preload-title{font-family:var(--serif);font-size:22px;letter-spacing:.12em;color:var(--ink);margin-bottom:6px}
 .be-preload-title b{font-weight:700;color:var(--gold-bright)}
@@ -1115,18 +1113,18 @@ html:has(.login-page),body:has(.login-page){overflow:hidden;height:100%;padding:
 
 .login-welcome-bg{
   position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
-  padding:max(20px,env(safe-area-inset-top,0px)) 20px max(20px,env(safe-area-inset-bottom,0px));
-  animation:fade .35s;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));
+  animation:fade .35s;overflow:hidden;touch-action:none;overscroll-behavior:none;
   background:#06070a;box-sizing:border-box;
-  height:100%;height:100dvh;height:100svh;max-height:100svh}
-.login-welcome-bg-image{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;
+  width:100%;max-width:100%;height:100%;height:100dvh;height:100svh;max-height:100svh}
+.login-welcome-bg-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   filter:blur(3px) brightness(.48);transform:scale(1.05);pointer-events:none;
   opacity:0;transition:opacity .45s ease}
 .login-welcome-bg-image--in{opacity:1}
-.login-welcome-bg-scrim{position:fixed;inset:0;pointer-events:none;
+.login-welcome-bg-scrim{position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(165deg,rgba(4,6,10,.55) 0%,rgba(4,6,10,.78) 55%,rgba(4,6,10,.88) 100%)}
-.login-welcome-modal{position:relative;z-index:1;width:100%;max-width:460px;text-align:center;padding:38px 32px 32px;
-  margin:auto;flex-shrink:0;
+.login-welcome-modal{position:relative;z-index:1;width:min(100%,460px);max-width:100%;text-align:center;padding:38px 32px 32px;
+  margin:0;flex-shrink:1;box-sizing:border-box;
   background:rgba(12,14,18,.94);border:1px solid rgba(216,182,90,.25);border-radius:24px;
   box-shadow:0 32px 80px rgba(0,0,0,.65),0 0 60px rgba(216,182,90,.08);animation:pop .45s cubic-bezier(.2,.7,.2,1)}
 .login-welcome-glow{position:absolute;top:-40%;left:50%;width:120%;height:80%;transform:translateX(-50%);
@@ -1141,18 +1139,18 @@ html:has(.login-page),body:has(.login-page){overflow:hidden;height:100%;padding:
 .login-welcome-copy strong{color:var(--ink);font-weight:600}
 .login-welcome-tagline{font-family:var(--serif);font-size:18px;font-style:italic;color:var(--gold-bright);
   margin-bottom:24px;letter-spacing:.02em}
+html:has(.login-welcome-bg),body:has(.login-welcome-bg){
+  overflow:hidden!important;overscroll-behavior:none;touch-action:none;width:100%;max-width:100%}
 @media(max-width:820px),(pointer:coarse),(hover:none){
   .login-welcome-bg{
-    align-items:flex-start;justify-content:center;
-    padding:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px))}
-  .login-welcome-modal{padding:18px 16px 16px;margin:12px auto;border-radius:18px}
-  .login-welcome-spark{font-size:20px;margin-bottom:4px}
-  .login-welcome-kicker{font-size:10px;margin-bottom:6px}
-  .login-welcome-title{font-size:22px;margin-bottom:8px}
-  .login-welcome-copy{font-size:13px;line-height:1.45;margin-bottom:12px}
-  .login-welcome-tagline{display:none}
-  .login-welcome-modal .premium-perks{display:none}
-  .login-welcome-badge-row{margin-bottom:2px}
+    align-items:center;justify-content:center;
+    padding:max(12px,env(safe-area-inset-top,0px)) 14px max(12px,env(safe-area-inset-bottom,0px));
+    overflow:hidden}
+  .login-welcome-modal{padding:16px 14px;border-radius:16px;width:min(100%,360px)}
+  .login-welcome-kicker{font-size:10px;margin-bottom:6px;letter-spacing:.16em}
+  .login-welcome-title{font-size:clamp(18px,5.5vw,22px);margin-bottom:6px}
+  .login-welcome-copy{font-size:12px;line-height:1.4;margin-bottom:12px}
+  .login-welcome-modal .login-btn{margin-top:0;padding:13px 16px;font-size:14px}
 }
 @media(max-width:480px){
   .login-card{padding:26px 20px 22px}
@@ -1160,14 +1158,14 @@ html:has(.login-page),body:has(.login-page){overflow:hidden;height:100%;padding:
 }
 @media(orientation:landscape) and (max-width:950px),(max-height:520px){
   .login-welcome-bg{
-    align-items:flex-start;
-    padding:max(10px,env(safe-area-inset-top,0px)) 14px max(10px,env(safe-area-inset-bottom,0px))}
-  .login-welcome-modal{padding:14px 16px;margin:8px auto;max-width:420px}
-  .login-welcome-spark,.login-welcome-tagline,.login-welcome-modal .premium-perks,.login-welcome-badge-row{display:none}
-  .login-welcome-kicker{margin-bottom:4px}
-  .login-welcome-title{font-size:20px;margin-bottom:4px}
-  .login-welcome-copy{font-size:12px;margin-bottom:10px}
-  .login-welcome-modal .login-btn{margin-top:4px;padding:12px 16px}
+    align-items:center;justify-content:center;
+    padding:max(8px,env(safe-area-inset-top,0px)) 12px max(8px,env(safe-area-inset-bottom,0px));
+    overflow:hidden}
+  .login-welcome-modal{padding:12px 14px;width:min(100%,380px)}
+  .login-welcome-kicker{margin-bottom:4px;font-size:9px}
+  .login-welcome-title{font-size:18px;margin-bottom:4px}
+  .login-welcome-copy{font-size:11px;margin-bottom:8px}
+  .login-welcome-modal .login-btn{padding:11px 14px;font-size:13px}
 }
 
 /* ---- Mobile rotate-to-landscape prompt ---- */
@@ -1222,11 +1220,4 @@ body.rotate-prompt-open{overflow:hidden}
   82%,100%{transform:rotate(0deg);opacity:.35}}
 @media(orientation:landscape) and (max-width:900px){
   .rotate-prompt{display:none!important}
-  .login-welcome-bg{
-    align-items:flex-start;
-    padding:max(10px,env(safe-area-inset-top,0px)) 14px max(10px,env(safe-area-inset-bottom,0px))}
-  .login-welcome-modal{padding:14px 16px;margin:8px auto}
-  .login-welcome-spark,.login-welcome-tagline,.login-welcome-modal .premium-perks,.login-welcome-badge-row{display:none}
-  .login-welcome-title{font-size:20px;margin-bottom:4px}
-  .login-welcome-copy{font-size:12px;margin-bottom:10px}
 }

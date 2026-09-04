@@ -1,8 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
+
+function syncLoginViewport(el) {
+  if (!el || typeof window === "undefined") return;
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+
+  const vv = window.visualViewport;
+  const w = Math.round(vv?.width || window.innerWidth || 0);
+  const h = Math.round(vv?.height || window.innerHeight || 0);
+  const top = Math.round(vv?.offsetTop || 0);
+  const left = Math.round(vv?.offsetLeft || 0);
+
+  el.style.position = "fixed";
+  el.style.top = `${top}px`;
+  el.style.left = `${left}px`;
+  el.style.right = "auto";
+  el.style.bottom = "auto";
+  el.style.width = `${w}px`;
+  el.style.height = `${h}px`;
+  el.style.maxWidth = `${w}px`;
+  el.style.maxHeight = `${h}px`;
+}
 
 export default function LoginPage({
   onSubmit,
@@ -19,12 +42,30 @@ export default function LoginPage({
   const [coupon, setCoupon] = useState("");
   /** Minimal mode: form hidden until user taps "Log in" in header */
   const [showForm, setShowForm] = useState(!minimal);
+  const rootRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.classList.remove("be-ios");
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    window.scrollTo(0, 0);
+    const el = rootRef.current;
+    const update = () => syncLoginViewport(el);
+    update();
+    // Second pass after Safari settles post-logout layout.
+    const t = window.setTimeout(update, 50);
+    const t2 = window.setTimeout(update, 300);
+
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(t2);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
   }, []);
 
   const submitLogin = useCallback(() => {
@@ -42,11 +83,14 @@ export default function LoginPage({
   const showBrand = !minimal && (eyebrow || title || accent);
 
   return (
-    <div className={
-      "login-page"
-      + (minimal ? " login-page--minimal" : "")
-      + (minimal && !showForm ? " login-page--teaser" : "")
-    }>
+    <div
+      ref={rootRef}
+      className={
+        "login-page"
+        + (minimal ? " login-page--minimal" : "")
+        + (minimal && !showForm ? " login-page--teaser" : "")
+      }
+    >
       <div className={"login-bg" + (backgroundVideo ? " login-bg--video" : "")} aria-hidden>
         {backgroundVideo ? (
           <video

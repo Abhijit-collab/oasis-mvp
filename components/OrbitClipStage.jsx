@@ -3,11 +3,16 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { isSlowNetwork } from "@/hooks/usePreloadVideos";
 
-const FRAME_PAD = 1 / 30;
+const END_HOLD_PAD = 0.05;
+const END_HOLD_PAD_ANDROID = 0.15;
 const DRAG_THRESHOLD = 12;
 const DATA_TIMEOUT_MS = 12000;
 const PAINT_TIMEOUT_MS = 1200;
-/** Unlock arrows if playback stops advancing (much shorter on Slow 4G). */
+const SEEK_TIMEOUT_MS = 900;
+
+const isAndroidClient = () =>
+  typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
 const stallAbortMs = () => (isSlowNetwork() ? 4500 : 12000);
 const stallRetryMs = () => (isSlowNetwork() ? 3500 : 6000);
 const WARM_COVERAGE = () => (isSlowNetwork() ? 0.28 : 0.4);
@@ -46,6 +51,30 @@ const waitForData = (el) =>
     el.addEventListener("loadeddata", onReady, { once: true });
     el.addEventListener("canplay", onReady, { once: true });
     el.addEventListener("error", onErr, { once: true });
+  });
+
+/** Seek then wait for a decoded frame (Android tears if we paint mid-seek). */
+const seekAndWait = (el, time) =>
+  new Promise((resolve) => {
+    if (!el) {
+      resolve();
+      return;
+    }
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      el.removeEventListener("seeked", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, SEEK_TIMEOUT_MS);
+    el.addEventListener("seeked", finish, { once: true });
+    try {
+      el.currentTime = time;
+    } catch {
+      finish();
+    }
   });
 
 /**
@@ -291,7 +320,22 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     if (!el || !Number.isFinite(el.duration)) return;
     el.pause();
     el.playbackRate = 1;
-    el.currentTime = at === "start" ? 0 : Math.max(0, el.duration - FRAME_PAD);
+
+    if (at === "start") {
+      if (el.currentTime > 0.02) {
+        await seekAndWait(el, 0);
+      }
+    } else {
+      // Android Chrome often tears / flashes on the true EOS frame — hold slightly earlier.
+      const pad = isAndroidClient() ? END_HOLD_PAD_ANDROID : END_HOLD_PAD;
+      const target = Math.max(0, el.duration - pad);
+      const delta = Math.abs((el.currentTime || 0) - target);
+      // Always re-settle on Android after `ended` (currentTime ≈ duration tears).
+      if (isAndroidClient() || delta > 0.03) {
+        await seekAndWait(el, target);
+      }
+    }
+
     await waitForPaint(el);
   };
 

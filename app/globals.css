@@ -90,6 +90,16 @@ html:has(.be-root),body:has(.be-root){
 .be-root--cover .be-stage,
 .be-root--cover .be-stage-media{background:#06070a}
 .be-root--cover .be-stage-media{transform:none}
+
+/* Android: GPU layer on <video> tears the hold/end frame — keep video on the main plane. */
+html.be-phone:not(.be-ios) .be-stage-video,
+html.be-phone:not(.be-ios) .be-root--cover .be-stage-video,
+html.be-phone:not(.be-ios) .be-root--contain .be-stage-video{
+  -webkit-transform:none!important;transform:none!important;
+  -webkit-backface-visibility:visible;backface-visibility:visible}
+html.be-phone:not(.be-ios) .be-stage-media{
+  -webkit-transform:none;transform:none}
+
 .be-root--contain .be-stage img,
 .be-root--contain .be-stage-video,
 .be-root--contain .be-start-still{

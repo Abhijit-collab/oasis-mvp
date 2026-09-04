@@ -7,14 +7,10 @@ export const ORBIT_STEP_PRELOAD_URLS = [
   ...ORBIT_STEP_CLIPS_REVERSE.filter(Boolean),
 ];
 
-export const ORBIT_PRIORITY_PRELOAD_URLS = [
-  ORBIT_STEP_CLIPS[0],
-  ORBIT_STEP_CLIPS[1],
-  ORBIT_STEP_CLIPS_REVERSE[ORBIT_STEP_CLIPS_REVERSE.length - 1],
-].filter(Boolean);
+/** @deprecated Prefer full ORBIT_STEP_PRELOAD_URLS for the mobile gate. */
+export const ORBIT_PRIORITY_PRELOAD_URLS = ORBIT_STEP_PRELOAD_URLS;
 
 let entranceImagePromise = null;
-let tourPrefetchStarted = false;
 
 function injectEntrancePreloadLink() {
   if (typeof document === "undefined") return;
@@ -53,20 +49,17 @@ export function preloadWelcomeBackgroundIdle() {
   }
 }
 
+/**
+ * After login: full-buffer every tour clip (deduped).
+ * Do not call on the login teaser screen.
+ */
 export function preloadTourAssetsAfterLogin() {
   if (typeof window === "undefined") return;
-  if (tourPrefetchStarted) return;
-  tourPrefetchStarted = true;
+  const g = globalThis;
+  if (g.__oasisTourPrefetchStarted) return;
+  g.__oasisTourPrefetchStarted = true;
 
-  ORBIT_PRIORITY_PRELOAD_URLS.forEach((url) => prefetchVideo(url, { depth: "full" }));
-
-  // HOK Sequence clips are large — full-buffer the rest so arrow clicks start instantly.
-  const rest = ORBIT_STEP_PRELOAD_URLS.filter((url) => !ORBIT_PRIORITY_PRELOAD_URLS.includes(url));
-  const prefetchRest = () => rest.forEach((url) => prefetchVideo(url, { depth: "full" }));
-
-  if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(prefetchRest, { timeout: 2500 });
-  } else {
-    setTimeout(prefetchRest, 400);
-  }
+  ORBIT_STEP_PRELOAD_URLS.filter(Boolean).forEach((url) =>
+    prefetchVideo(url, { depth: "full" })
+  );
 }

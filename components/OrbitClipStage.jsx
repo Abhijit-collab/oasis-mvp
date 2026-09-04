@@ -1,23 +1,55 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 const FRAME_PAD = 1 / 30;
 const DRAG_THRESHOLD = 12;
+const DATA_TIMEOUT_MS = 12000;
+const PAINT_TIMEOUT_MS = 1200;
 
 const waitForData = (el) =>
   new Promise((resolve) => {
     if (!el || el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      resolve();
+      resolve(true);
       return;
     }
-    const done = () => resolve();
-    el.addEventListener("loadeddata", done, { once: true });
-    el.addEventListener("canplay", done, { once: true });
-    el.addEventListener("error", done, { once: true });
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      el.removeEventListener("loadeddata", onReady);
+      el.removeEventListener("canplay", onReady);
+      el.removeEventListener("error", onErr);
+      resolve(ok);
+    };
+    const onReady = () => finish(true);
+    const onErr = () => finish(false);
+    const timer = setTimeout(() => finish(el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA), DATA_TIMEOUT_MS);
+    el.addEventListener("loadeddata", onReady, { once: true });
+    el.addEventListener("canplay", onReady, { once: true });
+    el.addEventListener("error", onErr, { once: true });
   });
 
-const PAINT_TIMEOUT_MS = 1200;
+/** iOS often ignores preload=auto — muted play/pause forces bytes to arrive. */
+const kickBuffer = (el) => {
+  if (!el) return;
+  try {
+    el.muted = true;
+    const p = el.play();
+    if (p?.then) {
+      p.then(() => {
+        try {
+          el.pause();
+        } catch {
+          /* ignore */
+        }
+      }).catch(() => {});
+    }
+  } catch {
+    /* ignore */
+  }
+};
 
 /** Wait until the decoder has a frame ready to paint (avoids black flash on swap). */
 const waitForPaint = (el) =>
@@ -47,7 +79,7 @@ const waitForPaint = (el) =>
 
     if (typeof el.requestVideoFrameCallback === "function") {
       try {
-        el.requestVideoFrameCallback(() => finish(), { once: true });
+        el.requestVideoFrameCallback(() => finish());
       } catch {
         finish();
       }
@@ -70,27 +102,30 @@ const sameClip = (a, b) => {
 
 /**
  * Dual-buffer video stage — always plays clips forward (use *-rev.mp4 for back nav).
- * The visible buffer is never hidden until the other buffer has a painted frame.
+ * Call beginPlay() from a click/tap handler so iOS allows playback under user gesture.
  */
-export default function OrbitClipStage({
-  clipSrc,
-  playToken = 0,
-  mode = "idle",
-  holdAt = "end",
-  playDirection = "forward",
-  landAfterPlay = null,
-  prefetchBack = null,
-  prefetchNext = null,
-  onComplete,
-  onPlayingChange,
-  onDragForward,
-  onDragBack,
-  dragDisabled = false,
-  onHoldFrameReady,
-  holdResetKey = 0,
-  prepareHomeClip = null,
-  onPrepareHomeReady,
-}) {
+const OrbitClipStage = forwardRef(function OrbitClipStage(
+  {
+    clipSrc,
+    playToken = 0,
+    mode = "idle",
+    holdAt = "end",
+    playDirection = "forward",
+    landAfterPlay = null,
+    prefetchBack = null,
+    prefetchNext = null,
+    onComplete,
+    onPlayingChange,
+    onDragForward,
+    onDragBack,
+    dragDisabled = false,
+    onHoldFrameReady,
+    holdResetKey = 0,
+    prepareHomeClip = null,
+    onPrepareHomeReady,
+  },
+  ref
+) {
   const refA = useRef(null);
   const refB = useRef(null);
   const dragRef = useRef(null);
@@ -100,6 +135,8 @@ export default function OrbitClipStage({
   const activeIdx = useRef(0);
   const hasFrameRef = useRef(false);
   const playSessionRef = useRef(0);
+  const landAfterPlayRef = useRef(landAfterPlay);
+  const playDirectionRef = useRef(playDirection);
   const onCompleteRef = useRef(onComplete);
   const onPlayingChangeRef = useRef(onPlayingChange);
   const onDragForwardRef = useRef(onDragForward);
@@ -107,10 +144,21 @@ export default function OrbitClipStage({
   const onHoldFrameReadyRef = useRef(onHoldFrameReady);
   const onPrepareHomeReadyRef = useRef(onPrepareHomeReady);
   const holdFrameReadySentRef = useRef(false);
+  const endedHandlerRef = useRef(null);
+  const playElRef = useRef(null);
 
   const [active, setActive] = useState(0);
   const [hasFrame, setHasFrame] = useState(false);
   const [bufReady, setBufReady] = useState([false, false]);
+
+  landAfterPlayRef.current = landAfterPlay;
+  playDirectionRef.current = playDirection;
+  onCompleteRef.current = onComplete;
+  onPlayingChangeRef.current = onPlayingChange;
+  onDragForwardRef.current = onDragForward;
+  onDragBackRef.current = onDragBack;
+  onHoldFrameReadyRef.current = onHoldFrameReady;
+  onPrepareHomeReadyRef.current = onPrepareHomeReady;
 
   const markHasFrame = (value) => {
     hasFrameRef.current = value;
@@ -128,13 +176,6 @@ export default function OrbitClipStage({
 
   const bufIndex = (el) => (el === refA.current ? 0 : 1);
 
-  onCompleteRef.current = onComplete;
-  onPlayingChangeRef.current = onPlayingChange;
-  onDragForwardRef.current = onDragForward;
-  onDragBackRef.current = onDragBack;
-  onHoldFrameReadyRef.current = onHoldFrameReady;
-  onPrepareHomeReadyRef.current = onPrepareHomeReady;
-
   const notifyHoldFrameReady = (el) => {
     if (holdFrameReadySentRef.current || !el) return;
     holdFrameReadySentRef.current = true;
@@ -149,14 +190,12 @@ export default function OrbitClipStage({
     setActive(activeIdx.current);
   };
 
-  /** Promote a buffer to the top only after it has a painted frame; hide the other. */
   const revealBuffer = async (el) => {
     if (!el) return;
     await waitForPaint(el);
     const idx = bufIndex(el);
     markBufReady(idx, true);
     if (idx !== activeIdx.current) swapActive();
-    // Prevent stacked/ghost frames (both buffers at opacity 1).
     markBufReady(1 - idx, false);
     markHasFrame(true);
   };
@@ -172,6 +211,163 @@ export default function OrbitClipStage({
     el.currentTime = at === "start" ? 0 : Math.max(0, el.duration - FRAME_PAD);
     await waitForPaint(el);
   };
+
+  const loadClip = async (el, src, { markReady = true } = {}) => {
+    if (!el) return false;
+    const idx = bufIndex(el);
+    const isActive = idx === activeIdx.current;
+
+    if (!sameClip(el.currentSrc || el.src, src)) {
+      if (!isActive) markBufReady(idx, false);
+      el.src = src;
+      kickBuffer(el);
+      const ok = await waitForData(el);
+      if (!ok) return false;
+    } else if (el.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      kickBuffer(el);
+      const ok = await waitForData(el);
+      if (!ok) return false;
+    }
+
+    if (markReady) markBufReady(idx, true);
+    return true;
+  };
+
+  const clearEndedHandler = () => {
+    const el = playElRef.current;
+    const handler = endedHandlerRef.current;
+    if (el && handler) el.removeEventListener("ended", handler);
+    endedHandlerRef.current = null;
+  };
+
+  const attachEndedHandler = (playEl, session, isBack) => {
+    clearEndedHandler();
+    playElRef.current = playEl;
+
+    const endedHandler = async () => {
+      if (playSessionRef.current !== session) return;
+      playEl.pause();
+
+      const land = landAfterPlayRef.current;
+      if (isBack && land?.clipSrc) {
+        const landAt = land.holdAt ?? "end";
+        const playSrc = playEl.currentSrc || playEl.src;
+
+        if (sameClip(playSrc, land.clipSrc)) {
+          await freezeAtHold(playEl, landAt);
+          if (playSessionRef.current !== session) return;
+          onPlayingChangeRef.current?.(false);
+          onCompleteRef.current?.("back");
+          return;
+        }
+
+        const landEl = inactiveEl().current;
+        const landReady = landEl
+          ? await loadClip(landEl, land.clipSrc, { markReady: false })
+          : false;
+
+        if (playSessionRef.current !== session) return;
+
+        if (landReady && landEl) {
+          await freezeAtHold(landEl, landAt);
+          if (playSessionRef.current !== session) return;
+          await revealBuffer(landEl);
+        } else {
+          await freezeAtHold(playEl, "end");
+        }
+
+        onPlayingChangeRef.current?.(false);
+        onCompleteRef.current?.("back");
+        return;
+      }
+
+      await freezeAtHold(playEl, "end");
+      onPlayingChangeRef.current?.(false);
+      onCompleteRef.current?.("forward");
+    };
+
+    endedHandlerRef.current = endedHandler;
+    playEl.addEventListener("ended", endedHandler, { once: true });
+  };
+
+  /**
+   * Must be called directly from a tap/click (user gesture) on iOS.
+   * Starts muted playback immediately, then finishes wiring async.
+   */
+  const beginPlay = useCallback(({ src, direction = "forward", token, landAfterPlay: land }) => {
+    if (!src) return false;
+
+    const session = token || Date.now();
+    playSessionRef.current = session;
+    playDirectionRef.current = direction;
+    if (land !== undefined) landAfterPlayRef.current = land;
+    clearEndedHandler();
+
+    const isBack = direction === "back";
+    const holdEl = hasFrameRef.current ? activeEl().current : null;
+    const inactive = inactiveEl().current;
+
+    const activeHas = holdEl && sameClip(holdEl.currentSrc || holdEl.src, src);
+    const inactiveHas = inactive && sameClip(inactive.currentSrc || inactive.src, src);
+
+    let playEl;
+    if (!isBack && activeHas) {
+      playEl = holdEl;
+    } else if (inactiveHas) {
+      playEl = inactive;
+    } else {
+      playEl = (hasFrameRef.current ? inactiveEl() : activeEl()).current;
+    }
+    if (!playEl) return false;
+
+    // Assign src synchronously under the gesture when needed.
+    if (!sameClip(playEl.currentSrc || playEl.src, src)) {
+      playEl.src = src;
+    }
+
+    try {
+      playEl.muted = true;
+      playEl.playsInline = true;
+      playEl.setAttribute("playsinline", "");
+      playEl.setAttribute("webkit-playsinline", "");
+      if (playEl.currentTime > 0.05) playEl.currentTime = 0;
+    } catch {
+      /* ignore */
+    }
+
+    playEl.playbackRate = 1;
+    onPlayingChangeRef.current?.(true);
+
+    // Critical: invoke play() in the same turn as the tap.
+    const playPromise = playEl.play();
+
+    (async () => {
+      try {
+        if (playPromise) await playPromise;
+      } catch {
+        // Retry once after a short buffer kick (still muted).
+        kickBuffer(playEl);
+        await waitForData(playEl);
+        if (playSessionRef.current !== session) return;
+        try {
+          if (playEl.currentTime > 0.05) playEl.currentTime = 0;
+          await playEl.play();
+        } catch {
+          onPlayingChangeRef.current?.(false);
+          return;
+        }
+      }
+
+      if (playSessionRef.current !== session) return;
+      await revealBuffer(playEl);
+      if (playSessionRef.current !== session) return;
+      attachEndedHandler(playEl, session, isBack);
+    })();
+
+    return true;
+  }, []);
+
+  useImperativeHandle(ref, () => ({ beginPlay }), [beginPlay]);
 
   const dragEnabled = mode === "hold" && Boolean(clipSrc) && hasFrame && !dragDisabled;
 
@@ -202,25 +398,6 @@ export default function OrbitClipStage({
     draggingRef.current = false;
   }, []);
 
-  /** Load clip on a buffer without hiding the currently visible active buffer. */
-  const loadClip = async (el, src, { markReady = true } = {}) => {
-    if (!el) return false;
-    const idx = bufIndex(el);
-    const isActive = idx === activeIdx.current;
-
-    if (!sameClip(el.currentSrc || el.src, src)) {
-      if (!isActive) markBufReady(idx, false);
-      el.src = src;
-      el.load();
-      await waitForData(el);
-    } else if (el.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
-      await waitForData(el);
-    }
-
-    if (markReady) markBufReady(idx, true);
-    return true;
-  };
-
   useEffect(() => {
     if (mode !== "hold" || !clipSrc) return;
     holdFrameReadySentRef.current = false;
@@ -234,6 +411,7 @@ export default function OrbitClipStage({
       const visibleHasClip = sameClip(visible.currentSrc || visible.src, clipSrc);
 
       if (visibleHasClip) {
+        kickBuffer(visible);
         await waitForData(visible);
         if (cancelled) return;
         await freezeAtHold(visible, holdAt);
@@ -250,7 +428,6 @@ export default function OrbitClipStage({
       if (cancelled) return;
       await notifyHoldFrameReady(activeEl().current);
 
-      // Warm next → clip only when it's a different file (same URL on two buffers = duplicate downloads).
       const warmSrc = prefetchNext || prefetchBack;
       if (cancelled || !warmSrc) return;
       if (sameClip(warmSrc, clipSrc)) return;
@@ -273,7 +450,6 @@ export default function OrbitClipStage({
     };
   }, [mode, clipSrc, holdAt, holdResetKey, prefetchBack, prefetchNext]);
 
-  /** Warm Main Gate on the hidden buffer while the home fade-out runs. */
   useEffect(() => {
     if (!prepareHomeClip) return;
     let cancelled = false;
@@ -294,155 +470,24 @@ export default function OrbitClipStage({
     };
   }, [prepareHomeClip]);
 
+  // Fallback if playToken changes without beginPlay (e.g. programmatic). Prefer beginPlay from taps.
   useEffect(() => {
     if (mode !== "play" || !clipSrc || !playToken) return;
+    if (playSessionRef.current === playToken) return;
+    beginPlay({ src: clipSrc, direction: playDirection, token: playToken });
+  }, [mode, clipSrc, playToken, playDirection, beginPlay]);
 
-    const session = playToken;
-    playSessionRef.current = session;
-    let cancelled = false;
-    let finished = false;
-    let endedHandler = null;
-    let playElRef = null;
+  useEffect(() => {
+    return () => clearEndedHandler();
+  }, []);
 
-    const isCurrent = () => !cancelled && playSessionRef.current === session;
-
-    const failPlay = () => {
-      if (!isCurrent()) return;
-      onPlayingChangeRef.current?.(false);
-    };
-
-    const finish = (direction) => {
-      if (!isCurrent() || finished) return;
-      finished = true;
-      onPlayingChangeRef.current?.(false);
-      onCompleteRef.current?.(direction);
-    };
-
-    const startPlayback = async (playEl) => {
-      if (!isCurrent() || !playEl) return false;
-
-      playEl.currentTime = 0;
-      playEl.playbackRate = 1;
-      playElRef = playEl;
-      onPlayingChangeRef.current?.(true);
-
-      try {
-        await playEl.play();
-      } catch {
-        return false;
-      }
-
-      if (!isCurrent()) return false;
-      await revealBuffer(playEl);
-      return isCurrent();
-    };
-
-    (async () => {
-      const isBack = playDirection === "back";
-      const holdEl = hasFrameRef.current ? activeEl().current : null;
-      const playEl = (hasFrameRef.current ? inactiveEl() : activeEl()).current;
-      if (!playEl) return;
-
-      const ok = await loadClip(playEl, clipSrc, { markReady: false });
-      if (!ok || !isCurrent()) {
-        failPlay();
-        return;
-      }
-
-      const alreadyWarmed =
-        isBack &&
-        sameClip(playEl.currentSrc || playEl.src, clipSrc) &&
-        playEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
-
-      if (!hasFrameRef.current) {
-        playEl.currentTime = 0;
-        playEl.playbackRate = 1;
-        playElRef = playEl;
-        onPlayingChangeRef.current?.(true);
-        try {
-          await playEl.play();
-        } catch {
-          finish(isBack ? "back" : "forward");
-          return;
-        }
-        await revealBuffer(playEl);
-      } else if (alreadyWarmed && playEl.currentTime < 0.05) {
-        playEl.currentTime = 0;
-        playEl.playbackRate = 1;
-        playElRef = playEl;
-        onPlayingChangeRef.current?.(true);
-        try {
-          await playEl.play();
-        } catch {
-          finish(isBack ? "back" : "forward");
-          return;
-        }
-        if (!isCurrent()) return;
-        await revealBuffer(playEl);
-      } else {
-        const started = await startPlayback(playEl);
-        if (!started) {
-          finish(isBack ? "back" : "forward");
-          return;
-        }
-      }
-
-      endedHandler = async () => {
-        if (!isCurrent() || finished) return;
-        playEl.pause();
-
-        if (isBack && landAfterPlay?.clipSrc) {
-          const landAt = landAfterPlay.holdAt ?? "end";
-          const playSrc = playEl.currentSrc || playEl.src;
-
-          if (sameClip(playSrc, landAfterPlay.clipSrc)) {
-            await freezeAtHold(playEl, landAt);
-            if (!isCurrent() || finished) return;
-            finish("back");
-            return;
-          }
-
-          const landEl = inactiveEl().current;
-          const landReady = landEl
-            ? await loadClip(landEl, landAfterPlay.clipSrc, { markReady: false })
-            : false;
-
-          if (!isCurrent() || finished) return;
-
-          if (landReady && landEl) {
-            await freezeAtHold(landEl, landAt);
-            if (!isCurrent() || finished) return;
-            await revealBuffer(landEl);
-          } else {
-            await freezeAtHold(playEl, "end");
-          }
-
-          finish("back");
-          return;
-        }
-
-        await freezeAtHold(playEl, "end");
-        finish("forward");
-      };
-
-      playEl.addEventListener("ended", endedHandler, { once: true });
-    })();
-
-    return () => {
-      cancelled = true;
-      if (playElRef && endedHandler) {
-        playElRef.removeEventListener("ended", endedHandler);
-      }
-    };
-  }, [mode, clipSrc, playToken, playDirection, landAfterPlay]);
-
-  const videoLayer = (ref, idx) => {
+  const videoLayer = (videoRef, idx) => {
     const isActive = active === idx;
     const show = bufReady[idx];
 
     return (
       <video
-        ref={ref}
+        ref={videoRef}
         className="be-stage-video hold"
         muted
         playsInline
@@ -472,4 +517,6 @@ export default function OrbitClipStage({
       )}
     </>
   );
-};
+});
+
+export default OrbitClipStage;

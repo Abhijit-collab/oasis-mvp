@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
+import AdoptXRLogo from "@/components/AdoptXRLogo";
+import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 import { isMobileTourDevice, isRotateOk } from "@/lib/rotateGate";
 
 function clearInline(el, props) {
@@ -88,6 +90,8 @@ export default function LoginPage({
   backgroundVideo = null,
   /** HOK: strip brand, badge, copy, perks, and name field */
   minimal = false,
+  projectLogo = null,
+  projectLogoAlt = "Brand",
 }) {
   const [name, setName] = useState("");
   const [coupon, setCoupon] = useState("");
@@ -187,15 +191,39 @@ export default function LoginPage({
         ) : null}
       </div>
 
-      {minimal && (
-        <header className="login-teaser-header">
-          <button
-            className="login-teaser-btn"
-            onClick={() => setShowForm(true)}
-            style={{ visibility: showForm ? "hidden" : "visible" }}
-          >
-            Log in
-          </button>
+      {projectLogo ? (
+        <div className="login-brand-stack">
+          <ProjectBrandLogo
+            src={projectLogo}
+            alt={projectLogoAlt}
+            className="project-brand-logo--login"
+          />
+          <div className="login-brand-stack-mid" aria-hidden />
+          <AdoptXRLogo variant="white" placement="login" />
+        </div>
+      ) : (
+        <AdoptXRLogo variant="white" placement="login" />
+      )}
+
+      {(minimal || projectLogo) && (
+        <header
+          className={
+            "login-teaser-header"
+            + (projectLogo ? " login-teaser-header--btn-only" : "")
+          }
+        >
+          <span aria-hidden />
+          {minimal ? (
+            <button
+              className="login-teaser-btn"
+              onClick={() => setShowForm(true)}
+              style={{ visibility: showForm ? "hidden" : "visible" }}
+            >
+              Log in
+            </button>
+          ) : (
+            <span aria-hidden />
+          )}
         </header>
       )}
 

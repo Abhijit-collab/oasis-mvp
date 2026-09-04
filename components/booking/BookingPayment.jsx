@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
+import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 
 const BOOKING_ADVANCE = 250000;
 
@@ -66,7 +67,11 @@ function CardPreview({ form }) {
   );
 }
 
-export default function BookingPayment({ liveUnits = null, productName = "The Oasis" }) {
+export default function BookingPayment({
+  liveUnits = null,
+  productName = "The Oasis",
+  brandLogo = null,
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -139,7 +144,11 @@ export default function BookingPayment({ liveUnits = null, productName = "The Oa
       <div className="bk-page">
         <header className="bk-top">
           <Link href={returnTo} className="bk-logo">
-            {productName}
+            {brandLogo ? (
+              <ProjectBrandLogo src={brandLogo} alt={productName} className="project-brand-logo--booking" />
+            ) : (
+              productName
+            )}
           </Link>
           <span className="bk-badge">Reserve · Test mode</span>
         </header>
@@ -161,7 +170,11 @@ export default function BookingPayment({ liveUnits = null, productName = "The Oa
       <div className="bk-page">
         <header className="bk-top">
           <Link href={returnTo} className="bk-logo">
-            {productName}
+            {brandLogo ? (
+              <ProjectBrandLogo src={brandLogo} alt={productName} className="project-brand-logo--booking" />
+            ) : (
+              productName
+            )}
           </Link>
           <span className="bk-badge">Reserve · Test mode</span>
         </header>
@@ -182,7 +195,11 @@ export default function BookingPayment({ liveUnits = null, productName = "The Oa
     <div className="bk-page">
       <header className="bk-top">
         <button type="button" className="bk-logo" onClick={leaveExplorer}>
-          {productName}
+          {brandLogo ? (
+            <ProjectBrandLogo src={brandLogo} alt={productName} className="project-brand-logo--booking" />
+          ) : (
+            productName
+          )}
         </button>
         <span className="bk-badge">Reserve · Test mode</span>
       </header>

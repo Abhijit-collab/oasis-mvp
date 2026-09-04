@@ -53,6 +53,8 @@ export const BRAND = {
   badge: "Premium Experience",
   /** Full name for copy / booking / welcome */
   fullName: "House of Krishna",
+  /** Top-left wordmark on login / 360 / welcome */
+  logoUrl: "https://d3deuzgnmq8y32.cloudfront.net/hok-logo/House+of+Krishna+Logo.png",
   /** Login screen */
   loginEyebrow: "",
   loginTitle: "House of",

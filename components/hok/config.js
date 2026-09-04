@@ -16,6 +16,8 @@ export const HOK_TOUR_CONFIG = {
   stepClips: ORBIT_STEP_CLIPS,
   stepClipsReverse: ORBIT_STEP_CLIPS_REVERSE,
   preloadUrls: ORBIT_STEP_PRELOAD_URLS,
+  /** Every Sequence must be buffered before the 360 opens. */
+  preloadGateUrls: ORBIT_STEP_PRELOAD_URLS,
   mainGateClip: ORBIT_STEP_CLIPS[0],
   getOrbitStepZones: getHOKOrbitStepZones,
   brand: BRAND,
@@ -26,7 +28,6 @@ export const HOK_TOUR_CONFIG = {
   /** Desktop: cover (original). Phones: keep aspect, contain if the screen is far from 16:9. */
   mediaFit: "adapt",
   mediaPosition: "center top",
-  /** Buffer every clip fully before the tour opens — avoids click lag on large Sequence files. */
   preloadDepth: "full",
   preloadVariant: "feather",
 };

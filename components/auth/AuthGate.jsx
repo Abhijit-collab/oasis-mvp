@@ -24,6 +24,8 @@ export default function AuthGate({
   welcomeProduct = "The Oasis",
   loginBackgroundVideo = null,
   loginMinimal = false,
+  projectLogo = null,
+  projectLogoAlt = "Brand",
 }) {
   const preloadEntranceImage = tourPreload?.preloadEntranceImage ?? defaultPreloadEntranceImage;
   const preloadTourAssetsAfterLogin =
@@ -50,11 +52,13 @@ export default function AuthGate({
 
   useEffect(() => {
     if (!preloadTourAfterLogin || session) return;
+    // Login screen: warm welcome still only — do not compete with the teaser video.
     preloadWelcomeBackgroundIdle();
   }, [preloadTourAfterLogin, session]);
 
   useEffect(() => {
     if (!preloadTourAfterLogin || !session) return;
+    // After login: full-buffer Sequence clips in the background.
     preloadTourAssetsAfterLogin();
   }, [preloadTourAfterLogin, session]);
 
@@ -131,6 +135,8 @@ export default function AuthGate({
         codePlaceholder={loginBrand?.codePlaceholder}
         backgroundVideo={loginBackgroundVideo}
         minimal={loginMinimal}
+        projectLogo={projectLogo}
+        projectLogoAlt={projectLogoAlt}
       />
     );
   }
@@ -148,6 +154,8 @@ export default function AuthGate({
           entranceImage={entranceImage}
           preloadEntranceImage={preloadEntranceImage}
           productName={welcomeProduct}
+          projectLogo={projectLogo}
+          projectLogoAlt={projectLogoAlt}
         />
       )}
     </AuthContext.Provider>

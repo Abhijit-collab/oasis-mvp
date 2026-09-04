@@ -17,6 +17,8 @@ export default function HOKLayout({ children }) {
       welcomeProduct={BRAND.welcomeProduct}
       loginBackgroundVideo={LOGIN_BG_VIDEO}
       loginMinimal
+      projectLogo={BRAND.logoUrl}
+      projectLogoAlt={BRAND.fullName}
     >
       {children}
     </AuthGate>

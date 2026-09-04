@@ -20,7 +20,11 @@ function BookingLoading() {
 export default function HOKBooking({ liveUnits = null }) {
   return (
     <Suspense fallback={<BookingLoading />}>
-      <BookingPayment liveUnits={liveUnits} productName={BRAND.fullName} />
+      <BookingPayment
+        liveUnits={liveUnits}
+        productName={BRAND.fullName}
+        brandLogo={BRAND.logoUrl}
+      />
     </Suspense>
   );
 }

@@ -11,9 +11,11 @@ import OrbitZoneOverlay from "@/components/OrbitZoneOverlay";
 import ExplorerPremiumChrome from "@/components/ExplorerPremiumChrome";
 import ExplorerNavMenu from "@/components/ExplorerNavMenu";
 import FullscreenButton from "@/components/FullscreenButton";
+import AdoptXRLogo from "@/components/AdoptXRLogo";
+import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 import PremiumBadge from "@/components/PremiumBadge";
 import { useAuth } from "@/components/auth/AuthContext";
-import usePreloadVideos from "@/hooks/usePreloadVideos";
+import usePreloadVideos, { releaseRetainedPreloadVideos } from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
 import RotateButton from "@/components/RotateButton";
@@ -95,6 +97,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     stepClips: ORBIT_STEP_CLIPS,
     stepClipsReverse: ORBIT_STEP_CLIPS_REVERSE,
     preloadUrls: ORBIT_STEP_PRELOAD_URLS,
+    preloadGateUrls = null,
     mainGateClip: MAIN_GATE_CLIP,
     getOrbitStepZones,
     brand,
@@ -170,17 +173,39 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const landHoldAtForBack = (landStep) => (landStep === 0 ? "start" : "end");
   const hasReverseClips = ORBIT_STEP_CLIPS_REVERSE.length === ORBIT_STEP_COUNT;
 
+  const gateUrls = useMemo(() => {
+    const all = [...new Set((ORBIT_STEP_PRELOAD_URLS || []).filter(Boolean))];
+    const gate = [...new Set((preloadGateUrls || all).filter(Boolean))];
+    return gate.length ? gate : all;
+  }, [ORBIT_STEP_PRELOAD_URLS, preloadGateUrls]);
+
+  const backgroundUrls = useMemo(() => {
+    const all = [...new Set((ORBIT_STEP_PRELOAD_URLS || []).filter(Boolean))];
+    const gateSet = new Set(gateUrls);
+    return all.filter((url) => !gateSet.has(url));
+  }, [ORBIT_STEP_PRELOAD_URLS, gateUrls]);
+
   const { ready: assetsReady, progress: loadProgress, failedCount, total: preloadTotal } =
-    usePreloadVideos(ORBIT_STEP_PRELOAD_URLS, { depth: preloadDepth });
+    usePreloadVideos(gateUrls, { depth: preloadDepth });
+  // Non-gate clips (if any) keep warming after the gate opens.
+  usePreloadVideos(backgroundUrls, { depth: preloadDepth });
   const { gateOpen, displayProgress } = useTourPreloadGate(assetsReady, loadProgress);
   const polledLiveUnits = useLiveUnitsPoll(liveUnits);
   const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
   const [tourRevealed, setTourRevealed] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
 
+  const clipsFailed = assetsReady && preloadTotal > 0 && failedCount > 0;
   const showPreload = !preloadHidden;
-  const mountTour = assetsReady;
+  // Open 360 only after every gated clip fully buffered.
+  const mountTour = assetsReady && !clipsFailed;
   const displayFit = mediaFit === "fill" ? "fill" : adaptiveFit;
+
+  // Free hidden preload videos so iOS can decode/play the stage clips.
+  useEffect(() => {
+    if (!mountTour) return;
+    releaseRetainedPreloadVideos();
+  }, [mountTour]);
 
   useEffect(() => {
     if (mediaFit === "fill") {
@@ -341,6 +366,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   };
 
   const pendingRef = useRef(false);
+  const stageRef = useRef(null);
 
   const handlePlayingChange = (playing) => {
     setIsPlaying(playing);
@@ -355,20 +381,29 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     hasReverseClips && !isPlaying && !pendingRef.current && !homeResetting;
   const canNext = !isPlaying && !pendingRef.current && !homeResetting;
   const holdAt = holdAtOverride ?? holdAtForStep(step);
-  const clipsFailed = assetsReady && preloadTotal > 0 && failedCount >= preloadTotal;
 
   const goNext = () => {
     if (!canNext) return;
     const fromStep = stepRef.current;
+    const src = ORBIT_STEP_CLIPS[fromStep >= ORBIT_STEP_COUNT ? 0 : fromStep];
+    const token = Date.now();
 
     clearTimeout(loopFadeTimerRef.current);
     setHoldAtOverride(null);
     pendingRef.current = true;
     setLandAfterPlay(null);
-    setClipSrc(ORBIT_STEP_CLIPS[fromStep >= ORBIT_STEP_COUNT ? 0 : fromStep]);
+    setClipSrc(src);
     setPlayDirection("forward");
     setMode("play");
-    setPlayToken(Date.now());
+    setPlayToken(token);
+    // Reveal video under the still immediately on tap (don't wait for play event).
+    if (startImage && fromStep === 0) setStartStillPhase("out");
+    stageRef.current?.beginPlay({
+      src,
+      direction: "forward",
+      token,
+      landAfterPlay: null,
+    });
   };
 
   const goPrev = () => {
@@ -382,14 +417,22 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       return;
     }
 
-    setLandAfterPlay({
+    const land = {
       clipSrc: holdClipForStep(landStep),
       holdAt: landHoldAtForBack(landStep),
-    });
+    };
+    const token = Date.now();
+    setLandAfterPlay(land);
     setClipSrc(reverseClip);
     setPlayDirection("back");
     setMode("play");
-    setPlayToken(Date.now());
+    setPlayToken(token);
+    stageRef.current?.beginPlay({
+      src: reverseClip,
+      direction: "back",
+      token,
+      landAfterPlay: land,
+    });
   };
 
   const goHome = () => {
@@ -715,6 +758,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
             }
           >
             <OrbitClipStage
+              ref={stageRef}
               clipSrc={clipSrc}
               mode={mode}
               holdAt={holdAt}
@@ -794,7 +838,15 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         <div className="scrim-bot" />
 
         <div className="be-top">
-          {showBrand ? (
+          {brand?.logoUrl ? (
+            <ProjectBrandLogo
+              src={brand.logoUrl}
+              alt={brand.fullName || brand.name || "Brand"}
+              className="project-brand-logo--explorer be-brand be-brand--logo"
+              onClick={goHome}
+              title="Return to Main Gate"
+            />
+          ) : showBrand ? (
             <div
               className="be-brand"
               onClick={goHome}
@@ -906,6 +958,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         <OrbitSideChevron dir="r" />
       </button>
 
+      {tourRevealed && <AdoptXRLogo variant="white" placement="explorer" />}
       {tourRevealed && <FullscreenButton />}
 
       {showPreload && (

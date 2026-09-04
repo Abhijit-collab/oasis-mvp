@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
+import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 import { ENTRANCE_IMAGE as DEFAULT_ENTRANCE_IMAGE } from "@/data/assets";
 import { preloadEntranceImage as defaultPreloadEntranceImage } from "@/lib/tourAssetPreload";
 
@@ -12,6 +13,8 @@ export default function WelcomeModal({
   entranceImage = DEFAULT_ENTRANCE_IMAGE,
   preloadEntranceImage = defaultPreloadEntranceImage,
   productName = "The Oasis",
+  projectLogo = null,
+  projectLogoAlt = "Brand",
 }) {
   const guest = name || "Premium Member";
   const [bgReady, setBgReady] = useState(false);
@@ -54,6 +57,15 @@ export default function WelcomeModal({
         onLoad={() => setBgReady(true)}
       />
       <div className="login-welcome-bg-scrim" aria-hidden />
+      {projectLogo ? (
+        <div className="login-welcome-brand">
+          <ProjectBrandLogo
+            src={projectLogo}
+            alt={projectLogoAlt}
+            className="project-brand-logo--welcome"
+          />
+        </div>
+      ) : null}
       <div className="login-welcome-modal">
         <div className="login-welcome-glow" aria-hidden />
         {!isPhone && (

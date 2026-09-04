@@ -9,7 +9,8 @@ const CDN_BASE =
 
 const cdnUrl = (key) => `${CDN_BASE}/${String(key).replace(/^\//, "")}`;
 
-const TV = "video-24fps";
+/** Smaller compressed forward clips (less phone WiFi lag). */
+const TV = "24fps-video-comp";
 const IMG = "image";
 
 /** Static images on HOK CDN */
@@ -26,17 +27,17 @@ export const START_IMAGE = CDN_IMAGES.mainGate;
 /** Login page full-bleed background loop */
 export const LOGIN_BG_VIDEO = cdnUrl("teaser/Websiteteaser.mp4");
 
-/** 9 forward clips (Sequence1 → Sequence9) */
+/** 9 forward clips (Sequence1 → Sequence9) — compressed Nyx3 */
 export const ORBIT_STEP_CLIPS = [
-  cdnUrl(`${TV}/Sequence1_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence2_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence3_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence4_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence5_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence6_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence7_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence8_nyx3.mp4`),
-  cdnUrl(`${TV}/Sequence9_nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence1+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence2+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence3+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence4+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence5+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence6+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence7+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence8+Nyx3.mp4`),
+  cdnUrl(`${TV}/Sequence9+Nyx3.mp4`),
 ];
 
 /**

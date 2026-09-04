@@ -195,9 +195,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const [tourRevealed, setTourRevealed] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
 
-  const clipsFailed = assetsReady && preloadTotal > 0 && failedCount > 0;
+  // Only block the tour if every gated clip failed (partial success still opens).
+  const clipsFailed = assetsReady && preloadTotal > 0 && failedCount >= preloadTotal;
   const showPreload = !preloadHidden;
-  // Open 360 only after every gated clip fully buffered.
   const mountTour = assetsReady && !clipsFailed;
   const displayFit = mediaFit === "fill" ? "fill" : adaptiveFit;
 
@@ -696,17 +696,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           : "Tap outside the block to go back — use filters to show available homes"
     : null;
 
-  if (!mountTour) {
-    return (
-      <TourPreloadScreen
-        progress={displayProgress}
-        brandPrefix={brand.prefix}
-        brandName={brand.name}
-        variant={preloadVariant}
-      />
-    );
-  }
-
   if (clipsFailed) {
     return (
       <div className="be-root be-preload">
@@ -716,6 +705,17 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           Sequence files are public on CloudFront, then refresh.
         </p>
       </div>
+    );
+  }
+
+  if (!mountTour) {
+    return (
+      <TourPreloadScreen
+        progress={displayProgress}
+        brandPrefix={brand.prefix}
+        brandName={brand.name}
+        variant={preloadVariant}
+      />
     );
   }
 

@@ -2,9 +2,50 @@
 
 import { useEffect, useState } from "react";
 
-const CLIP_TIMEOUT_MS = 45000;
-const MOBILE_CLIP_TIMEOUT_MS = 120000;
+const CLIP_TIMEOUT_MS = 90000;
+const MOBILE_CLIP_TIMEOUT_MS = 150000;
+const SLOW_CLIP_TIMEOUT_MS = 180000;
+/** Cap parallel full-buffer downloads so Slow/Fast 4G isn't saturated by 9 MP4s. */
+const FULL_CONCURRENCY = 3;
 const MOBILE_CONCURRENCY = 2;
+const SLOW_CONCURRENCY = 1;
+
+function connectionInfo() {
+  if (typeof navigator === "undefined") return null;
+  return navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
+}
+
+/** Slow 4G / 3G / save-data — open earlier, download fewer clips at once. */
+export function isSlowNetwork() {
+  const c = connectionInfo();
+  if (!c) return false;
+  if (c.saveData) return true;
+  const type = String(c.effectiveType || "").toLowerCase();
+  if (type === "slow-2g" || type === "2g" || type === "3g") return true;
+  // Chrome "Slow 4G" ~1.6 Mbps; treat weak 4G the same.
+  if (typeof c.downlink === "number" && c.downlink > 0 && c.downlink <= 2.2) return true;
+  if (typeof c.rtt === "number" && c.rtt >= 300) return true;
+  return false;
+}
+
+function isMobileClient() {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 900px)").matches
+  );
+}
+
+function bufferReadyThreshold() {
+  // Slow 4G: unlock with a smaller head of each gated clip.
+  if (isSlowNetwork()) return 0.35;
+  return 0.55;
+}
+
+function clipTimeoutMs() {
+  if (isSlowNetwork()) return SLOW_CLIP_TIMEOUT_MS;
+  return isMobileClient() ? MOBILE_CLIP_TIMEOUT_MS : CLIP_TIMEOUT_MS;
+}
 
 /** Survive duplicate module instances (dev / split chunks) so clips aren't fetched twice. */
 function store() {
@@ -34,23 +75,6 @@ function ensureRetainedHost() {
   return host;
 }
 
-function isMobileClient() {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
-    window.matchMedia("(max-width: 900px)").matches
-  );
-}
-
-function bufferReadyThreshold() {
-  // Require a solid buffer before the 360 opens (same bar on phone + desktop).
-  return 0.9;
-}
-
-function clipTimeoutMs() {
-  return isMobileClient() ? MOBILE_CLIP_TIMEOUT_MS : CLIP_TIMEOUT_MS;
-}
-
 function bufferCoverage(video) {
   if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
   if (!video.buffered?.length) return 0;
@@ -61,14 +85,15 @@ function bufferCoverage(video) {
   return Math.min(1, maxEnd / video.duration);
 }
 
-/** Timeout: only accept near-threshold coverage — never a tiny partial buffer. */
+/** Timeout: accept a playable head of the clip so slower networks still unlock. */
 function timeoutLooksPlayable(video, need, depth) {
   if (depth !== "full") return video.readyState >= HTMLMediaElement.HAVE_METADATA;
   const cover = bufferCoverage(video);
   if (cover >= need) return true;
-  if (cover >= Math.min(0.85, need) && video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
-    return true;
-  }
+  if (cover >= Math.min(0.4, need)) return true;
+  if (isSlowNetwork() && cover >= 0.2) return true;
+  if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
+  if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && cover >= 0.12) return true;
   return false;
 }
 
@@ -226,8 +251,8 @@ function preloadOne(url, depth = "metadata") {
     // Setting src starts the fetch — do NOT also call load() (duplicates every clip).
     video.src = url;
 
-    // iOS: muted play/pause kickstarts a real download (preload=auto is often ignored).
-    if (depth === "full" && isMobileClient()) {
+  // Kick buffering on desktop too (helps under throttled networks).
+    if (depth === "full") {
       const kick = video.play();
       if (kick?.then) {
         kick
@@ -265,32 +290,38 @@ async function mapPool(items, limit, worker) {
   return results;
 }
 
-/** Shared mobile full-buffer queue so login + gate don't start 9 MP4s at once. */
-const mobileFullWaiters = [];
-let mobileFullActive = 0;
+/** Shared full-buffer queue so login + gate don't start every MP4 at once. */
+const fullWaiters = [];
+let fullActive = 0;
 
-function enqueueMobileFull(start) {
+function fullConcurrency() {
+  if (isSlowNetwork()) return SLOW_CONCURRENCY;
+  return isMobileClient() ? MOBILE_CONCURRENCY : FULL_CONCURRENCY;
+}
+
+function enqueueFull(start) {
   return new Promise((resolve) => {
-    mobileFullWaiters.push({ start, resolve });
-    pumpMobileFull();
+    fullWaiters.push({ start, resolve });
+    pumpFull();
   });
 }
 
-function pumpMobileFull() {
-  while (mobileFullActive < MOBILE_CONCURRENCY && mobileFullWaiters.length) {
-    const { start, resolve } = mobileFullWaiters.shift();
-    mobileFullActive += 1;
+function pumpFull() {
+  const limit = fullConcurrency();
+  while (fullActive < limit && fullWaiters.length) {
+    const { start, resolve } = fullWaiters.shift();
+    fullActive += 1;
     Promise.resolve()
       .then(start)
       .then((result) => {
-        mobileFullActive -= 1;
+        fullActive -= 1;
         resolve(result);
-        pumpMobileFull();
+        pumpFull();
       })
       .catch(() => {
-        mobileFullActive -= 1;
+        fullActive -= 1;
         resolve({ url: null, ok: false });
-        pumpMobileFull();
+        pumpFull();
       });
   }
 }
@@ -305,10 +336,7 @@ export const prefetchVideo = (url, { depth = "metadata" } = {}) => {
     if (depth === "full" && existing.depth === "metadata") {
       const upgraded = {
         depth: "full",
-        promise:
-          isMobileClient()
-            ? enqueueMobileFull(() => preloadOne(url, "full"))
-            : preloadOne(url, "full"),
+        promise: enqueueFull(() => preloadOne(url, "full")),
       };
       cache.set(url, upgraded);
       return upgraded.promise;
@@ -317,9 +345,7 @@ export const prefetchVideo = (url, { depth = "metadata" } = {}) => {
   }
 
   const promise =
-    depth === "full" && isMobileClient()
-      ? enqueueMobileFull(() => preloadOne(url, "full"))
-      : preloadOne(url, depth);
+    depth === "full" ? enqueueFull(() => preloadOne(url, "full")) : preloadOne(url, depth);
   const entry = { depth, promise };
   cache.set(url, entry);
   return entry.promise;
@@ -370,10 +396,8 @@ export default function usePreloadVideos(urls, { depth = "metadata" } = {}) {
     let done = 0;
 
     (async () => {
-      const concurrency =
-        depth === "full" && isMobileClient() ? MOBILE_CONCURRENCY : list.length;
-
-      const results = await mapPool(list, concurrency, async (url) => {
+      // Prefetch already queues; mapPool can await all promises without re-parallelizing downloads.
+      const results = await mapPool(list, list.length, async (url) => {
         const result = await prefetchVideo(url, { depth });
         if (!cancelled) {
           done += 1;

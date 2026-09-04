@@ -98,8 +98,35 @@ export default function LoginPage({
   /** Minimal mode: form hidden until user taps "Log in" in header */
   const [showForm, setShowForm] = useState(!minimal);
   const [videoReady, setVideoReady] = useState(false);
+  /** Desktop: wait until teaser is ~80% buffered before revealing/playing. */
+  const [desktopTeaserGate, setDesktopTeaserGate] = useState(false);
+  const [teaserProgress, setTeaserProgress] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return (
+        window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)").matches &&
+        !isMobileTourDevice()
+      );
+    } catch {
+      return false;
+    }
+  });
+  const [introExit, setIntroExit] = useState(false);
   const rootRef = useRef(null);
   const videoRef = useRef(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)");
+    const sync = () => setIsDesktop(mq.matches && !isMobileTourDevice());
+    sync();
+    mq.addEventListener("change", sync);
+    window.addEventListener("resize", sync);
+    return () => {
+      mq.removeEventListener("change", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.remove("be-ios");
@@ -147,11 +174,122 @@ export default function LoginPage({
     };
   }, []);
 
+  // Desktop: short logo intro, then play as soon as the teaser can start smoothly.
+  // (Waiting for 80% of the full file caused ~45–50s delays on large teasers.)
   useEffect(() => {
-    if (!videoReady || !videoRef.current) return;
+    if (!backgroundVideo || !isDesktop || !videoReady) return undefined;
+
+    let settled = false;
+    let revealTimer = null;
+    let poll = null;
+    let raf = null;
+    const t0 = performance.now();
+    const MIN_INTRO_MS = 1600;
+    /** Enough ahead-of-play buffer — not 80% of the whole file. */
+    const PLAY_NEED = 0.18;
+    const listeners = [];
+
+    const detach = (video) => {
+      listeners.forEach(([type, fn]) => video.removeEventListener(type, fn));
+      listeners.length = 0;
+    };
+
+    const start = () => {
+      const video = videoRef.current;
+      if (!video) {
+        raf = requestAnimationFrame(start);
+        return;
+      }
+
+      const coverage = () => {
+        if (!Number.isFinite(video.duration) || video.duration <= 0) return 0;
+        if (!video.buffered?.length) return 0;
+        let maxEnd = 0;
+        for (let i = 0; i < video.buffered.length; i += 1) {
+          maxEnd = Math.max(maxEnd, video.buffered.end(i));
+        }
+        return Math.min(1, maxEnd / video.duration);
+      };
+
+      const canStart = () => {
+        const pct = coverage();
+        if (pct >= PLAY_NEED) return true;
+        if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
+        if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && pct >= 0.08) return true;
+        return false;
+      };
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        setTeaserProgress(100);
+        setIntroExit(true);
+        revealTimer = window.setTimeout(() => {
+          setDesktopTeaserGate(true);
+          try {
+            video.currentTime = 0;
+          } catch {
+            /* ignore */
+          }
+          const play = video.play();
+          if (play?.catch) play.catch(() => {});
+        }, 380);
+      };
+
+      const tick = () => {
+        const pct = coverage();
+        // Map early buffer into a smoother 0→95 bar while the logo shows.
+        const shown = Math.min(95, Math.round(Math.max(pct / PLAY_NEED, 0) * 90));
+        setTeaserProgress(shown);
+
+        const introDone = performance.now() - t0 >= MIN_INTRO_MS;
+        if (introDone && canStart()) finish();
+      };
+
+      video.preload = "auto";
+      video.muted = true;
+      video.playsInline = true;
+      video.pause();
+
+      const kick = video.play();
+      if (kick?.then) {
+        kick
+          .then(() => {
+            try {
+              video.pause();
+              if (video.currentTime > 0.05) video.currentTime = 0;
+            } catch {
+              /* ignore */
+            }
+          })
+          .catch(() => {});
+      }
+
+      ["progress", "loadeddata", "canplay", "canplaythrough"].forEach((type) => {
+        video.addEventListener(type, tick);
+        listeners.push([type, tick]);
+      });
+      poll = window.setInterval(tick, 200);
+      tick();
+    };
+
+    start();
+
+    return () => {
+      settled = true;
+      if (raf) cancelAnimationFrame(raf);
+      if (poll) clearInterval(poll);
+      if (revealTimer) clearTimeout(revealTimer);
+      if (videoRef.current) detach(videoRef.current);
+    };
+  }, [backgroundVideo, isDesktop, videoReady]);
+
+  // Mobile / non-desktop: play as soon as rotate gate allows (unchanged).
+  useEffect(() => {
+    if (isDesktop || !videoReady || !videoRef.current) return;
     const play = videoRef.current.play();
     if (play?.catch) play.catch(() => {});
-  }, [videoReady]);
+  }, [videoReady, isDesktop]);
 
   const submitLogin = useCallback(() => {
     onSubmit({ name: name.trim(), coupon: coupon.trim() });
@@ -166,6 +304,8 @@ export default function LoginPage({
   const keepTapOnButton = (e) => e.preventDefault();
 
   const showBrand = !minimal && (eyebrow || title || accent);
+  const showDesktopIntro = Boolean(backgroundVideo && isDesktop && !desktopTeaserGate);
+  const revealChrome = !showDesktopIntro;
 
   return (
     <div
@@ -174,24 +314,49 @@ export default function LoginPage({
         "login-page"
         + (minimal ? " login-page--minimal" : "")
         + (minimal && !showForm ? " login-page--teaser" : "")
+        + (showDesktopIntro ? " login-page--intro" : "")
+        + (introExit ? " login-page--intro-exit" : "")
       }
     >
       <div className={"login-bg" + (backgroundVideo ? " login-bg--video" : "")} aria-hidden>
         {backgroundVideo && videoReady ? (
           <video
             ref={videoRef}
-            className="login-bg-video"
+            className={
+              "login-bg-video"
+              + (isDesktop && !desktopTeaserGate ? " login-bg-video--pending" : "")
+            }
             src={backgroundVideo}
-            autoPlay
             muted
             loop
             playsInline
-            preload="metadata"
+            preload={isDesktop ? "auto" : "metadata"}
           />
         ) : null}
       </div>
 
-      {projectLogo ? (
+      {showDesktopIntro && (
+        <div className="login-teaser-intro" aria-busy="true" aria-live="polite">
+          <div className="login-teaser-intro-glow" aria-hidden />
+          {projectLogo ? (
+            <ProjectBrandLogo
+              src={projectLogo}
+              alt={projectLogoAlt}
+              className="project-brand-logo--login login-teaser-intro-logo"
+            />
+          ) : (
+            <p className="login-teaser-intro-title">
+              {title} {accent ? <span>{accent}</span> : null}
+            </p>
+          )}
+          <div className="login-teaser-intro-bar" role="progressbar" aria-valuenow={teaserProgress} aria-valuemin={0} aria-valuemax={100}>
+            <div className="login-teaser-intro-fill" style={{ width: `${Math.min(100, Math.max(8, teaserProgress))}%` }} />
+          </div>
+          <p className="login-teaser-intro-label">Preparing your experience…</p>
+        </div>
+      )}
+
+      {revealChrome && projectLogo ? (
         <div className="login-brand-stack">
           <ProjectBrandLogo
             src={projectLogo}
@@ -201,11 +366,11 @@ export default function LoginPage({
           <div className="login-brand-stack-mid" aria-hidden />
           <AdoptXRLogo variant="white" placement="login" />
         </div>
-      ) : (
+      ) : revealChrome ? (
         <AdoptXRLogo variant="white" placement="login" />
-      )}
+      ) : null}
 
-      {(minimal || projectLogo) && (
+      {revealChrome && (minimal || projectLogo) && (
         <header
           className={
             "login-teaser-header"
@@ -227,9 +392,11 @@ export default function LoginPage({
         </header>
       )}
 
-      <div className="login-premium-ribbon" aria-hidden>
-        <span>By invitation only</span>
-      </div>
+      {revealChrome && (
+        <div className="login-premium-ribbon" aria-hidden>
+          <span>By invitation only</span>
+        </div>
+      )}
 
       {minimal && showForm && (
         <div className="login-overlay-dismiss" onClick={() => setShowForm(false)} />

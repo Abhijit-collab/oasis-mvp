@@ -1,34 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
-
-/** Pin fullscreen login to the visible Safari viewport (fixes post-logout crop). */
-function pinToVisualViewport(el) {
-  if (!el || typeof window === "undefined") return;
-
-  window.scrollTo(0, 0);
-  document.documentElement.scrollTop = 0;
-  document.body.scrollTop = 0;
-
-  const vv = window.visualViewport;
-  const top = Math.max(0, Math.round(vv?.offsetTop ?? 0));
-  const left = Math.max(0, Math.round(vv?.offsetLeft ?? 0));
-  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth ?? 0));
-  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight ?? 0));
-
-  el.style.setProperty("position", "fixed");
-  el.style.setProperty("top", `${top}px`);
-  el.style.setProperty("left", `${left}px`);
-  el.style.setProperty("right", "auto");
-  el.style.setProperty("bottom", "auto");
-  el.style.setProperty("width", `${w}px`);
-  el.style.setProperty("height", `${h}px`);
-  el.style.setProperty("max-width", `${w}px`);
-  el.style.setProperty("max-height", `${h}px`);
-  el.style.setProperty("transform", "none");
-}
 
 export default function LoginPage({
   onSubmit,
@@ -45,38 +19,6 @@ export default function LoginPage({
   const [coupon, setCoupon] = useState("");
   /** Minimal mode: form hidden until user taps "Log in" in header */
   const [showForm, setShowForm] = useState(!minimal);
-  const rootRef = useRef(null);
-
-  useEffect(() => {
-    document.documentElement.classList.remove("be-ios");
-    document.body.style.position = "";
-    document.body.style.top = "";
-    document.body.style.left = "";
-    document.body.style.width = "";
-    document.body.style.height = "";
-    document.body.style.overflow = "";
-
-    const el = rootRef.current;
-    const update = () => pinToVisualViewport(el);
-
-    update();
-    const timers = [50, 150, 400, 800].map((ms) => window.setTimeout(update, ms));
-
-    window.addEventListener("resize", update);
-    window.addEventListener("orientationchange", update);
-    window.addEventListener("pageshow", update);
-    window.visualViewport?.addEventListener("resize", update);
-    window.visualViewport?.addEventListener("scroll", update);
-
-    return () => {
-      timers.forEach((id) => window.clearTimeout(id));
-      window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
-      window.removeEventListener("pageshow", update);
-      window.visualViewport?.removeEventListener("resize", update);
-      window.visualViewport?.removeEventListener("scroll", update);
-    };
-  }, []);
 
   const submitLogin = useCallback(() => {
     onSubmit({ name: name.trim(), coupon: coupon.trim() });
@@ -94,7 +36,6 @@ export default function LoginPage({
 
   return (
     <div
-      ref={rootRef}
       className={
         "login-page"
         + (minimal ? " login-page--minimal" : "")
@@ -115,7 +56,6 @@ export default function LoginPage({
         ) : null}
       </div>
 
-      {/* ---- Minimal header bar with Log in button (teaser mode) ---- */}
       {minimal && (
         <header className="login-teaser-header">
           <button
@@ -132,12 +72,10 @@ export default function LoginPage({
         <span>By invitation only</span>
       </div>
 
-      {/* ---- Backdrop click to dismiss form (minimal) ---- */}
       {minimal && showForm && (
         <div className="login-overlay-dismiss" onClick={() => setShowForm(false)} />
       )}
 
-      {/* ---- Login card (centered when visible) ---- */}
       <div className={"login-shell" + (minimal && !showForm ? " login-shell--hidden" : "")}>
         {showBrand ? (
           <header className="login-header">

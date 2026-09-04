@@ -75,25 +75,19 @@ export default function AuthGate({
 
   const logout = useCallback(() => {
     sessionStorage.removeItem(STORAGE_KEY);
-    setSession(null);
-    setShowWelcome(false);
-    setLoginError("");
     if (typeof document !== "undefined") {
       document.documentElement.classList.remove("be-ios");
       document.body.classList.remove("rotate-prompt-open");
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.left = "";
-      document.body.style.width = "";
-      document.body.style.height = "";
-      document.body.style.overflow = "";
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
     }
+    // Hard reload clears Safari viewport locks from the 360 tour so login
+    // matches a fresh page open exactly.
     if (typeof window !== "undefined") {
-      window.scrollTo(0, 0);
-      requestAnimationFrame(() => window.scrollTo(0, 0));
+      window.location.reload();
+      return;
     }
+    setSession(null);
+    setShowWelcome(false);
+    setLoginError("");
   }, []);
 
   useEffect(() => {

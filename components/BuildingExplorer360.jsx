@@ -349,6 +349,60 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     };
   }, []);
 
+  /** Android: pin AdoptXR + fullscreen to the contained video frame (not the letterbox). */
+  useEffect(() => {
+    if (!tourRevealed || !isPhoneChrome) return undefined;
+    if (typeof document !== "undefined" && document.documentElement.classList.contains("be-ios")) {
+      return undefined;
+    }
+
+    const stage = stageBoxRef.current;
+    if (!stage) return undefined;
+
+    const apply = () => {
+      const videos = [...stage.querySelectorAll("video.be-stage-video")];
+      const el =
+        videos.find((v) => v.style.visibility !== "hidden" && v.readyState >= 2) ||
+        videos.find((v) => v.videoWidth > 0) ||
+        videos[0];
+      const cw = stage.clientWidth;
+      const ch = stage.clientHeight;
+      if (!el || !cw || !ch) return;
+
+      const vw = el.videoWidth || 0;
+      const vh = el.videoHeight || 0;
+      let left = 0;
+      let top = 0;
+      let width = cw;
+      let height = ch;
+
+      if (vw > 0 && vh > 0) {
+        const scale = Math.min(cw / vw, ch / vh);
+        width = vw * scale;
+        height = vh * scale;
+        left = (cw - width) / 2;
+        top = (ch - height) / 2;
+      }
+
+      stage.style.setProperty("--be-vid-left", `${Math.round(left)}px`);
+      stage.style.setProperty("--be-vid-top", `${Math.round(top)}px`);
+      stage.style.setProperty("--be-vid-width", `${Math.round(width)}px`);
+      stage.style.setProperty("--be-vid-height", `${Math.round(height)}px`);
+      stage.classList.add("be-stage--has-vid-box");
+    };
+
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(stage);
+    window.addEventListener("orientationchange", apply);
+    const id = window.setInterval(apply, 800);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("orientationchange", apply);
+      clearInterval(id);
+    };
+  }, [tourRevealed, isPhoneChrome, clipSrc, displayFit, mode]);
+
   /* Phone orbit arrows: JS class toggle + CSS transitions (reliable on iOS Safari) */
   useEffect(() => {
     if (!isPhoneChrome || !tourRevealed || navOpen || isPlaying) {
@@ -446,6 +500,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const pendingRef = useRef(false);
   const stageRef = useRef(null);
+  const stageBoxRef = useRef(null);
 
   const handlePlayingChange = (playing) => {
     setIsPlaying(playing);
@@ -841,7 +896,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           (displayFit === "cover" || displayFit === "contain" ? " be-tour-reveal--sharp" : "")
         }
       >
-        <div className="be-stage">
+        <div className="be-stage" ref={stageBoxRef}>
           <div
             className={
               "be-stage-media" +
@@ -927,6 +982,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
               />
             )}
           </div>
+
+          {tourRevealed && (
+            <div className="be-stage-chrome">
+              <AdoptXRLogo variant="white" placement="explorer" />
+              <FullscreenButton />
+            </div>
+          )}
+        </div>
 
         <div className="scrim-top" />
         <div className="scrim-bot" />
@@ -1021,7 +1084,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
             bookingPath={booking.path}
           />
         )}
-        </div>
       </div>
 
       <button
@@ -1064,9 +1126,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           <OrbitSideChevron dir="r" />
         </span>
       </button>
-
-      {tourRevealed && <AdoptXRLogo variant="white" placement="explorer" />}
-      {tourRevealed && <FullscreenButton />}
 
       {showPreload && (
         <TourPreloadScreen

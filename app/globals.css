@@ -28,6 +28,9 @@ html:has(.be-root),body:has(.be-root){
    and the SVG overlay uses preserveAspectRatio="none", so both distort the same
    way -> the entire image shows, fills the screen, and zones stay aligned. */
 .be-stage{position:absolute;inset:0;width:100%;height:100%;line-height:0;background:#06070a}
+.be-stage-chrome{
+  position:absolute;inset:0;z-index:36;pointer-events:none}
+.be-stage-chrome .be-fs-btn{pointer-events:auto}
 .be-stage img{display:block;width:100%;height:100%;object-fit:fill;
   user-select:none;-webkit-user-drag:none}
 .be-look-viewport{position:absolute;inset:0;overflow:hidden;z-index:1;touch-action:none}
@@ -107,6 +110,25 @@ html.be-phone:not(.be-ios) .be-tour-reveal--in{
   position:absolute;inset:0;width:100%;height:100%;z-index:4;
   object-fit:contain;object-position:center center;
   pointer-events:none;background:#06070a}
+
+/* Android: AdoptXR + fullscreen sit on the contained video frame, not the letterbox. */
+html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer{
+  position:absolute;
+  left:calc(var(--be-vid-left, 0px) + 12px);
+  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px);
+  bottom:auto;right:auto;
+  transform:translateY(-100%);
+  animation:none;opacity:.9;z-index:37}
+html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer img{
+  height:28px;max-width:min(120px,28vw)}
+html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .be-fs-btn{
+  position:absolute;
+  left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px);
+  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px);
+  right:auto;bottom:auto;
+  width:48px;height:48px;z-index:37}
+html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .be-fs-btn svg{
+  width:20px;height:20px}
 
 .be-root--contain .be-stage img,
 .be-root--contain .be-stage-video,

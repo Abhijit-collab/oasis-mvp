@@ -4,27 +4,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
 
-function syncLoginViewport(el) {
+/** Pin fullscreen login to the visible Safari viewport (fixes post-logout crop). */
+function pinToVisualViewport(el) {
   if (!el || typeof window === "undefined") return;
+
   window.scrollTo(0, 0);
   document.documentElement.scrollTop = 0;
   document.body.scrollTop = 0;
 
   const vv = window.visualViewport;
-  const w = Math.round(vv?.width || window.innerWidth || 0);
-  const h = Math.round(vv?.height || window.innerHeight || 0);
-  const top = Math.round(vv?.offsetTop || 0);
-  const left = Math.round(vv?.offsetLeft || 0);
+  const top = Math.max(0, Math.round(vv?.offsetTop ?? 0));
+  const left = Math.max(0, Math.round(vv?.offsetLeft ?? 0));
+  const w = Math.max(1, Math.round(vv?.width ?? window.innerWidth ?? 0));
+  const h = Math.max(1, Math.round(vv?.height ?? window.innerHeight ?? 0));
 
-  el.style.position = "fixed";
-  el.style.top = `${top}px`;
-  el.style.left = `${left}px`;
-  el.style.right = "auto";
-  el.style.bottom = "auto";
-  el.style.width = `${w}px`;
-  el.style.height = `${h}px`;
-  el.style.maxWidth = `${w}px`;
-  el.style.maxHeight = `${h}px`;
+  el.style.setProperty("position", "fixed");
+  el.style.setProperty("top", `${top}px`);
+  el.style.setProperty("left", `${left}px`);
+  el.style.setProperty("right", "auto");
+  el.style.setProperty("bottom", "auto");
+  el.style.setProperty("width", `${w}px`);
+  el.style.setProperty("height", `${h}px`);
+  el.style.setProperty("max-width", `${w}px`);
+  el.style.setProperty("max-height", `${h}px`);
+  el.style.setProperty("transform", "none");
 }
 
 export default function LoginPage({
@@ -46,23 +49,30 @@ export default function LoginPage({
 
   useEffect(() => {
     document.documentElement.classList.remove("be-ios");
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.width = "";
+    document.body.style.height = "";
+    document.body.style.overflow = "";
+
     const el = rootRef.current;
-    const update = () => syncLoginViewport(el);
+    const update = () => pinToVisualViewport(el);
+
     update();
-    // Second pass after Safari settles post-logout layout.
-    const t = window.setTimeout(update, 50);
-    const t2 = window.setTimeout(update, 300);
+    const timers = [50, 150, 400, 800].map((ms) => window.setTimeout(update, ms));
 
     window.addEventListener("resize", update);
     window.addEventListener("orientationchange", update);
+    window.addEventListener("pageshow", update);
     window.visualViewport?.addEventListener("resize", update);
     window.visualViewport?.addEventListener("scroll", update);
 
     return () => {
-      window.clearTimeout(t);
-      window.clearTimeout(t2);
+      timers.forEach((id) => window.clearTimeout(id));
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
+      window.removeEventListener("pageshow", update);
       window.visualViewport?.removeEventListener("resize", update);
       window.visualViewport?.removeEventListener("scroll", update);
     };
@@ -118,7 +128,7 @@ export default function LoginPage({
         </header>
       )}
 
-      <div className="login-premium-ribbon">
+      <div className="login-premium-ribbon" aria-hidden>
         <span>By invitation only</span>
       </div>
 

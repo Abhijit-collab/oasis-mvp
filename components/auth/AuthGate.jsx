@@ -78,15 +78,21 @@ export default function AuthGate({
     setSession(null);
     setShowWelcome(false);
     setLoginError("");
-    // Drop 360 viewport locks so the login teaser isn't offset / scrollable.
     if (typeof document !== "undefined") {
       document.documentElement.classList.remove("be-ios");
       document.body.classList.remove("rotate-prompt-open");
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.width = "";
+      document.body.style.height = "";
+      document.body.style.overflow = "";
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
     }
     if (typeof window !== "undefined") {
       window.scrollTo(0, 0);
+      requestAnimationFrame(() => window.scrollTo(0, 0));
     }
   }, []);
 

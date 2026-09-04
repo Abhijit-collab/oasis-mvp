@@ -236,6 +236,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     window.visualViewport?.addEventListener("scroll", update);
     return () => {
       document.documentElement.classList.remove("be-ios");
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      window.scrollTo(0, 0);
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
       window.visualViewport?.removeEventListener("resize", update);

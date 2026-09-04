@@ -1,11 +1,28 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { isSlowNetwork } from "@/hooks/usePreloadVideos";
 
 const FRAME_PAD = 1 / 30;
 const DRAG_THRESHOLD = 12;
 const DATA_TIMEOUT_MS = 12000;
 const PAINT_TIMEOUT_MS = 1200;
+/** Unlock arrows if playback stops advancing (much shorter on Slow 4G). */
+const stallAbortMs = () => (isSlowNetwork() ? 4500 : 12000);
+const stallRetryMs = () => (isSlowNetwork() ? 3500 : 6000);
+const WARM_COVERAGE = () => (isSlowNetwork() ? 0.28 : 0.4);
+const WARM_COVERAGE_TIMEOUT_MS = () => (isSlowNetwork() ? 12000 : 20000);
+const WARM_KICK_MS = 1800;
+
+const bufferCoverage = (el) => {
+  if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return 0;
+  if (!el.buffered?.length) return 0;
+  let maxEnd = 0;
+  for (let i = 0; i < el.buffered.length; i += 1) {
+    maxEnd = Math.max(maxEnd, el.buffered.end(i));
+  }
+  return Math.min(1, maxEnd / el.duration);
+};
 
 const waitForData = (el) =>
   new Promise((resolve) => {
@@ -31,14 +48,18 @@ const waitForData = (el) =>
     el.addEventListener("error", onErr, { once: true });
   });
 
-/** iOS often ignores preload=auto — muted play/pause forces bytes to arrive. */
-const kickBuffer = (el) => {
+/**
+ * iOS often ignores preload=auto — muted play/pause forces bytes to arrive.
+ * Never pause when `keepPlaying` is set (active orbit play session).
+ */
+const kickBuffer = (el, { keepPlaying = false } = {}) => {
   if (!el) return;
   try {
     el.muted = true;
     const p = el.play();
     if (p?.then) {
       p.then(() => {
+        if (keepPlaying) return;
         try {
           el.pause();
         } catch {
@@ -49,6 +70,63 @@ const kickBuffer = (el) => {
   } catch {
     /* ignore */
   }
+};
+
+/**
+ * Keep warming the next clip while on hold. Returns a cancel() so play/tap
+ * stops the play→pause kicks (otherwise they pause the same element mid-play).
+ */
+const startWarmCoverage = (el, { need = WARM_COVERAGE(), timeoutMs = WARM_COVERAGE_TIMEOUT_MS() } = {}) => {
+  let settled = false;
+  let timer = null;
+  let kick = null;
+  let poll = null;
+
+  const cleanup = () => {
+    if (timer) clearTimeout(timer);
+    if (kick) clearInterval(kick);
+    if (poll) clearInterval(poll);
+    timer = kick = poll = null;
+    if (el) {
+      el.removeEventListener("progress", onProg);
+      el.removeEventListener("canplaythrough", onProg);
+    }
+  };
+
+  const onProg = () => {
+    if (settled || !el) return;
+    if (bufferCoverage(el) >= need || el.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+      settled = true;
+      cleanup();
+    }
+  };
+
+  if (
+    el &&
+    (bufferCoverage(el) >= need || el.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA)
+  ) {
+    settled = true;
+    return () => {};
+  }
+
+  if (el) {
+    kickBuffer(el);
+    kick = setInterval(() => {
+      if (!settled) kickBuffer(el);
+    }, WARM_KICK_MS);
+    poll = setInterval(onProg, 400);
+    el.addEventListener("progress", onProg);
+    el.addEventListener("canplaythrough", onProg);
+    timer = setTimeout(() => {
+      settled = true;
+      cleanup();
+    }, timeoutMs);
+  }
+
+  return () => {
+    settled = true;
+    cleanup();
+  };
 };
 
 /** Wait until the decoder has a frame ready to paint (avoids black flash on swap). */
@@ -116,6 +194,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     prefetchNext = null,
     onComplete,
     onPlayingChange,
+    onPlayFailed,
     onDragForward,
     onDragBack,
     dragDisabled = false,
@@ -139,6 +218,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   const playDirectionRef = useRef(playDirection);
   const onCompleteRef = useRef(onComplete);
   const onPlayingChangeRef = useRef(onPlayingChange);
+  const onPlayFailedRef = useRef(onPlayFailed);
   const onDragForwardRef = useRef(onDragForward);
   const onDragBackRef = useRef(onDragBack);
   const onHoldFrameReadyRef = useRef(onHoldFrameReady);
@@ -146,6 +226,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   const holdFrameReadySentRef = useRef(false);
   const endedHandlerRef = useRef(null);
   const playElRef = useRef(null);
+  const stallTimerRef = useRef(null);
+  const stallListenersRef = useRef(null);
 
   const [active, setActive] = useState(0);
   const [hasFrame, setHasFrame] = useState(false);
@@ -155,6 +237,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   playDirectionRef.current = playDirection;
   onCompleteRef.current = onComplete;
   onPlayingChangeRef.current = onPlayingChange;
+  onPlayFailedRef.current = onPlayFailed;
   onDragForwardRef.current = onDragForward;
   onDragBackRef.current = onDragBack;
   onHoldFrameReadyRef.current = onHoldFrameReady;
@@ -240,12 +323,97 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     endedHandlerRef.current = null;
   };
 
+  const clearStallWatch = () => {
+    if (stallTimerRef.current) {
+      clearTimeout(stallTimerRef.current);
+      stallTimerRef.current = null;
+    }
+    const pair = stallListenersRef.current;
+    if (pair?.el) {
+      pair.el.removeEventListener("waiting", pair.onWaiting);
+      pair.el.removeEventListener("stalled", pair.onWaiting);
+      pair.el.removeEventListener("playing", pair.onPlaying);
+      pair.el.removeEventListener("timeupdate", pair.onPlaying);
+    }
+    stallListenersRef.current = null;
+  };
+
+  const abortPlaySession = (session) => {
+    if (playSessionRef.current !== session) return;
+    clearStallWatch();
+    clearEndedHandler();
+    const el = playElRef.current;
+    try {
+      el?.pause();
+    } catch {
+      /* ignore */
+    }
+    onPlayingChangeRef.current?.(false);
+    onPlayFailedRef.current?.();
+  };
+
+  const attachStallWatch = (playEl, session) => {
+    clearStallWatch();
+    let lastTime = playEl.currentTime || 0;
+    let armed = false;
+
+    const arm = () => {
+      if (stallTimerRef.current) clearTimeout(stallTimerRef.current);
+      armed = true;
+      stallTimerRef.current = setTimeout(() => {
+        if (playSessionRef.current !== session) return;
+        // One resume attempt, then unlock nav if still stuck.
+        kickBuffer(playEl, { keepPlaying: true });
+        try {
+          const p = playEl.play();
+          if (p?.catch) p.catch(() => {});
+        } catch {
+          /* ignore */
+        }
+        stallTimerRef.current = setTimeout(() => abortPlaySession(session), stallRetryMs());
+      }, stallAbortMs());
+    };
+
+    const onWaiting = () => {
+      if (playSessionRef.current !== session) return;
+      kickBuffer(playEl, { keepPlaying: true });
+      arm();
+    };
+
+    // Only clear stall when playback actually advances (Slow 4G can drip timeupdates).
+    const onProgress = () => {
+      if (playSessionRef.current !== session) return;
+      const t = playEl.currentTime || 0;
+      if (t - lastTime < 0.12) return;
+      lastTime = t;
+      if (stallTimerRef.current) {
+        clearTimeout(stallTimerRef.current);
+        stallTimerRef.current = null;
+      }
+      armed = false;
+    };
+
+    // If play never leaves the first frames, unlock anyway (common on Slow 4G Seq4).
+    stallTimerRef.current = setTimeout(() => {
+      if (playSessionRef.current !== session) return;
+      const t = playEl.currentTime || 0;
+      if (t < 0.35 && !armed) arm();
+    }, stallAbortMs());
+
+    playEl.addEventListener("waiting", onWaiting);
+    playEl.addEventListener("stalled", onWaiting);
+    playEl.addEventListener("playing", onProgress);
+    playEl.addEventListener("timeupdate", onProgress);
+    stallListenersRef.current = { el: playEl, onWaiting, onPlaying: onProgress };
+  };
+
   const attachEndedHandler = (playEl, session, isBack) => {
     clearEndedHandler();
     playElRef.current = playEl;
 
     const endedHandler = async () => {
       if (playSessionRef.current !== session) return;
+      clearStallWatch();
       playEl.pause();
 
       const land = landAfterPlayRef.current;
@@ -301,6 +469,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     playSessionRef.current = session;
     playDirectionRef.current = direction;
     if (land !== undefined) landAfterPlayRef.current = land;
+    clearStallWatch();
     clearEndedHandler();
 
     const isBack = direction === "back";
@@ -336,7 +505,9 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     }
 
     playEl.playbackRate = 1;
+    playElRef.current = playEl;
     onPlayingChangeRef.current?.(true);
+    attachStallWatch(playEl, session);
 
     // Critical: invoke play() in the same turn as the tap.
     const playPromise = playEl.play();
@@ -345,15 +516,15 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       try {
         if (playPromise) await playPromise;
       } catch {
-        // Retry once after a short buffer kick (still muted).
-        kickBuffer(playEl);
+        // Retry once after a short buffer kick (still muted) — do not pause.
+        kickBuffer(playEl, { keepPlaying: true });
         await waitForData(playEl);
         if (playSessionRef.current !== session) return;
         try {
           if (playEl.currentTime > 0.05) playEl.currentTime = 0;
           await playEl.play();
         } catch {
-          onPlayingChangeRef.current?.(false);
+          abortPlaySession(session);
           return;
         }
       }
@@ -402,6 +573,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     if (mode !== "hold" || !clipSrc) return;
     holdFrameReadySentRef.current = false;
     let cancelled = false;
+    let stopWarm = null;
 
     (async () => {
       const visible = activeEl().current;
@@ -434,19 +606,20 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       const warmEl = inactiveEl().current;
       if (!warmEl) return;
       markBufReady(bufIndex(warmEl), false);
-      if (sameClip(warmEl.currentSrc || warmEl.src, warmSrc)) {
-        await freezeAtHold(warmEl, "start");
-        markBufReady(bufIndex(warmEl), false);
-        return;
+      if (!sameClip(warmEl.currentSrc || warmEl.src, warmSrc)) {
+        const warmed = await loadClip(warmEl, warmSrc, { markReady: false });
+        if (cancelled || !warmed) return;
       }
-      const warmed = await loadClip(warmEl, warmSrc, { markReady: false });
-      if (cancelled || !warmed) return;
       await freezeAtHold(warmEl, "start");
+      if (cancelled) return;
       markBufReady(bufIndex(warmEl), false);
+      // Warm a playable head of Seq4+ before the next tap (abortable on play).
+      stopWarm = startWarmCoverage(warmEl);
     })();
 
     return () => {
       cancelled = true;
+      stopWarm?.();
     };
   }, [mode, clipSrc, holdAt, holdResetKey, prefetchBack, prefetchNext]);
 
@@ -478,7 +651,10 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   }, [mode, clipSrc, playToken, playDirection, beginPlay]);
 
   useEffect(() => {
-    return () => clearEndedHandler();
+    return () => {
+      clearStallWatch();
+      clearEndedHandler();
+    };
   }, []);
 
   const videoLayer = (videoRef, idx) => {

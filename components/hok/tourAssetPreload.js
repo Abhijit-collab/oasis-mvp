@@ -8,18 +8,17 @@ export const ORBIT_STEP_PRELOAD_URLS = [
 ];
 
 /**
- * Gate / first wave (phones + Slow 4G):
- * - Seq1–3: enough forward runway so opening after Seq2 doesn’t stall
- * - Rev9–7: wrap / late-orbit back nav
- * Remaining forwards then remaining reverses warm in background.
+ * Gate / first wave:
+ * Seq1–5 first (Seq4 was stalling arrows on Slow 4G when only 1–3 were gated).
+ * Rev9 only for wrap-back — other reverses wait so forwards keep the pipe.
  */
 export const ORBIT_PRIORITY_PRELOAD_URLS = [
   ORBIT_STEP_CLIPS[0],
   ORBIT_STEP_CLIPS[1],
   ORBIT_STEP_CLIPS[2],
+  ORBIT_STEP_CLIPS[3],
+  ORBIT_STEP_CLIPS[4],
   ORBIT_STEP_CLIPS_REVERSE[8],
-  ORBIT_STEP_CLIPS_REVERSE[7],
-  ORBIT_STEP_CLIPS_REVERSE[6],
 ].filter(Boolean);
 
 /** After the gate: prefer leftover forward clips, then leftover reverses. */
@@ -83,13 +82,23 @@ export function preloadTourAssetsAfterLogin() {
   ORBIT_PRIORITY_PRELOAD_URLS.forEach((url) => prefetchVideo(url, { depth: "full" }));
 
   const rest = orbitBackgroundPreloadUrls(ORBIT_PRIORITY_PRELOAD_URLS);
-  // Slight delay so Seq1–3 + Rev9–7 claim the bandwidth first on Slow 4G.
+  // Delay leftover clips so Seq1–5 + Rev9 claim bandwidth (longer on Slow 4G / phones).
   const warmRest = () => {
     rest.forEach((url) => prefetchVideo(url, { depth: "full" }));
   };
+  const slow =
+    typeof navigator !== "undefined" &&
+    (() => {
+      const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!c) return false;
+      if (c.saveData) return true;
+      const t = String(c.effectiveType || "").toLowerCase();
+      return t === "slow-2g" || t === "2g" || t === "3g" || (typeof c.downlink === "number" && c.downlink > 0 && c.downlink <= 2.2);
+    })();
+  const delayMs = slow ? 8000 : 1200;
   if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(warmRest, { timeout: 1800 });
+    requestIdleCallback(warmRest, { timeout: Math.max(2500, delayMs) });
   } else {
-    setTimeout(warmRest, 600);
+    setTimeout(warmRest, delayMs);
   }
 }

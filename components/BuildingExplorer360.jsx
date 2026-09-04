@@ -18,6 +18,8 @@ import { useAuth } from "@/components/auth/AuthContext";
 import usePreloadVideos, {
   releaseRetainedPreloadVideos,
   areUrlsBufferedEnough,
+  prefetchVideo,
+  isSlowNetwork,
 } from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
@@ -216,8 +218,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const { ready: assetsReady, progress: loadProgress, failedCount, total: preloadTotal } =
     usePreloadVideos(gateUrls, { depth: preloadDepth });
-  // Non-gate clips (if any) keep warming after the gate opens.
-  usePreloadVideos(backgroundUrls, { depth: preloadDepth });
+  // Wait for the gate before background clips — Slow 4G Seq4 needs the pipe first.
+  usePreloadVideos(assetsReady ? backgroundUrls : [], { depth: preloadDepth });
   const { gateOpen, displayProgress } = useTourPreloadGate(assetsReady, loadProgress);
   const polledLiveUnits = useLiveUnitsPoll(liveUnits);
   const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
@@ -225,6 +227,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const [orbitHint, setOrbitHint] = useState(false);
   const [isPhoneChrome, setIsPhoneChrome] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
+
+  // Prefetch the clip after next so Seq4 is warm while viewing Seq2/3.
+  useEffect(() => {
+    if (!tourRevealed || isPlaying) return undefined;
+    const ahead = forwardClipAtStep(nextStepForward(step));
+    if (ahead) prefetchVideo(ahead, { depth: "full", force: isSlowNetwork() });
+    return undefined;
+  }, [step, tourRevealed, isPlaying]);
 
   // Only block the tour if every gated clip failed (partial success still opens).
   const clipsFailed = assetsReady && preloadTotal > 0 && failedCount >= preloadTotal;
@@ -446,6 +456,18 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     }
   };
 
+  /** Stall / failed play — unlock arrows without advancing the orbit step. */
+  const handlePlayFailed = () => {
+    pendingRef.current = false;
+    setIsPlaying(false);
+    setMode("hold");
+    setLandAfterPlay(null);
+    setPlayDirection("forward");
+    setClipSrc(holdClipForStep(stepRef.current));
+    setHoldAtOverride(null);
+    setHoldResetKey(Date.now());
+  };
+
   const canPrev =
     hasReverseClips && !isPlaying && !pendingRef.current && !homeResetting;
   const canNext = !isPlaying && !pendingRef.current && !homeResetting;
@@ -467,12 +489,13 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     setPlayToken(token);
     // Reveal video under the still immediately on tap (don't wait for play event).
     if (startImage && fromStep === 0) setStartStillPhase("out");
-    stageRef.current?.beginPlay({
+    const started = stageRef.current?.beginPlay({
       src,
       direction: "forward",
       token,
       landAfterPlay: null,
     });
+    if (!started) handlePlayFailed();
   };
 
   const goPrev = () => {
@@ -496,12 +519,13 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     setPlayDirection("back");
     setMode("play");
     setPlayToken(token);
-    stageRef.current?.beginPlay({
+    const started = stageRef.current?.beginPlay({
       src: reverseClip,
       direction: "back",
       token,
       landAfterPlay: land,
     });
+    if (!started) handlePlayFailed();
   };
 
   const goHome = () => {
@@ -837,6 +861,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
               prefetchBack={backClipAtStep(step)}
               prefetchNext={forwardClipAtStep(step)}
               onPlayingChange={handlePlayingChange}
+              onPlayFailed={handlePlayFailed}
               onComplete={onClipDone}
               onDragForward={goNext}
               onDragBack={goPrev}

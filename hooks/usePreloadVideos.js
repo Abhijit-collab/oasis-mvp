@@ -326,13 +326,17 @@ function pumpFull() {
   }
 }
 
-/** Warm the browser cache for a clip (deduped per URL; upgrades metadata → full). */
-export const prefetchVideo = (url, { depth = "metadata" } = {}) => {
+/**
+ * Warm the browser cache for a clip (deduped per URL; upgrades metadata → full).
+ * @param {{ depth?: 'metadata' | 'full', force?: boolean }} [options]
+ *   force — re-warm when retained was discarded (mobile / Slow 4G look-ahead).
+ */
+export const prefetchVideo = (url, { depth = "metadata", force = false } = {}) => {
   if (!url) return Promise.resolve({ url, ok: false });
-  const { cache } = store();
+  const { cache, retained } = store();
   const existing = cache.get(url);
 
-  if (existing) {
+  if (existing && !(force && depth === "full" && !retained.has(url))) {
     if (depth === "full" && existing.depth === "metadata") {
       const upgraded = {
         depth: "full",

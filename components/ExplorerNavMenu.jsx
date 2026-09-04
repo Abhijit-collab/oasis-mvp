@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import DownloadMenu from "@/components/DownloadMenu";
+import ProjectGalleryModal from "@/components/ProjectGalleryModal";
 
 const DOWNLOAD_ITEMS = [
   { label: "Rera Certificate", href: "#" },
@@ -31,10 +32,12 @@ function isPhoneLikeDevice() {
  * Desktop: horizontal nav links.
  * Phones (iOS + Android): top-right hamburger that opens a dropdown.
  */
-export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange }) {
+export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galleryImages = [] }) {
   const [open, setOpen] = useState(false);
   const [downloadsOpen, setDownloadsOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const rootRef = useRef(null);
+  const hasGallery = Array.isArray(galleryImages) && galleryImages.length > 0;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -80,6 +83,12 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange }) {
     fn?.();
   };
 
+  const openGallery = () => {
+    if (!hasGallery) return;
+    setOpen(false);
+    setGalleryOpen(true);
+  };
+
   return (
     <>
       <div className="be-links be-links--desktop">
@@ -87,11 +96,22 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange }) {
           Home
         </span>
         <DownloadMenu />
-        {["Location Map", "Gallery"].map((l) => (
-          <span key={l} className="be-link">
-            {l}
-          </span>
-        ))}
+        <span className="be-link">Location Map</span>
+        <span
+          className="be-link"
+          onClick={openGallery}
+          role="button"
+          tabIndex={hasGallery ? 0 : -1}
+          style={{ cursor: hasGallery ? "pointer" : "default" }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openGallery();
+            }
+          }}
+        >
+          Gallery
+        </span>
         <span className="be-link" onClick={onLogout} role="button" style={{ cursor: "pointer" }}>
           Log out
         </span>
@@ -119,7 +139,7 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange }) {
               <button type="button" className="be-nav-item" role="menuitem">
                 Location Map
               </button>
-              <button type="button" className="be-nav-item" role="menuitem">
+              <button type="button" className="be-nav-item" role="menuitem" onClick={openGallery}>
                 Gallery
               </button>
             </div>
@@ -164,6 +184,10 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange }) {
           </div>
         )}
       </div>
+
+      {galleryOpen && hasGallery && (
+        <ProjectGalleryModal images={galleryImages} onClose={() => setGalleryOpen(false)} />
+      )}
     </>
   );
 }

@@ -69,3 +69,18 @@ export const BOOKING = {
 
 /** Hide side filter / unit panel on HOK for now */
 export const SHOW_FILTERS = false;
+
+/** Project gallery stills (desktop Gallery popup) */
+export const GALLERY_IMAGES = [
+  { src: cdnUrl("hok-gallery/1_BuildingNight.png"), alt: "Building at night" },
+  { src: cdnUrl("hok-gallery/2_BuildingNight.png"), alt: "Building night view" },
+  { src: cdnUrl("hok-gallery/3_BuildingSide.png"), alt: "Building side elevation" },
+  { src: cdnUrl("hok-gallery/4_BuildingMorning.png"), alt: "Building in morning light" },
+  { src: cdnUrl("hok-gallery/5_Podium1.png"), alt: "Podium view" },
+  { src: cdnUrl("hok-gallery/7_EntranceTemple.png"), alt: "Entrance temple" },
+  { src: cdnUrl("hok-gallery/8_Pool1.png"), alt: "Pool" },
+  { src: cdnUrl("hok-gallery/9_Pool2.png"), alt: "Pool terrace" },
+  { src: cdnUrl("hok-gallery/10_Podium3.png"), alt: "Podium plaza" },
+  { src: cdnUrl("hok-gallery/11_Podium4.png"), alt: "Podium landscape" },
+  { src: cdnUrl("hok-gallery/12_Podium5.png"), alt: "Podium evening" },
+];

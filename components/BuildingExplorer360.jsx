@@ -109,6 +109,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     preloadDepth = "metadata",
     showBrand = true,
     preloadVariant = "bar",
+    galleryImages = [],
   } = tour;
   const { logout, setIdleSuspended } = useAuth() || {};
   /** cover vs contain — always keeps original aspect; picks based on the device viewport. */
@@ -879,7 +880,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
             <div />
           )}
           <div className="be-top-actions">
-            <ExplorerNavMenu onHome={goHome} onLogout={handleLogout} onOpenChange={setNavOpen} />
+            <ExplorerNavMenu
+              onHome={goHome}
+              onLogout={handleLogout}
+              onOpenChange={setNavOpen}
+              galleryImages={galleryImages}
+            />
           </div>
         </div>
 

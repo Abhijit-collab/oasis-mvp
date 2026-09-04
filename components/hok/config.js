@@ -6,6 +6,7 @@ import {
   BOOKING,
   SHOW_FILTERS,
   START_IMAGE,
+  GALLERY_IMAGES,
 } from "./assets";
 import { ORBIT_STEP_PRELOAD_URLS, ORBIT_PRIORITY_PRELOAD_URLS } from "./tourAssetPreload";
 import { getHOKOrbitStepZones } from "./orbitZones";
@@ -30,4 +31,5 @@ export const HOK_TOUR_CONFIG = {
   mediaPosition: "center top",
   preloadDepth: "full",
   preloadVariant: "feather",
+  galleryImages: GALLERY_IMAGES,
 };

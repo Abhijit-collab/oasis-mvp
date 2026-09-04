@@ -78,6 +78,16 @@ export default function AuthGate({
     setSession(null);
     setShowWelcome(false);
     setLoginError("");
+    // Drop 360 viewport locks so the login teaser isn't offset / scrollable.
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.remove("be-ios");
+      document.body.classList.remove("rotate-prompt-open");
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+    }
   }, []);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
 
@@ -19,6 +19,13 @@ export default function LoginPage({
   const [coupon, setCoupon] = useState("");
   /** Minimal mode: form hidden until user taps "Log in" in header */
   const [showForm, setShowForm] = useState(!minimal);
+
+  useEffect(() => {
+    document.documentElement.classList.remove("be-ios");
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }, []);
 
   const submitLogin = useCallback(() => {
     onSubmit({ name: name.trim(), coupon: coupon.trim() });

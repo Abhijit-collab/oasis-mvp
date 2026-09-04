@@ -381,7 +381,8 @@ button.project-brand-logo{cursor:pointer}
   left:max(14px,env(safe-area-inset-left,0px));z-index:3;pointer-events:none}
 @media(max-width:640px),(pointer:coarse){
   .project-brand-logo--login img{max-width:min(340px,72vw)}
-  .project-brand-logo--explorer img{height:96px;max-width:min(360px,68vw)}
+  .project-brand-logo--explorer,
+  .be-brand--logo.project-brand-logo--explorer{display:none!important}
   .project-brand-logo--welcome img{height:90px;max-width:min(340px,78vw)}
   .project-brand-logo--booking img{height:80px;max-width:min(300px,70vw)}
   .login-brand-stack{
@@ -390,7 +391,8 @@ button.project-brand-logo{cursor:pointer}
 }
 @media(orientation:landscape) and (max-height:480px){
   .project-brand-logo--login img{max-width:min(280px,48vw)}
-  .project-brand-logo--explorer img{height:70px;max-width:min(280px,48vw)}
+  .project-brand-logo--explorer,
+  .be-brand--logo.project-brand-logo--explorer{display:none!important}
   .login-welcome-brand{top:8px;left:12px}
   .project-brand-logo--welcome img{height:64px;max-width:min(260px,52vw)}
   .login-brand-stack{
@@ -955,17 +957,18 @@ button.project-brand-logo{cursor:pointer}
 @media(max-width:1200px),(pointer:coarse),(hover:none){
   .be-links--desktop{display:none!important}
   .be-nav-mobile{display:block;margin-left:auto}
-  .be-top{padding:14px 16px;justify-content:space-between;align-items:center;gap:8px;overflow:visible}
+  .be-top{padding:14px 16px;justify-content:flex-end;align-items:center;gap:8px;overflow:visible}
   .be-top-actions{flex:0 0 auto;margin-left:auto;z-index:50}
-  .be-brand--logo,.project-brand-logo--explorer{flex:1 1 auto;min-width:0;max-width:calc(100% - 56px)}
+  .project-brand-logo--explorer,
+  .be-brand--logo.project-brand-logo--explorer{display:none!important}
   .be-brand:not(.be-brand--logo){display:none!important}
 }
 html.be-phone .be-links--desktop{display:none!important}
 html.be-phone .be-nav-mobile{display:block!important;margin-left:auto}
-html.be-phone .be-top{padding:14px 16px;justify-content:space-between;align-items:center;gap:8px;overflow:visible}
+html.be-phone .be-top{padding:14px 16px;justify-content:flex-end;align-items:center;gap:8px;overflow:visible}
 html.be-phone .be-top-actions{flex:0 0 auto;margin-left:auto;z-index:50}
-html.be-phone .be-brand--logo,html.be-phone .project-brand-logo--explorer{
-  flex:1 1 auto;min-width:0;max-width:calc(100% - 56px)}
+html.be-phone .project-brand-logo--explorer,
+html.be-phone .be-brand--logo.project-brand-logo--explorer{display:none!important}
 @media(max-width:820px){
   .be-side{position:static;width:auto;margin:0;border-radius:0;top:auto;bottom:auto;
     transform:none!important;max-height:none;border-left:none;border-right:none;border-bottom:none}
@@ -1100,41 +1103,31 @@ html.login-lock,body.login-lock{
 @media(max-width:640px),(pointer:coarse),(hover:none){
   .login-page{
     --login-ribbon-size:clamp(128px,32vmin,148px);
-    --login-btn-ribbon-gap:clamp(12px,3.2vmin,20px);
-    --login-btn-clear:1.1;
+    /* Sit close to the ribbon — 2px gap */
+    --login-btn-ribbon-gap:2px;
+    --login-btn-clear:.72;
     --login-brand-pad-top:max(14px,env(safe-area-inset-top,0px));
     --login-logo-h:clamp(72px,14vw,92px)}
   .login-brand-stack{
     padding-top:var(--login-brand-pad-top)}
   .project-brand-logo--login img{
     height:var(--login-logo-h);max-width:min(340px,72vw)}
-  .login-teaser-btn{
-    padding:6px 11px 6px 26px;font-size:10px;letter-spacing:.08em;
-    white-space:nowrap;max-width:min(112px,28vw)}
-  .login-teaser-btn::before{left:9px;font-size:10px}
 }
 /* Narrow / phone — tighter Log in pill (ribbon stays full) */
 @media(max-width:420px),(max-width:900px) and (pointer:coarse){
   .login-page{
     --login-ribbon-size:clamp(124px,34vmin,140px);
-    --login-btn-ribbon-gap:clamp(14px,3.5vmin,22px);
-    --login-btn-clear:1.14}
-  .login-teaser-btn{
-    padding:5px 9px 5px 22px;font-size:9px;letter-spacing:.06em;
-    max-width:min(96px,26vw)}
-  .login-teaser-btn::before{left:8px;font-size:9px}
+    --login-btn-ribbon-gap:2px;
+    --login-btn-clear:.7}
 }
 @media(orientation:landscape) and (max-height:480px){
   .login-page{
     --login-ribbon-size:clamp(112px,28vmin,132px);
-    --login-btn-ribbon-gap:clamp(10px,2.5vmin,16px);
-    --login-btn-clear:1.12;
+    --login-btn-ribbon-gap:2px;
+    --login-btn-clear:.68;
     --login-brand-pad-top:max(8px,env(safe-area-inset-top,0px));
     --login-logo-h:clamp(56px,16vh,70px)}
   .project-brand-logo--login img{height:var(--login-logo-h);max-width:min(280px,48vw)}
-  .login-teaser-btn{
-    padding:5px 9px 5px 22px;font-size:9px;max-width:min(100px,22vw)}
-  .login-teaser-btn::before{left:8px;font-size:9px}
 }
 .login-page--loading{align-items:center;justify-content:center}
 .login-loading{color:var(--muted);font-size:14px;letter-spacing:.06em}
@@ -1264,6 +1257,42 @@ html.login-lock,body.login-lock{
 @media(hover:hover) and (pointer:fine){
   .login-teaser-header--btn-only .login-teaser-btn:hover{
     transform:translateY(calc(-50% - 2px))}
+}
+
+/* Phones: larger text-only LOG IN, optically centered, near the ribbon */
+@media(max-width:640px),(pointer:coarse),(hover:none){
+  .login-page .login-teaser-btn,
+  .login-page .login-teaser-header--btn-only .login-teaser-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.12em;
+    /* Compensate trailing letter-spacing so “LOG IN” sits true-center */
+    padding:11px calc(18px - .12em) 11px 18px;
+    text-align:center;
+    white-space:nowrap;
+    max-width:none;
+    box-sizing:border-box}
+  .login-page .login-teaser-btn::before{
+    content:none!important;
+    display:none!important}
+}
+@media(max-width:420px),(max-width:900px) and (pointer:coarse){
+  .login-page .login-teaser-btn,
+  .login-page .login-teaser-header--btn-only .login-teaser-btn{
+    font-size:11px;
+    letter-spacing:.12em;
+    padding:10px calc(16px - .12em) 10px 16px}
+}
+@media(orientation:landscape) and (max-height:480px){
+  .login-page .login-teaser-btn,
+  .login-page .login-teaser-header--btn-only .login-teaser-btn{
+    font-size:11px;
+    letter-spacing:.1em;
+    padding:9px calc(14px - .1em) 9px 14px}
 }
 
 /* When teaser is playing (form hidden) — full-screen teaser, no overlay darkening */

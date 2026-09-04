@@ -384,7 +384,7 @@ export default function LoginPage({
               onClick={() => setShowForm(true)}
               style={{ visibility: showForm ? "hidden" : "visible" }}
             >
-              Log in
+              LOG IN
             </button>
           ) : (
             <span aria-hidden />

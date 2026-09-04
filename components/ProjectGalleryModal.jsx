@@ -43,9 +43,30 @@ export default function ProjectGalleryModal({ images = [], onClose, title = "Gal
   const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(null);
   const [immersive, setImmersive] = useState(false);
+  const [isPhone, setIsPhone] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => {
+      const phone =
+        document.documentElement.classList.contains("be-phone") ||
+        window.matchMedia("(max-width: 820px)").matches ||
+        (window.matchMedia("(pointer: coarse)").matches &&
+          window.matchMedia("(max-width: 1200px)").matches);
+      setIsPhone(phone);
+      setIsLandscape(window.matchMedia("(orientation: landscape)").matches);
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -180,7 +201,12 @@ export default function ProjectGalleryModal({ images = [], onClose, title = "Gal
 
   return createPortal(
     <div
-      className={"pg-overlay" + (immersive ? " pg-overlay--immersive" : "")}
+      className={
+        "pg-overlay" +
+        (immersive ? " pg-overlay--immersive" : "") +
+        (isPhone ? " pg-overlay--phone" : "") +
+        (isPhone && isLandscape ? " pg-overlay--landscape" : "")
+      }
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -231,37 +257,39 @@ export default function ProjectGalleryModal({ images = [], onClose, title = "Gal
               ‹
             </button>
             <div className="pg-viewer-frame">
-              <img
-                src={activeImage.src}
-                alt=""
-                className="pg-viewer-img"
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  if (!immersive) enterImmersive();
-                }}
-              />
-              {immersive ? (
-                <button
-                  type="button"
-                  className="pg-fs-close"
-                  onClick={leaveImmersive}
-                  aria-label="Close full screen"
-                  title="Close"
-                >
-                  ×
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="pg-fs-btn"
-                  onClick={toggleFullscreen}
-                  aria-pressed={false}
-                  aria-label="Enter full screen"
-                  title="Full screen"
-                >
-                  <ExpandCornersIcon />
-                </button>
-              )}
+              <div className="pg-viewer-shot">
+                <img
+                  src={activeImage.src}
+                  alt=""
+                  className="pg-viewer-img"
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    if (!immersive) enterImmersive();
+                  }}
+                />
+                {immersive ? (
+                  <button
+                    type="button"
+                    className="pg-fs-close"
+                    onClick={leaveImmersive}
+                    aria-label="Close full screen"
+                    title="Close"
+                  >
+                    ×
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="pg-fs-btn pg-fs-btn--on-image"
+                    onClick={toggleFullscreen}
+                    aria-pressed={false}
+                    aria-label="Enter full screen"
+                    title="Full screen"
+                  >
+                    <ExpandCornersIcon />
+                  </button>
+                )}
+              </div>
             </div>
             <button
               type="button"

@@ -1584,7 +1584,12 @@ html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
 .pg-viewer-frame{
   position:relative;flex:1;min-width:0;max-height:100%;
   display:flex;align-items:center;justify-content:center}
+.pg-viewer-shot{
+  position:relative;display:inline-block;max-width:100%;max-height:100%;
+  line-height:0}
 .pg-viewer--fs .pg-viewer-frame{width:100%;height:100%;padding:48px 72px 56px;box-sizing:border-box}
+.pg-viewer--fs .pg-viewer-shot{width:100%;height:100%;max-height:100%;
+  display:flex;align-items:center;justify-content:center}
 .pg-viewer-img{
   display:block;max-width:100%;max-height:min(72vh,780px);width:auto;height:auto;
   object-fit:contain;border-radius:12px;animation:pg-fade .3s ease}
@@ -1605,15 +1610,17 @@ html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
   color:#fff;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   transition:background .25s,transform .25s cubic-bezier(.2,.7,.2,1),opacity .25s;
   animation:pg-fs-pulse 2.4s ease-in-out infinite}
+.pg-fs-btn--on-image{
+  top:12px;right:12px;z-index:4;
+  background:rgba(0,0,0,.48);box-shadow:0 2px 12px rgba(0,0,0,.35)}
 .pg-fs-btn--thumb{
   opacity:.88;background:rgba(0,0,0,.4);
   box-shadow:0 2px 10px rgba(0,0,0,.35)}
 .pg-cell:hover .pg-fs-btn--thumb,.pg-fs-btn--thumb:focus-visible{opacity:1}
-.pg-viewer-frame .pg-fs-btn{top:12px;right:12px}
 .pg-fs-btn:hover,.pg-fs-btn:focus-visible{
   background:rgba(0,0,0,.55);transform:scale(1.06);animation:none}
 .pg-fs-close{
-  position:absolute;top:16px;right:16px;z-index:4;width:44px;height:44px;padding:0;
+  position:absolute;top:12px;right:12px;z-index:4;width:44px;height:44px;padding:0;
   display:inline-flex;align-items:center;justify-content:center;
   border:none;border-radius:0;background:transparent;
   color:#fff;font-size:34px;line-height:1;cursor:pointer;
@@ -1651,6 +1658,11 @@ html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
 @keyframes pg-rise{
   from{opacity:0;transform:translateY(12px) scale(.985)}
   to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes pg-rise-mobile{
+  from{opacity:0;transform:translateY(18px)}
+  to{opacity:1;transform:translateY(0)}}
+
+/* Tablet */
 @media(max-width:900px){
   .pg-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:14px 14px 16px}
   .pg-head{padding:16px 16px 12px}
@@ -1658,8 +1670,133 @@ html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
   .pg-nav{width:38px;height:38px;font-size:24px}
   .pg-nav--prev{left:10px}
   .pg-nav--next{right:10px}}
-@media(max-width:560px){
-  .pg-overlay{padding:12px}
-  .pg-panel{border-radius:14px;max-height:92vh}
-  .pg-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .pg-title{font-size:20px}}
+
+/* Phones — iOS + Android (driven by .pg-overlay--phone) */
+.pg-overlay--phone{
+  align-items:stretch;justify-content:stretch;
+  padding:0;
+  background:rgba(4,6,10,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.pg-overlay--phone .pg-panel{
+  width:100%;max-width:none;height:100%;
+  max-height:100%;max-height:100dvh;max-height:100svh;
+  border:none;border-radius:0;box-shadow:none;background:#080a0e;
+  animation:pg-rise-mobile .34s cubic-bezier(.2,.7,.2,1)}
+.pg-overlay--phone .pg-panel--viewer{
+  max-height:100%;max-height:100dvh;max-height:100svh}
+.pg-overlay--phone .pg-head{
+  padding:max(14px,env(safe-area-inset-top,0px)) 16px 12px;
+  align-items:center;
+  background:linear-gradient(180deg,rgba(8,10,14,.98),rgba(8,10,14,.92))}
+.pg-overlay--phone .pg-kicker{font-size:9px;letter-spacing:.22em;margin-bottom:2px}
+.pg-overlay--phone .pg-title{font-size:clamp(18px,5.2vw,22px)}
+.pg-overlay--phone .pg-close{
+  width:44px;height:44px;font-size:28px;
+  border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.05);
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pg-overlay--phone .pg-grid{
+  flex:1;min-height:0;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-auto-rows:auto;
+  align-items:start;
+  gap:8px;
+  padding:10px 12px max(16px,env(safe-area-inset-bottom,0px));
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+/* Uniform tiles — mixed aspect-ratio collapses rows on iOS Safari and causes overlap */
+.pg-overlay--phone .pg-cell,
+.pg-overlay--phone .pg-cell:nth-child(n){
+  position:relative;
+  width:100%;
+  height:0;
+  padding-bottom:133.333%; /* 3:4 — reliable on iOS vs aspect-ratio alone */
+  aspect-ratio:auto;
+  border-radius:12px;
+  overflow:hidden;
+  transform:none!important;box-shadow:none!important;
+  align-self:stretch}
+.pg-overlay--phone .pg-cell:hover .pg-thumb{transform:none;filter:none}
+.pg-overlay--phone .pg-cell-hit{
+  position:absolute;inset:0;width:100%;height:100%;
+  display:block;padding:0;margin:0;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.pg-overlay--phone .pg-thumb{
+  position:absolute;inset:0;width:100%;height:100%;
+  max-width:none;object-fit:cover;object-position:center center;
+  /* stop intrinsic image size from driving iOS grid layout */
+  -webkit-transform:translateZ(0);transform:translateZ(0)}
+.pg-overlay--phone .pg-cell-veil{
+  position:absolute;inset:0;z-index:1;
+  opacity:.45;
+  background:linear-gradient(180deg,rgba(0,0,0,.12) 0%,transparent 40%,rgba(0,0,0,.28) 100%)}
+.pg-overlay--phone .pg-fs-btn--thumb{
+  top:8px;right:8px;width:34px;height:34px;opacity:1;z-index:2;
+  background:rgba(0,0,0,.42);animation:none}
+.pg-overlay--phone .pg-fs-icon{width:14px;height:14px}
+.pg-overlay--phone .pg-fs-c{width:5px;height:5px;border-width:1.6px}
+.pg-overlay--phone .pg-viewer{
+  flex:1;min-height:0;flex-direction:column;
+  padding:0 0 max(12px,env(safe-area-inset-bottom,0px));gap:0}
+.pg-overlay--phone .pg-viewer-frame{
+  flex:1;width:100%;min-height:0;padding:8px 12px;
+  display:flex;align-items:center;justify-content:center}
+.pg-overlay--phone .pg-viewer-shot{
+  max-width:100%;max-height:min(72dvh,72svh)}
+.pg-overlay--phone .pg-viewer-img{
+  width:100%;height:auto;max-width:100%;
+  max-height:min(72dvh,72svh);
+  object-fit:contain;object-position:center;
+  border-radius:10px;background:#050608}
+.pg-overlay--phone .pg-fs-btn--on-image{top:10px;right:10px}
+.pg-overlay--phone .pg-nav{
+  position:absolute;top:auto;bottom:max(18px,calc(env(safe-area-inset-bottom,0px) + 8px));
+  transform:none;width:46px;height:46px;font-size:26px;
+  background:rgba(12,14,18,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pg-overlay--phone .pg-nav--prev{left:max(12px,env(safe-area-inset-left,0px))}
+.pg-overlay--phone .pg-nav--next{right:max(12px,env(safe-area-inset-right,0px))}
+.pg-overlay--phone .pg-count{
+  bottom:max(28px,calc(env(safe-area-inset-bottom,0px) + 18px));
+  font-size:12px;letter-spacing:.12em;padding:4px 10px;border-radius:999px;
+  background:rgba(0,0,0,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.pg-overlay--phone .pg-viewer--fs{
+  position:fixed;inset:0;width:100%;height:100%;
+  height:100dvh;height:100svh;padding:0;background:#000}
+.pg-overlay--phone .pg-viewer--fs .pg-viewer-frame{
+  padding:
+    max(52px,calc(env(safe-area-inset-top,0px) + 36px))
+    max(12px,env(safe-area-inset-right,0px))
+    max(56px,calc(env(safe-area-inset-bottom,0px) + 40px))
+    max(12px,env(safe-area-inset-left,0px))}
+.pg-overlay--phone .pg-viewer--fs .pg-viewer-shot{
+  width:100%;height:100%;max-height:100%}
+.pg-overlay--phone .pg-viewer--fs .pg-viewer-img{
+  width:100%;height:100%;max-width:100%;max-height:100%;
+  object-fit:contain;object-position:center;border-radius:0;background:transparent}
+.pg-overlay--phone .pg-viewer--fs .pg-nav{
+  bottom:max(20px,calc(env(safe-area-inset-bottom,0px) + 12px))}
+.pg-overlay--phone .pg-fs-close{
+  top:max(12px,env(safe-area-inset-top,0px));
+  right:max(10px,env(safe-area-inset-right,0px));
+  width:48px;height:48px;font-size:36px;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pg-overlay--phone.pg-overlay--immersive{padding:0;background:#000}
+.pg-overlay--phone .pg-panel--immersive{
+  height:100%;height:100dvh;height:100svh}
+
+/* Phone landscape — wider tiles matching screen aspect */
+.pg-overlay--phone.pg-overlay--landscape .pg-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;padding:8px 12px max(10px,env(safe-area-inset-bottom,0px))}
+.pg-overlay--phone.pg-overlay--landscape .pg-cell,
+.pg-overlay--phone.pg-overlay--landscape .pg-cell:nth-child(n){
+  height:0;padding-bottom:62.5%; /* 16:10 */aspect-ratio:auto}
+.pg-overlay--phone.pg-overlay--landscape .pg-viewer-img{
+  width:auto;max-width:100%;max-height:min(78dvh,78svh)}
+.pg-overlay--phone.pg-overlay--landscape .pg-viewer-frame{padding:6px 56px 8px}
+.pg-overlay--phone.pg-overlay--landscape .pg-nav{
+  top:50%;bottom:auto;transform:translateY(-50%)}
+.pg-overlay--phone.pg-overlay--landscape .pg-nav--prev{left:max(10px,env(safe-area-inset-left,0px))}
+.pg-overlay--phone.pg-overlay--landscape .pg-nav--next{right:max(10px,env(safe-area-inset-right,0px))}
+.pg-overlay--phone.pg-overlay--landscape .pg-count{
+  bottom:max(12px,env(safe-area-inset-bottom,0px))}
+

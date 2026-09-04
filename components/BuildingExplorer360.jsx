@@ -194,6 +194,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const polledLiveUnits = useLiveUnitsPoll(liveUnits);
   const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
   const [tourRevealed, setTourRevealed] = useState(false);
+  const [orbitHint, setOrbitHint] = useState(false);
+  const [isPhoneChrome, setIsPhoneChrome] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
 
   // Only block the tour if every gated clip failed (partial success still opens).
@@ -289,6 +291,36 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     const timer = setTimeout(() => setPreloadHidden(true), TOUR_REVEAL_MS);
     return () => clearTimeout(timer);
   }, [gateOpen, tourRevealed, preloadHidden]);
+
+  useEffect(() => {
+    const sync = () => {
+      const ua = navigator.userAgent || "";
+      setIsPhoneChrome(
+        document.documentElement.classList.contains("be-phone") ||
+          /iPhone|iPad|iPod|Android|Mobile/i.test(ua) ||
+          window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+          window.matchMedia("(max-width: 900px)").matches
+      );
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+    };
+  }, []);
+
+  /* Phone orbit arrows: JS class toggle + CSS transitions (reliable on iOS Safari) */
+  useEffect(() => {
+    if (!isPhoneChrome || !tourRevealed || navOpen || isPlaying) {
+      setOrbitHint(false);
+      return undefined;
+    }
+    setOrbitHint(true);
+    const id = window.setInterval(() => setOrbitHint((v) => !v), 700);
+    return () => window.clearInterval(id);
+  }, [isPhoneChrome, tourRevealed, navOpen, isPlaying]);
 
   useEffect(() => {
     return () => {
@@ -945,7 +977,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           "be-orbit-arw be-orbit-arw--l" +
           (!canPrev ? " be-orbit-arw--inactive" : "") +
           (navOpen ? " be-orbit-arw--hidden" : "") +
-          (tourRevealed ? " be-orbit-arw--on" : "")
+          (tourRevealed ? " be-orbit-arw--on" : "") +
+          (isPhoneChrome ? " be-orbit-arw--mobile" : "") +
+          (isPhoneChrome && orbitHint && hasReverseClips && canPrev ? " be-orbit-arw--hint" : "")
         }
         aria-label="Rotate left"
         onClick={() => {
@@ -953,7 +987,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           goPrev();
         }}
       >
-        <OrbitSideChevron dir="l" />
+        <span className="be-orbit-arw-move">
+          <OrbitSideChevron dir="l" />
+        </span>
       </button>
       <button
         type="button"
@@ -961,7 +997,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           "be-orbit-arw be-orbit-arw--r" +
           (!canNext ? " be-orbit-arw--inactive" : "") +
           (navOpen ? " be-orbit-arw--hidden" : "") +
-          (tourRevealed ? " be-orbit-arw--on" : "")
+          (tourRevealed ? " be-orbit-arw--on" : "") +
+          (isPhoneChrome ? " be-orbit-arw--mobile" : "") +
+          (isPhoneChrome && orbitHint && canNext ? " be-orbit-arw--hint" : "")
         }
         aria-label="Rotate right"
         onClick={() => {
@@ -969,7 +1007,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           goNext();
         }}
       >
-        <OrbitSideChevron dir="r" />
+        <span className="be-orbit-arw-move">
+          <OrbitSideChevron dir="r" />
+        </span>
       </button>
 
       {tourRevealed && <AdoptXRLogo variant="white" placement="explorer" />}

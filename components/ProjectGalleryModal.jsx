@@ -30,6 +30,12 @@ function ExpandCornersIcon() {
   );
 }
 
+function blockImageSave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  return false;
+}
+
 /**
  * Minimal gallery popup: grid + expanded viewer + fullscreen image.
  */
@@ -215,6 +221,7 @@ export default function ProjectGalleryModal({ images = [], onClose, title = "Gal
         if (active !== null) setActive(null);
         else onClose?.();
       }}
+      onContextMenu={blockImageSave}
     >
       <div
         className={
@@ -223,6 +230,7 @@ export default function ProjectGalleryModal({ images = [], onClose, title = "Gal
           (immersive ? " pg-panel--immersive" : "")
         }
         onClick={(e) => e.stopPropagation()}
+        onContextMenu={blockImageSave}
       >
         {!immersive && (
           <header className="pg-head">
@@ -262,6 +270,9 @@ export default function ProjectGalleryModal({ images = [], onClose, title = "Gal
                   src={activeImage.src}
                   alt=""
                   className="pg-viewer-img"
+                  draggable={false}
+                  onContextMenu={blockImageSave}
+                  onDragStart={blockImageSave}
                   onDoubleClick={(e) => {
                     e.preventDefault();
                     if (!immersive) enterImmersive();
@@ -317,7 +328,15 @@ export default function ProjectGalleryModal({ images = [], onClose, title = "Gal
                   }}
                   aria-label={`View image ${i + 1}`}
                 >
-                  <img src={img.src} alt="" loading={i < 6 ? "eager" : "lazy"} className="pg-thumb" />
+                  <img
+                    src={img.src}
+                    alt=""
+                    loading={i < 6 ? "eager" : "lazy"}
+                    className="pg-thumb"
+                    draggable={false}
+                    onContextMenu={blockImageSave}
+                    onDragStart={blockImageSave}
+                  />
                   <span className="pg-cell-veil" aria-hidden />
                 </button>
                 <button

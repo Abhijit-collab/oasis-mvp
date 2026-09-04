@@ -329,9 +329,9 @@ function pumpFull() {
 /** Warm the browser cache for a clip (deduped per URL; upgrades metadata → full). */
 export const prefetchVideo = (url, { depth = "metadata" } = {}) => {
   if (!url) return Promise.resolve({ url, ok: false });
-
   const { cache } = store();
   const existing = cache.get(url);
+
   if (existing) {
     if (depth === "full" && existing.depth === "metadata") {
       const upgraded = {
@@ -344,12 +344,30 @@ export const prefetchVideo = (url, { depth = "metadata" } = {}) => {
     return existing.promise;
   }
 
-  const promise =
-    depth === "full" ? enqueueFull(() => preloadOne(url, "full")) : preloadOne(url, depth);
-  const entry = { depth, promise };
+  const entry = {
+    depth,
+    promise:
+      depth === "full" ? enqueueFull(() => preloadOne(url, "full")) : preloadOne(url, depth),
+  };
   cache.set(url, entry);
   return entry.promise;
 };
+
+/**
+ * True when every URL already has a retained buffer at/above the full-preload threshold.
+ * Used to decide adaptive gate: priority-ready → wait for all; else wait for priority only.
+ */
+export function areUrlsBufferedEnough(urls) {
+  const list = [...new Set((urls || []).filter(Boolean))];
+  if (!list.length) return true;
+  const { retained } = store();
+  const need = bufferReadyThreshold();
+  return list.every((url) => {
+    const video = retained.get(url);
+    if (!video) return false;
+    return bufferCoverage(video) >= need || timeoutLooksPlayable(video, need, "full");
+  });
+}
 
 /** Free hidden preload <video>s so the tour stage can decode/play on iOS. */
 export function releaseRetainedPreloadVideos() {

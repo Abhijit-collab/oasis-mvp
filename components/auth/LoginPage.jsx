@@ -92,6 +92,8 @@ export default function LoginPage({
   minimal = false,
   projectLogo = null,
   projectLogoAlt = "Brand",
+  /** Fired once when the teaser has essentially fully buffered — safe to warm tour clips. */
+  onTeaserFullyBuffered = null,
 }) {
   const [name, setName] = useState("");
   const [coupon, setCoupon] = useState("");
@@ -283,6 +285,78 @@ export default function LoginPage({
       if (videoRef.current) detach(videoRef.current);
     };
   }, [backgroundVideo, isDesktop, videoReady]);
+
+  // Once teaser is fully buffered, start warming tour clips (does not wait for login).
+  useEffect(() => {
+    if (!backgroundVideo || !videoReady || !onTeaserFullyBuffered) return undefined;
+
+    let settled = false;
+    let poll = null;
+    let raf = null;
+    const listeners = [];
+    const FULL_NEED = 0.96;
+
+    const detach = (video) => {
+      listeners.forEach(([type, fn]) => video.removeEventListener(type, fn));
+      listeners.length = 0;
+    };
+
+    const coverage = (video) => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return 0;
+      if (!video.buffered?.length) return 0;
+      let maxEnd = 0;
+      for (let i = 0; i < video.buffered.length; i += 1) {
+        maxEnd = Math.max(maxEnd, video.buffered.end(i));
+      }
+      return Math.min(1, maxEnd / video.duration);
+    };
+
+    const isFull = (video) => {
+      const pct = coverage(video);
+      if (pct >= FULL_NEED) return true;
+      // canplaythrough with most of the file already fetched
+      if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA && pct >= 0.9) return true;
+      return false;
+    };
+
+    const notify = () => {
+      if (settled) return;
+      settled = true;
+      try {
+        onTeaserFullyBuffered();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const attach = () => {
+      const video = videoRef.current;
+      if (!video) {
+        raf = requestAnimationFrame(attach);
+        return;
+      }
+
+      const tick = () => {
+        if (isFull(video)) notify();
+      };
+
+      ["progress", "loadeddata", "canplay", "canplaythrough"].forEach((type) => {
+        video.addEventListener(type, tick);
+        listeners.push([type, tick]);
+      });
+      poll = window.setInterval(tick, 400);
+      tick();
+    };
+
+    attach();
+
+    return () => {
+      settled = true;
+      if (raf) cancelAnimationFrame(raf);
+      if (poll) clearInterval(poll);
+      if (videoRef.current) detach(videoRef.current);
+    };
+  }, [backgroundVideo, videoReady, onTeaserFullyBuffered]);
 
   // Mobile / non-desktop: play as soon as rotate gate allows (unchanged).
   useEffect(() => {

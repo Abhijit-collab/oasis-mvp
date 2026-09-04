@@ -52,15 +52,21 @@ export default function AuthGate({
 
   useEffect(() => {
     if (!preloadTourAfterLogin || session) return;
-    // Login screen: warm welcome still only — do not compete with the teaser video.
+    // Login screen: warm welcome still only until teaser is fully buffered.
     preloadWelcomeBackgroundIdle();
-  }, [preloadTourAfterLogin, session]);
+  }, [preloadTourAfterLogin, session, preloadWelcomeBackgroundIdle]);
+
+  const handleTeaserFullyBuffered = useCallback(() => {
+    if (!preloadTourAfterLogin) return;
+    // Teaser done — start Seq/Rev warm while user is still on login.
+    preloadTourAssetsAfterLogin();
+  }, [preloadTourAfterLogin, preloadTourAssetsAfterLogin]);
 
   useEffect(() => {
     if (!preloadTourAfterLogin || !session) return;
-    // After login: full-buffer Sequence clips in the background.
+    // After login: ensure tour warm started (no-op if teaser already kicked it off).
     preloadTourAssetsAfterLogin();
-  }, [preloadTourAfterLogin, session]);
+  }, [preloadTourAfterLogin, session, preloadTourAssetsAfterLogin]);
 
   const handleLogin = useCallback(({ name, coupon }) => {
     if (!coupon) {
@@ -72,7 +78,7 @@ export default function AuthGate({
     const next = { name, coupon, at: Date.now() };
     setSession(next);
     setShowWelcome(true);
-  }, []);
+  }, [preloadEntranceImage]);
 
   const dismissWelcome = () => setShowWelcome(false);
 
@@ -137,6 +143,7 @@ export default function AuthGate({
         minimal={loginMinimal}
         projectLogo={projectLogo}
         projectLogoAlt={projectLogoAlt}
+        onTeaserFullyBuffered={handleTeaserFullyBuffered}
       />
     );
   }

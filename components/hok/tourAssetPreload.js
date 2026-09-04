@@ -7,12 +7,28 @@ export const ORBIT_STEP_PRELOAD_URLS = [
   ...ORBIT_STEP_CLIPS_REVERSE.filter(Boolean),
 ];
 
-/** First steps needed to enter the 360 — rest warm in background (critical on Slow 4G). */
+/**
+ * Gate / first wave (phones + Slow 4G):
+ * - Seq1–3: enough forward runway so opening after Seq2 doesn’t stall
+ * - Rev9–7: wrap / late-orbit back nav
+ * Remaining forwards then remaining reverses warm in background.
+ */
 export const ORBIT_PRIORITY_PRELOAD_URLS = [
   ORBIT_STEP_CLIPS[0],
   ORBIT_STEP_CLIPS[1],
-  ORBIT_STEP_CLIPS_REVERSE.filter(Boolean).at(-1),
+  ORBIT_STEP_CLIPS[2],
+  ORBIT_STEP_CLIPS_REVERSE[8],
+  ORBIT_STEP_CLIPS_REVERSE[7],
+  ORBIT_STEP_CLIPS_REVERSE[6],
 ].filter(Boolean);
+
+/** After the gate: prefer leftover forward clips, then leftover reverses. */
+export function orbitBackgroundPreloadUrls(priorityUrls = ORBIT_PRIORITY_PRELOAD_URLS) {
+  const priority = new Set(priorityUrls.filter(Boolean));
+  const forwards = ORBIT_STEP_CLIPS.filter((url) => url && !priority.has(url));
+  const reverses = ORBIT_STEP_CLIPS_REVERSE.filter((url) => url && !priority.has(url));
+  return [...forwards, ...reverses];
+}
 
 let entranceImagePromise = null;
 
@@ -54,8 +70,8 @@ export function preloadWelcomeBackgroundIdle() {
 }
 
 /**
- * After login: priority clips first, then the rest (queued).
- * Do not call on the login teaser screen.
+ * Warm tour clips (Seq + Rev): priority first, then the rest.
+ * Safe to call after teaser is fully buffered and/or after login (idempotent).
  */
 export function preloadTourAssetsAfterLogin() {
   if (typeof window === "undefined") return;
@@ -66,8 +82,8 @@ export function preloadTourAssetsAfterLogin() {
   const priority = new Set(ORBIT_PRIORITY_PRELOAD_URLS);
   ORBIT_PRIORITY_PRELOAD_URLS.forEach((url) => prefetchVideo(url, { depth: "full" }));
 
-  const rest = ORBIT_STEP_PRELOAD_URLS.filter((url) => url && !priority.has(url));
-  // Slight delay so Seq1/Seq2 claim the bandwidth first on Slow 4G.
+  const rest = orbitBackgroundPreloadUrls(ORBIT_PRIORITY_PRELOAD_URLS);
+  // Slight delay so Seq1–3 + Rev9–7 claim the bandwidth first on Slow 4G.
   const warmRest = () => {
     rest.forEach((url) => prefetchVideo(url, { depth: "full" }));
   };

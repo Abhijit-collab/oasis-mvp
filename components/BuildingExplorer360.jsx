@@ -15,7 +15,10 @@ import AdoptXRLogo from "@/components/AdoptXRLogo";
 import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 import PremiumBadge from "@/components/PremiumBadge";
 import { useAuth } from "@/components/auth/AuthContext";
-import usePreloadVideos, { releaseRetainedPreloadVideos } from "@/hooks/usePreloadVideos";
+import usePreloadVideos, {
+  releaseRetainedPreloadVideos,
+  areUrlsBufferedEnough,
+} from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
 import RotateButton from "@/components/RotateButton";
@@ -98,6 +101,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     stepClipsReverse: ORBIT_STEP_CLIPS_REVERSE,
     preloadUrls: ORBIT_STEP_PRELOAD_URLS,
     preloadGateUrls = null,
+    preloadBackgroundUrls = null,
     mainGateClip: MAIN_GATE_CLIP,
     getOrbitStepZones,
     brand,
@@ -174,17 +178,41 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const landHoldAtForBack = (landStep) => (landStep === 0 ? "start" : "end");
   const hasReverseClips = ORBIT_STEP_CLIPS_REVERSE.length === ORBIT_STEP_COUNT;
 
-  const gateUrls = useMemo(() => {
+  const priorityUrls = useMemo(() => {
     const all = [...new Set((ORBIT_STEP_PRELOAD_URLS || []).filter(Boolean))];
     const gate = [...new Set((preloadGateUrls || all).filter(Boolean))];
     return gate.length ? gate : all;
   }, [ORBIT_STEP_PRELOAD_URLS, preloadGateUrls]);
 
+  const allTourUrls = useMemo(
+    () => [...new Set((ORBIT_STEP_PRELOAD_URLS || []).filter(Boolean))],
+    [ORBIT_STEP_PRELOAD_URLS]
+  );
+
+  /**
+   * Adaptive gate (decided once on mount):
+   * - Priority already warm (e.g. after teaser) → wait for all clips, then open 360
+   * - Priority not ready → wait for Seq1–3 + Rev9–7 only, rest in background
+   */
+  const [gateAllClips, setGateAllClips] = useState(false);
+
+  useEffect(() => {
+    setGateAllClips(areUrlsBufferedEnough(priorityUrls));
+  }, [priorityUrls]);
+
+  const gateUrls = useMemo(() => {
+    if (gateAllClips && allTourUrls.length) return allTourUrls;
+    return priorityUrls;
+  }, [gateAllClips, priorityUrls, allTourUrls]);
+
   const backgroundUrls = useMemo(() => {
-    const all = [...new Set((ORBIT_STEP_PRELOAD_URLS || []).filter(Boolean))];
+    if (gateAllClips) return [];
     const gateSet = new Set(gateUrls);
-    return all.filter((url) => !gateSet.has(url));
-  }, [ORBIT_STEP_PRELOAD_URLS, gateUrls]);
+    if (Array.isArray(preloadBackgroundUrls) && preloadBackgroundUrls.length) {
+      return [...new Set(preloadBackgroundUrls.filter((url) => url && !gateSet.has(url)))];
+    }
+    return allTourUrls.filter((url) => !gateSet.has(url));
+  }, [gateAllClips, gateUrls, preloadBackgroundUrls, allTourUrls]);
 
   const { ready: assetsReady, progress: loadProgress, failedCount, total: preloadTotal } =
     usePreloadVideos(gateUrls, { depth: preloadDepth });

@@ -292,8 +292,9 @@ html.be-ios .be-orbit-arw--r{right:var(--be-orbit-inset-r)!important;left:auto!i
 
 /* topbar */
 .be-top{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;justify-content:space-between;
-  align-items:center;padding:18px 26px;gap:8px;overflow:visible}
+  align-items:center;padding:0 26px 18px;gap:8px;overflow:visible}
 .be-top-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0;z-index:50}
+.be-links--desktop{transform:translateY(-16px)}
 .be-fs-btn{
   position:fixed;right:max(72px,calc(env(safe-area-inset-right,0px) + 64px));
   bottom:72px;top:auto;left:auto;

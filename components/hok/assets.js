@@ -40,10 +40,20 @@ export const ORBIT_STEP_CLIPS = [
 ];
 
 /**
- * Reverse clips for ← / back drag.
- * Leave empty until *-rev.mp4 files are uploaded (back nav stays disabled).
+ * Reverse clips for ← / back drag (Seq1…Seq9 Rev).
+ * Must match ORBIT_STEP_CLIPS length to enable back navigation.
  */
-export const ORBIT_STEP_CLIPS_REVERSE = [];
+export const ORBIT_STEP_CLIPS_REVERSE = [
+  cdnUrl("24fps-comp-rev/Seq1+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq2+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq3+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq4+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq5+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq6+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq7+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq8+Rev.mp4"),
+  cdnUrl("24fps-comp-rev/Seq9+Rev.mp4"),
+];
 
 export const ORBIT_STEP_COUNT = ORBIT_STEP_CLIPS.length;
 

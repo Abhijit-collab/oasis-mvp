@@ -110,7 +110,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     showBrand = true,
     preloadVariant = "bar",
   } = tour;
-  const { logout } = useAuth() || {};
+  const { logout, setIdleSuspended } = useAuth() || {};
   /** cover vs contain — always keeps original aspect; picks based on the device viewport. */
   const [adaptiveFit, setAdaptiveFit] = useState(mediaFit === "fill" ? "fill" : "contain");
   const [navOpen, setNavOpen] = useState(false);
@@ -200,6 +200,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   // Open 360 only after every gated clip fully buffered.
   const mountTour = assetsReady && !clipsFailed;
   const displayFit = mediaFit === "fill" ? "fill" : adaptiveFit;
+
+  // Don't idle-logout while the buffering screen is up.
+  useEffect(() => {
+    if (!setIdleSuspended) return undefined;
+    const buffering = !gateOpen || showPreload;
+    setIdleSuspended(buffering);
+    return () => setIdleSuspended(false);
+  }, [gateOpen, showPreload, setIdleSuspended]);
 
   // Free hidden preload videos so iOS can decode/play the stage clips.
   useEffect(() => {

@@ -9,7 +9,7 @@ import { preloadEntranceImage as defaultPreloadEntranceImage, preloadTourAssetsA
 import { ENTRANCE_IMAGE as DEFAULT_ENTRANCE_IMAGE } from "@/data/assets";
 
 const STORAGE_KEY = "oasis_access";
-const IDLE_TIMEOUT_MS = 60 * 1000;
+const IDLE_TIMEOUT_MS = 120 * 1000;
 
 const IDLE_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
 
@@ -36,17 +36,17 @@ export default function AuthGate({
   const [session, setSession] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [idleSuspended, setIdleSuspended] = useState(false);
 
   useEffect(() => {
+    // Refresh / hard refresh always starts logged out (session is memory-only).
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.coupon) setSession(parsed);
-      }
-    } catch {
       sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
     }
+    setSession(null);
+    setShowWelcome(false);
     setReady(true);
   }, []);
 
@@ -70,7 +70,6 @@ export default function AuthGate({
     setLoginError("");
     preloadEntranceImage();
     const next = { name, coupon, at: Date.now() };
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setSession(next);
     setShowWelcome(true);
   }, []);
@@ -96,7 +95,8 @@ export default function AuthGate({
   }, []);
 
   useEffect(() => {
-    if (!session || showWelcome) return;
+    // Welcome + buffering: don't idle-logout while the user is waiting on assets.
+    if (!session || showWelcome || idleSuspended) return;
 
     const timeoutRef = { id: null };
 
@@ -114,7 +114,7 @@ export default function AuthGate({
       clearTimeout(timeoutRef.id);
       IDLE_EVENTS.forEach((event) => window.removeEventListener(event, onActivity));
     };
-  }, [session, showWelcome, logout]);
+  }, [session, showWelcome, idleSuspended, logout]);
 
   if (!ready) {
     return (
@@ -144,7 +144,7 @@ export default function AuthGate({
   const showApp = !deferUntilWelcome || !showWelcome;
 
   return (
-    <AuthContext.Provider value={{ logout, session }}>
+    <AuthContext.Provider value={{ logout, session, setIdleSuspended }}>
       {showApp && children}
       {showWhatsApp && <WhatsAppButton />}
       {showWelcome && (

@@ -104,11 +104,14 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
   .be-root--cover .be-stage img,
   .be-root--cover .be-stage-video,
   .be-root--cover .be-start-still,
+  .be-root--contain .be-stage img,
+  .be-root--contain .be-stage-video,
+  .be-root--contain .be-start-still,
   .be-stage img,
   .be-stage-video,
   .be-start-still{
     object-fit:contain!important;object-position:center center!important}
-  .be-stage,.be-stage-media{background:#06070a}
+  .be-stage,.be-stage-media,.be-tour-reveal{background:#06070a}
   .be-rotate-wrap{display:none}
   .be-orbit-arw{
     display:flex;align-items:center;justify-content:center;
@@ -124,6 +127,18 @@ body{background:#06070a;font-family:var(--sans);color:var(--ink);padding:14px}
   .be-orbit-arw--hidden{display:none!important}
   .be-cta-hint{bottom:max(6px,calc(env(safe-area-inset-bottom,0px) + 4px));padding:8px 14px;font-size:12px}
 }
+/* iOS Safari landscape: keep full frame visible (no top/bottom crop) */
+html.be-ios .be-root,
+html.be-ios .be-root--cover,
+html.be-ios .be-root--contain{
+  overflow:hidden;background:#06070a}
+html.be-ios .be-stage img,
+html.be-ios .be-stage-video,
+html.be-ios .be-start-still,
+html.be-ios .be-root--cover .be-stage img,
+html.be-ios .be-root--cover .be-stage-video,
+html.be-ios .be-root--cover .be-start-still{
+  object-fit:contain!important;object-position:center center!important}
 .be-tour-reveal .be-top,.be-tour-reveal .be-cta-hint{
   opacity:0;transform:translateY(10px);
   transition:opacity .7s ease .45s,transform .7s cubic-bezier(.22,1,.36,1) .45s}

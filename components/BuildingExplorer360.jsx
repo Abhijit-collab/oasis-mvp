@@ -112,6 +112,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const [adaptiveFit, setAdaptiveFit] = useState(mediaFit === "fill" ? "fill" : "contain");
   const [navOpen, setNavOpen] = useState(false);
   const [viewH, setViewH] = useState(null);
+  const [viewTop, setViewTop] = useState(0);
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState("hold");
@@ -189,7 +190,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       return undefined;
     }
 
+    const isIOS = () => {
+      const ua = navigator.userAgent || "";
+      if (/iPad|iPhone|iPod/i.test(ua)) return true;
+      return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    };
+
     const isSmallDevice = () =>
+      isIOS() ||
       window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
       window.matchMedia("(max-width: 900px)").matches;
 
@@ -197,11 +205,20 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       if (!isSmallDevice()) {
         setAdaptiveFit("cover");
         setViewH(null);
+        setViewTop(0);
+        document.documentElement.classList.remove("be-ios");
         return;
       }
+      // Phones / iOS Safari: always contain so top/bottom never crop.
       setAdaptiveFit("contain");
-      const h = window.visualViewport?.height || window.innerHeight;
-      setViewH(Math.round(h));
+      if (isIOS()) document.documentElement.classList.add("be-ios");
+      else document.documentElement.classList.remove("be-ios");
+
+      const vv = window.visualViewport;
+      const h = Math.round(vv?.height || window.innerHeight || 0);
+      const top = Math.round(vv?.offsetTop || 0);
+      setViewH(h || null);
+      setViewTop(top);
     };
 
     update();
@@ -210,6 +227,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     window.visualViewport?.addEventListener("resize", update);
     window.visualViewport?.addEventListener("scroll", update);
     return () => {
+      document.documentElement.classList.remove("be-ios");
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
       window.visualViewport?.removeEventListener("resize", update);
@@ -649,7 +667,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       }
       style={{
         "--filter-w": showPremiumChrome ? "400px" : "0px",
-        ...(viewH ? { height: `${viewH}px`, maxHeight: `${viewH}px` } : null),
+        ...(viewH
+          ? {
+              height: `${viewH}px`,
+              maxHeight: `${viewH}px`,
+              top: `${viewTop}px`,
+              bottom: "auto",
+            }
+          : null),
         ...(displayFit === "cover" || displayFit === "contain"
           ? { "--be-media-position": displayFit === "cover" ? mediaPosition : "center center" }
           : null),

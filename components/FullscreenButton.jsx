@@ -2,60 +2,48 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+function isIOSDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/i.test(ua)) return true;
+  // iPadOS 13+ reports as Mac
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
 function getFullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
 
-function getTourVideo() {
-  return (
-    document.querySelector(".be-stage-video.on") ||
-    document.querySelector(".be-stage-video") ||
-    document.querySelector("video")
-  );
-}
-
-function isVideoFullscreen(video) {
-  return Boolean(
-    video && (video.webkitDisplayingFullscreen || document.webkitFullscreenElement === video)
-  );
-}
-
 export default function FullscreenButton() {
   const [active, setActive] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    const sync = () => {
-      const video = getTourVideo();
-      setActive(Boolean(getFullscreenElement()) || isVideoFullscreen(video) || document.documentElement.classList.contains("be-immersive"));
-    };
+    // iOS Safari/Chrome cannot fullscreen a webpage — hide the control.
+    if (isIOSDevice()) {
+      setHidden(true);
+      return undefined;
+    }
+
+    const sync = () => setActive(Boolean(getFullscreenElement()));
     sync();
     document.addEventListener("fullscreenchange", sync);
     document.addEventListener("webkitfullscreenchange", sync);
-    const video = getTourVideo();
-    video?.addEventListener("webkitbeginfullscreen", sync);
-    video?.addEventListener("webkitendfullscreen", sync);
     return () => {
       document.removeEventListener("fullscreenchange", sync);
       document.removeEventListener("webkitfullscreenchange", sync);
-      video?.removeEventListener("webkitbeginfullscreen", sync);
-      video?.removeEventListener("webkitendfullscreen", sync);
     };
   }, []);
 
   const toggle = useCallback(async () => {
     const root = document.documentElement;
-    const video = getTourVideo();
-
     try {
-      if (getFullscreenElement() || isVideoFullscreen(video) || root.classList.contains("be-immersive")) {
+      if (getFullscreenElement()) {
         if (document.exitFullscreen) await document.exitFullscreen();
         else document.webkitExitFullscreen?.();
-        video?.webkitExitFullscreen?.();
-        root.classList.remove("be-immersive");
         setActive(false);
         return;
       }
-
       if (root.requestFullscreen) {
         await root.requestFullscreen();
         setActive(true);
@@ -64,31 +52,13 @@ export default function FullscreenButton() {
       if (root.webkitRequestFullscreen) {
         root.webkitRequestFullscreen();
         setActive(true);
-        return;
       }
-      if (video?.webkitEnterFullscreen) {
-        video.webkitEnterFullscreen();
-        setActive(true);
-        return;
-      }
-
-      root.classList.add("be-immersive");
-      setActive(true);
     } catch {
-      const v = getTourVideo();
-      if (v?.webkitEnterFullscreen) {
-        try {
-          v.webkitEnterFullscreen();
-          setActive(true);
-          return;
-        } catch {
-          /* ignore */
-        }
-      }
-      root.classList.add("be-immersive");
-      setActive(true);
+      /* browser blocked fullscreen */
     }
   }, []);
+
+  if (hidden) return null;
 
   return (
     <button

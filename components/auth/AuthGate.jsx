@@ -23,6 +23,7 @@ export default function AuthGate({
   loginBrand = null,
   welcomeProduct = "The Oasis",
   loginBackgroundVideo = null,
+  loginBackgroundAudio = null,
   loginMinimal = false,
   projectLogo = null,
   projectLogoAlt = "Brand",
@@ -140,6 +141,7 @@ export default function AuthGate({
         accent={loginBrand?.accent}
         codePlaceholder={loginBrand?.codePlaceholder}
         backgroundVideo={loginBackgroundVideo}
+        backgroundAudio={loginBackgroundAudio}
         minimal={loginMinimal}
         projectLogo={projectLogo}
         projectLogoAlt={projectLogoAlt}

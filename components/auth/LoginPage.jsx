@@ -88,6 +88,8 @@ export default function LoginPage({
   accent = "OASIS",
   codePlaceholder = "e.g. OASIS-VIP",
   backgroundVideo = null,
+  /** Desktop-only teaser soundtrack — plays in sync with the muted background video. */
+  backgroundAudio = null,
   /** HOK: strip brand, badge, copy, perks, and name field */
   minimal = false,
   projectLogo = null,
@@ -115,8 +117,16 @@ export default function LoginPage({
     }
   });
   const [introExit, setIntroExit] = useState(false);
+  /** Desktop: intro ready but browser blocked unmuted autoplay — wait for one Enter gesture. */
+  const [awaitingEnter, setAwaitingEnter] = useState(false);
+  /** Desktop soundtrack — starts on; user can mute. */
+  const [soundOn, setSoundOn] = useState(true);
   const rootRef = useRef(null);
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
+  const desktopTeaserGateRef = useRef(false);
+  const startTeaserRef = useRef(null);
+  desktopTeaserGateRef.current = desktopTeaserGate;
 
   useEffect(() => {
     const mq = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)");
@@ -176,8 +186,8 @@ export default function LoginPage({
     };
   }, []);
 
-  // Desktop: short logo intro, then play as soon as the teaser can start smoothly.
-  // (Waiting for 80% of the full file caused ~45–50s delays on large teasers.)
+  // Desktop: short logo intro, then start teaser with soundtrack unmuted.
+  // If the browser blocks audible autoplay, one Enter gesture starts A+V with sound on.
   useEffect(() => {
     if (!backgroundVideo || !isDesktop || !videoReady) return undefined;
 
@@ -185,9 +195,11 @@ export default function LoginPage({
     let revealTimer = null;
     let poll = null;
     let raf = null;
+    let syncTimer = null;
+    let cancelled = false;
+    let starting = false;
     const t0 = performance.now();
     const MIN_INTRO_MS = 1600;
-    /** Enough ahead-of-play buffer — not 80% of the whole file. */
     const PLAY_NEED = 0.18;
     const listeners = [];
 
@@ -196,8 +208,141 @@ export default function LoginPage({
       listeners.length = 0;
     };
 
+    const bedEl = () => audioRef.current;
+    const videoEl = () => videoRef.current;
+
+    const syncBedToVideo = () => {
+      const video = videoEl();
+      const bed = bedEl();
+      if (!video || !bed) return;
+      try {
+        if (Math.abs((bed.currentTime || 0) - (video.currentTime || 0)) > 0.35) {
+          bed.currentTime = video.currentTime || 0;
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const stopBed = () => {
+      try {
+        bedEl()?.pause();
+      } catch {
+        /* ignore */
+      }
+    };
+
+    /** Returns true when soundtrack is playing unmuted. */
+    const tryPlayBedAudible = async () => {
+      const bed = bedEl();
+      if (!bed || !backgroundAudio) return true;
+      bed.loop = true;
+      bed.playsInline = true;
+      bed.muted = false;
+      bed.volume = 1;
+      syncBedToVideo();
+      try {
+        await bed.play();
+        return !bed.muted && !bed.paused;
+      } catch {
+        try {
+          bed.muted = true;
+          await bed.play();
+          bed.muted = false;
+          await bed.play();
+          return !bed.muted && !bed.paused;
+        } catch {
+          stopBed();
+          return false;
+        }
+      }
+    };
+
+    const revealChrome = (audible) => {
+      setAwaitingEnter(false);
+      setIntroExit(true);
+      setSoundOn(Boolean(audible && backgroundAudio));
+      setDesktopTeaserGate(true);
+    };
+
+    const startTeaser = async ({ fromGesture = false } = {}) => {
+      const video = videoEl();
+      if (!video || cancelled || starting) return false;
+      starting = true;
+
+      try {
+        video.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+      if (bedEl()) {
+        try {
+          bedEl().currentTime = 0;
+        } catch {
+          /* ignore */
+        }
+      }
+
+      // Visual bed stays muted (separate soundtrack element carries audio).
+      video.muted = true;
+      const vp = video.play();
+      if (vp?.catch) vp.catch(() => {});
+
+      let audioOk = true;
+      if (backgroundAudio) {
+        audioOk = await tryPlayBedAudible();
+        if (!audioOk && fromGesture) {
+          audioOk = await tryPlayBedAudible();
+        }
+      }
+
+      if (!audioOk && backgroundAudio && !fromGesture) {
+        try {
+          video.pause();
+        } catch {
+          /* ignore */
+        }
+        stopBed();
+        starting = false;
+        setAwaitingEnter(true);
+        setIntroExit(false);
+        return false;
+      }
+
+      // Gesture path: still reveal even if audio somehow fails (button can retry).
+      revealChrome(audioOk || !backgroundAudio);
+      if (!audioOk && backgroundAudio) {
+        // Keep bed primed muted so the mute button can unlock on click.
+        const bed = bedEl();
+        if (bed) {
+          bed.muted = true;
+          bed.play()?.catch?.(() => {});
+        }
+        setSoundOn(false);
+      }
+      syncBedToVideo();
+      if (syncTimer) clearInterval(syncTimer);
+      syncTimer = window.setInterval(syncBedToVideo, 500);
+      return true;
+    };
+    startTeaserRef.current = startTeaser;
+
+    const finishIntro = () => {
+      if (settled || cancelled) return;
+      settled = true;
+      setTeaserProgress(100);
+      if (backgroundAudio) {
+        startTeaser({ fromGesture: false });
+        return;
+      }
+      setIntroExit(true);
+      revealTimer = window.setTimeout(() => {
+        startTeaser({ fromGesture: false });
+      }, 380);
+    };
+
     const start = () => {
-      const video = videoRef.current;
+      const video = videoEl();
       if (!video) {
         raf = requestAnimationFrame(start);
         return;
@@ -221,37 +366,28 @@ export default function LoginPage({
         return false;
       };
 
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        setTeaserProgress(100);
-        setIntroExit(true);
-        revealTimer = window.setTimeout(() => {
-          setDesktopTeaserGate(true);
-          try {
-            video.currentTime = 0;
-          } catch {
-            /* ignore */
-          }
-          const play = video.play();
-          if (play?.catch) play.catch(() => {});
-        }, 380);
-      };
-
       const tick = () => {
         const pct = coverage();
-        // Map early buffer into a smoother 0→95 bar while the logo shows.
         const shown = Math.min(95, Math.round(Math.max(pct / PLAY_NEED, 0) * 90));
         setTeaserProgress(shown);
 
         const introDone = performance.now() - t0 >= MIN_INTRO_MS;
-        if (introDone && canStart()) finish();
+        if (introDone && canStart()) finishIntro();
       };
 
       video.preload = "auto";
       video.muted = true;
       video.playsInline = true;
       video.pause();
+
+      const bed = bedEl();
+      if (bed && backgroundAudio) {
+        bed.loop = true;
+        bed.playsInline = true;
+        bed.muted = true;
+        bed.preload = "auto";
+        bed.play()?.catch?.(() => {});
+      }
 
       const kick = video.play();
       if (kick?.then) {
@@ -278,13 +414,36 @@ export default function LoginPage({
     start();
 
     return () => {
+      cancelled = true;
       settled = true;
+      startTeaserRef.current = null;
       if (raf) cancelAnimationFrame(raf);
       if (poll) clearInterval(poll);
       if (revealTimer) clearTimeout(revealTimer);
-      if (videoRef.current) detach(videoRef.current);
+      if (syncTimer) clearInterval(syncTimer);
+      if (videoEl()) detach(videoEl());
+      stopBed();
     };
-  }, [backgroundVideo, isDesktop, videoReady]);
+  }, [backgroundVideo, backgroundAudio, isDesktop, videoReady]);
+
+  // Browser blocked unmuted autoplay — one real gesture starts video + music (sound on).
+  useEffect(() => {
+    if (!awaitingEnter || !isDesktop) return undefined;
+
+    const onEnter = (e) => {
+      if (e.type === "mousemove") return;
+      const run = startTeaserRef.current;
+      if (!run) return;
+      e.preventDefault?.();
+      run({ fromGesture: true });
+    };
+
+    const types = ["pointerdown", "keydown", "touchstart", "click"];
+    types.forEach((type) => window.addEventListener(type, onEnter, { capture: true }));
+    return () => {
+      types.forEach((type) => window.removeEventListener(type, onEnter, { capture: true }));
+    };
+  }, [awaitingEnter, isDesktop]);
 
   // Once teaser is fully buffered, start warming tour clips (does not wait for login).
   useEffect(() => {
@@ -377,9 +536,37 @@ export default function LoginPage({
   // Prevent focused inputs from stealing the first tap (iOS / mobile keyboard blur).
   const keepTapOnButton = (e) => e.preventDefault();
 
+  const toggleSound = useCallback(() => {
+    const bed = audioRef.current;
+    const video = videoRef.current;
+    if (!bed || !backgroundAudio) return;
+
+    const next = !soundOn;
+    bed.loop = true;
+    bed.playsInline = true;
+    bed.muted = !next;
+    if (next) bed.volume = 1;
+    try {
+      if (video && Math.abs((bed.currentTime || 0) - (video.currentTime || 0)) > 0.35) {
+        bed.currentTime = video.currentTime || 0;
+      }
+    } catch {
+      /* ignore */
+    }
+    const play = bed.play();
+    if (play?.catch) {
+      play.catch(() => {
+        setSoundOn(false);
+        bed.muted = true;
+      });
+    }
+    setSoundOn(next);
+  }, [backgroundAudio, soundOn]);
+
   const showBrand = !minimal && (eyebrow || title || accent);
   const showDesktopIntro = Boolean(backgroundVideo && isDesktop && !desktopTeaserGate);
   const revealChrome = !showDesktopIntro;
+  const showSoundToggle = Boolean(revealChrome && backgroundAudio && isDesktop);
 
   return (
     <div
@@ -390,6 +577,7 @@ export default function LoginPage({
         + (minimal && !showForm ? " login-page--teaser" : "")
         + (showDesktopIntro ? " login-page--intro" : "")
         + (introExit ? " login-page--intro-exit" : "")
+        + (awaitingEnter ? " login-page--await-enter" : "")
       }
     >
       <div className={"login-bg" + (backgroundVideo ? " login-bg--video" : "")} aria-hidden>
@@ -407,10 +595,47 @@ export default function LoginPage({
             preload={isDesktop ? "auto" : "metadata"}
           />
         ) : null}
+        {backgroundAudio && isDesktop ? (
+          <video
+            ref={audioRef}
+            className="login-bg-audio"
+            src={backgroundAudio}
+            muted
+            loop
+            playsInline
+            preload="auto"
+            aria-hidden
+            tabIndex={-1}
+          />
+        ) : null}
       </div>
 
       {showDesktopIntro && (
-        <div className="login-teaser-intro" aria-busy="true" aria-live="polite">
+        <div
+          className={"login-teaser-intro" + (awaitingEnter ? " login-teaser-intro--enter" : "")}
+          aria-busy={!awaitingEnter}
+          aria-live="polite"
+          role={awaitingEnter ? "button" : undefined}
+          tabIndex={awaitingEnter ? 0 : undefined}
+          onClick={
+            awaitingEnter
+              ? (e) => {
+                  e.preventDefault();
+                  startTeaserRef.current?.({ fromGesture: true });
+                }
+              : undefined
+          }
+          onKeyDown={
+            awaitingEnter
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    startTeaserRef.current?.({ fromGesture: true });
+                  }
+                }
+              : undefined
+          }
+        >
           <div className="login-teaser-intro-glow" aria-hidden />
           {projectLogo ? (
             <ProjectBrandLogo
@@ -423,12 +648,38 @@ export default function LoginPage({
               {title} {accent ? <span>{accent}</span> : null}
             </p>
           )}
-          <div className="login-teaser-intro-bar" role="progressbar" aria-valuenow={teaserProgress} aria-valuemin={0} aria-valuemax={100}>
-            <div className="login-teaser-intro-fill" style={{ width: `${Math.min(100, Math.max(8, teaserProgress))}%` }} />
-          </div>
-          <p className="login-teaser-intro-label">Preparing your experience…</p>
+          {!awaitingEnter ? (
+            <div className="login-teaser-intro-bar" role="progressbar" aria-valuenow={teaserProgress} aria-valuemin={0} aria-valuemax={100}>
+              <div className="login-teaser-intro-fill" style={{ width: `${Math.min(100, Math.max(8, teaserProgress))}%` }} />
+            </div>
+          ) : null}
+          <p className="login-teaser-intro-label">
+            {awaitingEnter ? "Click anywhere to enter" : "Preparing your experience…"}
+          </p>
         </div>
       )}
+
+      {showSoundToggle ? (
+        <button
+          type="button"
+          className={"login-sound-btn" + (soundOn ? " login-sound-btn--on" : "")}
+          onClick={toggleSound}
+          onMouseDown={keepTapOnButton}
+          aria-label={soundOn ? "Mute soundtrack" : "Unmute soundtrack"}
+          aria-pressed={soundOn}
+          title={soundOn ? "Mute" : "Unmute"}
+        >
+          {soundOn ? (
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+              <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+              <path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.65 21 13.36 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z" />
+            </svg>
+          )}
+        </button>
+      ) : null}
 
       {revealChrome && projectLogo ? (
         <div className="login-brand-stack">

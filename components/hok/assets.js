@@ -26,6 +26,8 @@ export const ELEVATION_IMAGE = CDN_IMAGES.elevation;
 export const START_IMAGE = CDN_IMAGES.mainGate;
 /** Login page full-bleed background loop */
 export const LOGIN_BG_VIDEO = cdnUrl("teaser/Websiteteaser.mp4");
+/** Desktop login teaser soundtrack (plays with the video) */
+export const LOGIN_BG_AUDIO = cdnUrl("music-cover-video/short++music.mp3.mpeg");
 
 /** 9 forward clips (Sequence1 → Sequence9) — compressed Nyx3 */
 export const ORBIT_STEP_CLIPS = [

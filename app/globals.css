@@ -1225,6 +1225,8 @@ html.login-lock,body.login-lock{
 .login-bg--video{background:none;filter:none;transform:none;overflow:hidden}
 .login-bg-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;
   pointer-events:none;filter:brightness(.55)}
+.login-bg-audio{
+  position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0;overflow:hidden;z-index:0}
 .login-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(165deg,rgba(5,6,8,.58) 0%,rgba(5,6,8,.78) 55%,rgba(5,6,8,.88) 100%)}
 .login-bg--video::after{background:linear-gradient(165deg,rgba(5,6,8,.45) 0%,rgba(5,6,8,.62) 50%,rgba(5,6,8,.82) 100%);z-index:1}
 /* HOK minimal login — teaser + centered login card on demand */
@@ -1243,6 +1245,28 @@ html.login-lock,body.login-lock{
   position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:22px;padding:24px;
   pointer-events:none;text-align:center}
+.login-teaser-intro--enter{
+  pointer-events:auto;cursor:pointer}
+.login-page--await-enter .login-teaser-intro-label{
+  color:rgba(245,241,230,.88);letter-spacing:.2em}
+.login-sound-btn{
+  position:absolute;z-index:12;right:max(16px,env(safe-area-inset-right,0px));
+  bottom:max(18px,env(safe-area-inset-bottom,0px));
+  width:44px;height:44px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid rgba(255,255,255,.22);background:rgba(8,10,14,.55);
+  color:rgba(245,241,230,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  cursor:pointer;transition:background .18s,border-color .18s,transform .18s,color .18s;
+  box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.login-sound-btn:hover{
+  background:rgba(16,18,24,.72);border-color:rgba(216,182,90,.45);color:#fff;
+  transform:translateY(-1px)}
+.login-sound-btn--on{
+  border-color:rgba(216,182,90,.55);color:var(--gold-bright)}
+.login-page--minimal .login-sound-btn{
+  bottom:max(20px,env(safe-area-inset-bottom,0px))}
+/* Keep clear of LOG IN on the right */
+.login-page--minimal .login-sound-btn{
+  right:max(16px,env(safe-area-inset-right,0px))}
 .login-teaser-intro-glow{
   position:absolute;width:min(520px,70vw);height:min(520px,70vw);border-radius:50%;
   background:radial-gradient(circle,rgba(216,182,90,.22),rgba(0,229,204,.06) 45%,transparent 70%);

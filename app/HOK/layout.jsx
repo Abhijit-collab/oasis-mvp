@@ -1,7 +1,7 @@
 "use client";
 
 import AuthGate from "@/components/auth/AuthGate";
-import { BRAND, ENTRANCE_IMAGE, LOGIN_BG_VIDEO } from "@/components/hok/assets";
+import { BRAND, ENTRANCE_IMAGE, LOGIN_BG_VIDEO, LOGIN_BG_AUDIO } from "@/components/hok/assets";
 import * as hokTourPreload from "@/components/hok/tourAssetPreload";
 
 export default function HOKLayout({ children }) {
@@ -16,6 +16,7 @@ export default function HOKLayout({ children }) {
       }}
       welcomeProduct={BRAND.welcomeProduct}
       loginBackgroundVideo={LOGIN_BG_VIDEO}
+      loginBackgroundAudio={LOGIN_BG_AUDIO}
       loginMinimal
       projectLogo={BRAND.logoUrl}
       projectLogoAlt={BRAND.fullName}

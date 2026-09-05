@@ -12,6 +12,7 @@ import ExplorerPremiumChrome from "@/components/ExplorerPremiumChrome";
 import ExplorerNavMenu from "@/components/ExplorerNavMenu";
 import FullscreenButton from "@/components/FullscreenButton";
 import AdoptXRLogo from "@/components/AdoptXRLogo";
+import { SoundToggleButton, useTourSoundtrack } from "@/components/TourSoundtrack";
 import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 import PremiumBadge from "@/components/PremiumBadge";
 import { useAuth } from "@/components/auth/AuthContext";
@@ -118,6 +119,9 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     galleryImages = [],
   } = tour;
   const { logout, setIdleSuspended } = useAuth() || {};
+  const soundtrack = useTourSoundtrack();
+  const soundtrackRef = useRef(soundtrack);
+  soundtrackRef.current = soundtrack;
   /** cover vs contain — always keeps original aspect; picks based on the device viewport. */
   const [adaptiveFit, setAdaptiveFit] = useState(mediaFit === "fill" ? "fill" : "contain");
   const [navOpen, setNavOpen] = useState(false);
@@ -329,6 +333,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     const timer = setTimeout(() => setPreloadHidden(true), TOUR_REVEAL_MS);
     return () => clearTimeout(timer);
   }, [gateOpen, tourRevealed, preloadHidden]);
+
+  // Keep shared login→tour soundtrack playing once the 360 stage is visible.
+  useEffect(() => {
+    if (!tourRevealed) return;
+    const st = soundtrackRef.current;
+    if (!st?.available) return;
+    st.ensurePlaying({ audible: st.soundOn !== false });
+  }, [tourRevealed]);
 
   useEffect(() => {
     const sync = () => {
@@ -986,6 +998,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           {tourRevealed && (
             <div className="be-stage-chrome">
               <AdoptXRLogo variant="white" placement="explorer" />
+              <SoundToggleButton className="tour-sound-btn--explorer" />
               <FullscreenButton />
             </div>
           )}

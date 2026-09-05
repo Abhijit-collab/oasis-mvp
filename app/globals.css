@@ -30,7 +30,8 @@ html:has(.be-root),body:has(.be-root){
 .be-stage{position:absolute;inset:0;width:100%;height:100%;line-height:0;background:#06070a}
 .be-stage-chrome{
   position:absolute;inset:0;z-index:36;pointer-events:none}
-.be-stage-chrome .be-fs-btn{pointer-events:auto}
+.be-stage-chrome .be-fs-btn,
+.be-stage-chrome .tour-sound-btn{pointer-events:auto}
 .be-stage img{display:block;width:100%;height:100%;object-fit:fill;
   user-select:none;-webkit-user-drag:none}
 .be-look-viewport{position:absolute;inset:0;overflow:hidden;z-index:1;touch-action:none}
@@ -124,6 +125,12 @@ html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark
 html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .be-fs-btn{
   position:absolute;
   left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px);
+  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px);
+  right:auto;bottom:auto;
+  width:48px;height:48px;z-index:37}
+html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .tour-sound-btn{
+  position:absolute;
+  left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px - 56px);
   top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px);
   right:auto;bottom:auto;
   width:48px;height:48px;z-index:37}
@@ -345,6 +352,32 @@ html.be-ios .be-orbit-arw--r{right:var(--be-orbit-inset-r)!important;left:auto!i
   box-shadow:0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12);
   -webkit-tap-highlight-color:transparent;transition:background .15s,border-color .15s,transform .15s;
   animation:be-fs-pulse 2.2s ease-in-out infinite}
+/* Persistent mute control — above login / welcome / preload / tour chrome */
+.tour-sound-btn{
+  position:fixed;
+  right:max(16px,env(safe-area-inset-right,0px));
+  bottom:max(18px,env(safe-area-inset-bottom,0px));
+  z-index:560;display:grid;place-items:center;width:48px;height:48px;padding:0;
+  border-radius:50%;cursor:pointer;color:rgba(245,241,230,.92);
+  background:rgba(8,10,14,.55);border:1px solid rgba(255,255,255,.22);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  -webkit-tap-highlight-color:transparent;
+  transition:background .18s,border-color .18s,transform .18s,color .18s}
+.tour-sound-btn--on{
+  border-color:rgba(216,182,90,.55);color:var(--gold-bright,#f2d27e)}
+.tour-sound-btn:hover,.tour-sound-btn:active{
+  background:rgba(16,18,24,.72);border-color:rgba(216,182,90,.45);color:#fff;
+  transform:translateY(-1px)}
+.tour-soundtrack-bed{
+  position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0;overflow:hidden;z-index:0}
+/* On 360, hide shell button once the explorer control is mounted beside fullscreen */
+html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!important}
+.tour-sound-btn--explorer,
+.be-stage-chrome .tour-sound-btn{
+  right:max(140px,calc(env(safe-area-inset-right,0px) + 132px));
+  bottom:72px;width:56px;height:56px;z-index:40;
+  color:#f7e7b0;background:rgba(12,14,18,.42);border-color:rgba(216,182,90,.45)}
 .be-fs-btn::after{
   content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(242,210,126,.45);
   animation:be-fs-ring 2.2s ease-out infinite;pointer-events:none}
@@ -365,10 +398,22 @@ html.be-ios .be-orbit-arw--r{right:var(--be-orbit-inset-r)!important;left:auto!i
     bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 88px));
     top:auto;
     z-index:40}
+  .tour-sound-btn--explorer,
+  .be-stage-chrome .tour-sound-btn{
+    left:auto;
+    right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px + 64px);
+    bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 88px));
+    top:auto;
+    z-index:40}
 }
 @media(orientation:landscape) and (max-height:480px){
   .be-fs-btn{
     right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px);
+    bottom:max(14px,calc(env(safe-area-inset-bottom,0px) + 10px));
+    left:auto;top:auto}
+  .tour-sound-btn--explorer,
+  .be-stage-chrome .tour-sound-btn{
+    right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px + 64px);
     bottom:max(14px,calc(env(safe-area-inset-bottom,0px) + 10px));
     left:auto;top:auto}
 }
@@ -1249,24 +1294,6 @@ html.login-lock,body.login-lock{
   pointer-events:auto;cursor:pointer}
 .login-page--await-enter .login-teaser-intro-label{
   color:rgba(245,241,230,.88);letter-spacing:.2em}
-.login-sound-btn{
-  position:absolute;z-index:12;right:max(16px,env(safe-area-inset-right,0px));
-  bottom:max(18px,env(safe-area-inset-bottom,0px));
-  width:44px;height:44px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;
-  border:1px solid rgba(255,255,255,.22);background:rgba(8,10,14,.55);
-  color:rgba(245,241,230,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  cursor:pointer;transition:background .18s,border-color .18s,transform .18s,color .18s;
-  box-shadow:0 8px 24px rgba(0,0,0,.35)}
-.login-sound-btn:hover{
-  background:rgba(16,18,24,.72);border-color:rgba(216,182,90,.45);color:#fff;
-  transform:translateY(-1px)}
-.login-sound-btn--on{
-  border-color:rgba(216,182,90,.55);color:var(--gold-bright)}
-.login-page--minimal .login-sound-btn{
-  bottom:max(20px,env(safe-area-inset-bottom,0px))}
-/* Keep clear of LOG IN on the right */
-.login-page--minimal .login-sound-btn{
-  right:max(16px,env(safe-area-inset-right,0px))}
 .login-teaser-intro-glow{
   position:absolute;width:min(520px,70vw);height:min(520px,70vw);border-radius:50%;
   background:radial-gradient(circle,rgba(216,182,90,.22),rgba(0,229,204,.06) 45%,transparent 70%);

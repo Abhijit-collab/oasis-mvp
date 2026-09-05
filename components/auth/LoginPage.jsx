@@ -6,6 +6,7 @@ import PremiumPerks from "@/components/PremiumPerks";
 import AdoptXRLogo from "@/components/AdoptXRLogo";
 import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 import { isMobileTourDevice, isRotateOk } from "@/lib/rotateGate";
+import { useTourSoundtrack } from "@/components/TourSoundtrack";
 
 function clearInline(el, props) {
   if (!el) return;
@@ -119,14 +120,15 @@ export default function LoginPage({
   const [introExit, setIntroExit] = useState(false);
   /** Desktop: intro ready but browser blocked unmuted autoplay — wait for one Enter gesture. */
   const [awaitingEnter, setAwaitingEnter] = useState(false);
-  /** Desktop soundtrack — starts on; user can mute. */
-  const [soundOn, setSoundOn] = useState(true);
+  const soundtrack = useTourSoundtrack();
+  const soundtrackRef = useRef(soundtrack);
+  soundtrackRef.current = soundtrack;
   const rootRef = useRef(null);
   const videoRef = useRef(null);
-  const audioRef = useRef(null);
   const desktopTeaserGateRef = useRef(false);
   const startTeaserRef = useRef(null);
   desktopTeaserGateRef.current = desktopTeaserGate;
+  const hasAudio = Boolean(backgroundAudio && soundtrack?.available);
 
   useEffect(() => {
     const mq = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)");
@@ -186,8 +188,7 @@ export default function LoginPage({
     };
   }, []);
 
-  // Desktop: short logo intro, then start teaser with soundtrack unmuted.
-  // If the browser blocks audible autoplay, one Enter gesture starts A+V with sound on.
+  // Desktop: short logo intro, then start teaser with shared soundtrack unmuted.
   useEffect(() => {
     if (!backgroundVideo || !isDesktop || !videoReady) return undefined;
 
@@ -208,60 +209,18 @@ export default function LoginPage({
       listeners.length = 0;
     };
 
-    const bedEl = () => audioRef.current;
     const videoEl = () => videoRef.current;
 
     const syncBedToVideo = () => {
       const video = videoEl();
-      const bed = bedEl();
-      if (!video || !bed) return;
-      try {
-        if (Math.abs((bed.currentTime || 0) - (video.currentTime || 0)) > 0.35) {
-          bed.currentTime = video.currentTime || 0;
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    const stopBed = () => {
-      try {
-        bedEl()?.pause();
-      } catch {
-        /* ignore */
-      }
-    };
-
-    /** Returns true when soundtrack is playing unmuted. */
-    const tryPlayBedAudible = async () => {
-      const bed = bedEl();
-      if (!bed || !backgroundAudio) return true;
-      bed.loop = true;
-      bed.playsInline = true;
-      bed.muted = false;
-      bed.volume = 1;
-      syncBedToVideo();
-      try {
-        await bed.play();
-        return !bed.muted && !bed.paused;
-      } catch {
-        try {
-          bed.muted = true;
-          await bed.play();
-          bed.muted = false;
-          await bed.play();
-          return !bed.muted && !bed.paused;
-        } catch {
-          stopBed();
-          return false;
-        }
-      }
+      if (!video || !hasAudio) return;
+      soundtrackRef.current?.syncTo?.(video.currentTime || 0);
     };
 
     const revealChrome = (audible) => {
       setAwaitingEnter(false);
       setIntroExit(true);
-      setSoundOn(Boolean(audible && backgroundAudio));
+      soundtrackRef.current?.setSoundOn?.(Boolean(audible && hasAudio));
       setDesktopTeaserGate(true);
     };
 
@@ -269,56 +228,43 @@ export default function LoginPage({
       const video = videoEl();
       if (!video || cancelled || starting) return false;
       starting = true;
+      const st = soundtrackRef.current;
 
       try {
         video.currentTime = 0;
       } catch {
         /* ignore */
       }
-      if (bedEl()) {
-        try {
-          bedEl().currentTime = 0;
-        } catch {
-          /* ignore */
-        }
-      }
+      if (hasAudio) st?.syncTo?.(0);
 
-      // Visual bed stays muted (separate soundtrack element carries audio).
       video.muted = true;
       const vp = video.play();
       if (vp?.catch) vp.catch(() => {});
 
       let audioOk = true;
-      if (backgroundAudio) {
-        audioOk = await tryPlayBedAudible();
+      if (hasAudio) {
+        audioOk = Boolean(await st.playAudible());
         if (!audioOk && fromGesture) {
-          audioOk = await tryPlayBedAudible();
+          audioOk = Boolean(await st.playAudible());
         }
       }
 
-      if (!audioOk && backgroundAudio && !fromGesture) {
+      if (!audioOk && hasAudio && !fromGesture) {
         try {
           video.pause();
         } catch {
           /* ignore */
         }
-        stopBed();
+        await st.playMuted();
         starting = false;
         setAwaitingEnter(true);
         setIntroExit(false);
         return false;
       }
 
-      // Gesture path: still reveal even if audio somehow fails (button can retry).
-      revealChrome(audioOk || !backgroundAudio);
-      if (!audioOk && backgroundAudio) {
-        // Keep bed primed muted so the mute button can unlock on click.
-        const bed = bedEl();
-        if (bed) {
-          bed.muted = true;
-          bed.play()?.catch?.(() => {});
-        }
-        setSoundOn(false);
+      revealChrome(audioOk || !hasAudio);
+      if (!audioOk && hasAudio) {
+        await st.playMuted();
       }
       syncBedToVideo();
       if (syncTimer) clearInterval(syncTimer);
@@ -331,7 +277,7 @@ export default function LoginPage({
       if (settled || cancelled) return;
       settled = true;
       setTeaserProgress(100);
-      if (backgroundAudio) {
+      if (hasAudio) {
         startTeaser({ fromGesture: false });
         return;
       }
@@ -380,14 +326,7 @@ export default function LoginPage({
       video.playsInline = true;
       video.pause();
 
-      const bed = bedEl();
-      if (bed && backgroundAudio) {
-        bed.loop = true;
-        bed.playsInline = true;
-        bed.muted = true;
-        bed.preload = "auto";
-        bed.play()?.catch?.(() => {});
-      }
+      if (hasAudio) soundtrackRef.current?.playMuted?.();
 
       const kick = video.play();
       if (kick?.then) {
@@ -422,9 +361,9 @@ export default function LoginPage({
       if (revealTimer) clearTimeout(revealTimer);
       if (syncTimer) clearInterval(syncTimer);
       if (videoEl()) detach(videoEl());
-      stopBed();
+      // Keep shared soundtrack playing into welcome / 360 — do not pause here.
     };
-  }, [backgroundVideo, backgroundAudio, isDesktop, videoReady]);
+  }, [backgroundVideo, hasAudio, isDesktop, videoReady]);
 
   // Browser blocked unmuted autoplay — one real gesture starts video + music (sound on).
   useEffect(() => {
@@ -432,6 +371,7 @@ export default function LoginPage({
 
     const onEnter = (e) => {
       if (e.type === "mousemove") return;
+      if (e.target?.closest?.(".tour-sound-btn")) return;
       const run = startTeaserRef.current;
       if (!run) return;
       e.preventDefault?.();
@@ -536,37 +476,9 @@ export default function LoginPage({
   // Prevent focused inputs from stealing the first tap (iOS / mobile keyboard blur).
   const keepTapOnButton = (e) => e.preventDefault();
 
-  const toggleSound = useCallback(() => {
-    const bed = audioRef.current;
-    const video = videoRef.current;
-    if (!bed || !backgroundAudio) return;
-
-    const next = !soundOn;
-    bed.loop = true;
-    bed.playsInline = true;
-    bed.muted = !next;
-    if (next) bed.volume = 1;
-    try {
-      if (video && Math.abs((bed.currentTime || 0) - (video.currentTime || 0)) > 0.35) {
-        bed.currentTime = video.currentTime || 0;
-      }
-    } catch {
-      /* ignore */
-    }
-    const play = bed.play();
-    if (play?.catch) {
-      play.catch(() => {
-        setSoundOn(false);
-        bed.muted = true;
-      });
-    }
-    setSoundOn(next);
-  }, [backgroundAudio, soundOn]);
-
   const showBrand = !minimal && (eyebrow || title || accent);
   const showDesktopIntro = Boolean(backgroundVideo && isDesktop && !desktopTeaserGate);
   const revealChrome = !showDesktopIntro;
-  const showSoundToggle = Boolean(revealChrome && backgroundAudio && isDesktop);
 
   return (
     <div
@@ -593,19 +505,6 @@ export default function LoginPage({
             loop
             playsInline
             preload={isDesktop ? "auto" : "metadata"}
-          />
-        ) : null}
-        {backgroundAudio && isDesktop ? (
-          <video
-            ref={audioRef}
-            className="login-bg-audio"
-            src={backgroundAudio}
-            muted
-            loop
-            playsInline
-            preload="auto"
-            aria-hidden
-            tabIndex={-1}
           />
         ) : null}
       </div>
@@ -658,28 +557,6 @@ export default function LoginPage({
           </p>
         </div>
       )}
-
-      {showSoundToggle ? (
-        <button
-          type="button"
-          className={"login-sound-btn" + (soundOn ? " login-sound-btn--on" : "")}
-          onClick={toggleSound}
-          onMouseDown={keepTapOnButton}
-          aria-label={soundOn ? "Mute soundtrack" : "Unmute soundtrack"}
-          aria-pressed={soundOn}
-          title={soundOn ? "Mute" : "Unmute"}
-        >
-          {soundOn ? (
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-              <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-              <path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.65 21 13.36 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z" />
-            </svg>
-          )}
-        </button>
-      ) : null}
 
       {revealChrome && projectLogo ? (
         <div className="login-brand-stack">

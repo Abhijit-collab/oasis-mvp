@@ -5,6 +5,7 @@ import LoginPage from "@/components/auth/LoginPage";
 import WelcomeModal from "@/components/auth/WelcomeModal";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import { AuthContext } from "@/components/auth/AuthContext";
+import { TourSoundtrackProvider, useTourSoundtrack } from "@/components/TourSoundtrack";
 import { preloadEntranceImage as defaultPreloadEntranceImage, preloadTourAssetsAfterLogin as defaultPreloadTourAssetsAfterLogin, preloadWelcomeBackgroundIdle as defaultPreloadWelcomeBackgroundIdle } from "@/lib/tourAssetPreload";
 import { ENTRANCE_IMAGE as DEFAULT_ENTRANCE_IMAGE } from "@/data/assets";
 
@@ -12,6 +13,20 @@ const STORAGE_KEY = "oasis_access";
 const IDLE_TIMEOUT_MS = 120 * 1000;
 
 const IDLE_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
+
+function WelcomeWithSoundtrack(props) {
+  const soundtrack = useTourSoundtrack();
+  return (
+    <WelcomeModal
+      {...props}
+      onContinue={() => {
+        // Unlock / keep music during the same user gesture as "Enter tour".
+        soundtrack?.ensurePlaying?.({ audible: soundtrack.soundOn !== false });
+        props.onContinue?.();
+      }}
+    />
+  );
+}
 
 export default function AuthGate({
   children,
@@ -123,16 +138,15 @@ export default function AuthGate({
     };
   }, [session, showWelcome, idleSuspended, logout]);
 
+  let gateBody;
   if (!ready) {
-    return (
+    gateBody = (
       <div className="login-page login-page--loading">
         <p className="login-loading">Loading…</p>
       </div>
     );
-  }
-
-  if (!session) {
-    return (
+  } else if (!session) {
+    gateBody = (
       <LoginPage
         onSubmit={handleLogin}
         error={loginError}
@@ -148,25 +162,30 @@ export default function AuthGate({
         onTeaserFullyBuffered={handleTeaserFullyBuffered}
       />
     );
+  } else {
+    const showApp = !deferUntilWelcome || !showWelcome;
+    gateBody = (
+      <AuthContext.Provider value={{ logout, session, setIdleSuspended }}>
+        {showApp && children}
+        {showWhatsApp && <WhatsAppButton />}
+        {showWelcome && (
+          <WelcomeWithSoundtrack
+            name={session.name}
+            onContinue={dismissWelcome}
+            entranceImage={entranceImage}
+            preloadEntranceImage={preloadEntranceImage}
+            productName={welcomeProduct}
+            projectLogo={projectLogo}
+            projectLogoAlt={projectLogoAlt}
+          />
+        )}
+      </AuthContext.Provider>
+    );
   }
 
-  const showApp = !deferUntilWelcome || !showWelcome;
-
   return (
-    <AuthContext.Provider value={{ logout, session, setIdleSuspended }}>
-      {showApp && children}
-      {showWhatsApp && <WhatsAppButton />}
-      {showWelcome && (
-        <WelcomeModal
-          name={session.name}
-          onContinue={dismissWelcome}
-          entranceImage={entranceImage}
-          preloadEntranceImage={preloadEntranceImage}
-          productName={welcomeProduct}
-          projectLogo={projectLogo}
-          projectLogoAlt={projectLogoAlt}
-        />
-      )}
-    </AuthContext.Provider>
+    <TourSoundtrackProvider src={loginBackgroundAudio}>
+      {gateBody}
+    </TourSoundtrackProvider>
   );
 }

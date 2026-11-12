@@ -1,8 +1,8 @@
 "use client";
 
 const LOGOS = {
-  white: "https://d3deuzgnmq8y32.cloudfront.net/adoptXR-logo/AdoptXR+Logo_white.png",
-  dark: "https://d3deuzgnmq8y32.cloudfront.net/adoptXR-logo/AdoptXR+Logo_dark.png",
+  white: "https://d38jpb447hexfu.cloudfront.net/adoptXR-logo/AdoptXR+Logo_white.png",
+  dark: "https://d38jpb447hexfu.cloudfront.net/adoptXR-logo/AdoptXR+Logo_dark.png",
 };
 
 /**

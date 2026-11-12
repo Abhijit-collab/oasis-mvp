@@ -5,6 +5,7 @@ build
 .DS_Store
 *.log
 .env*
+.sanity/
 .vercel
 public/oasis-360.mp4
 public/rev/

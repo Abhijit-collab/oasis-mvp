@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { isMobileTourDevice } from "@/lib/rotateGate";
 
 const TourSoundtrackContext = createContext(null);
 
@@ -23,9 +24,31 @@ export function TourSoundtrackProvider({ src = null, children }) {
   /** Was the bed actively playing when the tab was hidden? */
   const wasPlayingRef = useRef(false);
   const available = Boolean(src);
+  const [phone, setPhone] = useState(false);
 
   useEffect(() => {
-    if (!src) return undefined;
+    const sync = () => {
+      const onPhone = isMobileTourDevice();
+      setPhone(onPhone);
+      if (onPhone) {
+        try {
+          bedRef.current?.pause();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    window.addEventListener("orientationchange", sync);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("orientationchange", sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!src || isMobileTourDevice()) return undefined;
     const bed = bedRef.current;
     if (!bed) return undefined;
     bed.loop = true;
@@ -46,7 +69,7 @@ export function TourSoundtrackProvider({ src = null, children }) {
   // Phones block unmuted autoplay. The first tap is the unlock; the tour videos
   // must not be the thing that starts it, or iOS drops the soundtrack.
   useEffect(() => {
-    if (!src) return undefined;
+    if (!src || isMobileTourDevice()) return undefined;
     let done = false;
 
     const unlock = (e) => {
@@ -86,7 +109,7 @@ export function TourSoundtrackProvider({ src = null, children }) {
 
   // Pause soundtrack when the user leaves the tab/window; resume on return.
   useEffect(() => {
-    if (!src) return undefined;
+    if (!src || isMobileTourDevice()) return undefined;
 
     const bedEl = () => bedRef.current;
 
@@ -153,7 +176,7 @@ export function TourSoundtrackProvider({ src = null, children }) {
 
   const playAudible = useCallback(async () => {
     const bed = bedRef.current;
-    if (!bed || !src) return false;
+    if (!bed || !src || isMobileTourDevice()) return false;
     bed.loop = true;
     bed.playsInline = true;
     bed.muted = false;
@@ -182,7 +205,7 @@ export function TourSoundtrackProvider({ src = null, children }) {
 
   const playMuted = useCallback(async () => {
     const bed = bedRef.current;
-    if (!bed || !src) return;
+    if (!bed || !src || isMobileTourDevice()) return;
     bed.loop = true;
     bed.playsInline = true;
     bed.muted = true;
@@ -195,19 +218,19 @@ export function TourSoundtrackProvider({ src = null, children }) {
   }, [src]);
 
   const ensurePlaying = useCallback(async ({ audible = true } = {}) => {
-    if (!src) return false;
+    if (!src || isMobileTourDevice()) return false;
     if (audible) return playAudible();
     await playMuted();
     return true;
   }, [src, playAudible, playMuted]);
 
   const toggleSound = useCallback(() => {
+    const bed = bedRef.current;
+    if (!bed || !src || isMobileTourDevice()) return;
+
     const now = Date.now();
     if (now - lastToggleAt.current < 400) return;
     lastToggleAt.current = now;
-
-    const bed = bedRef.current;
-    if (!bed || !src) return;
 
     // Trust the element, not the icon. On a phone the icon can say "on"
     // while the bed is still paused, and that tap must start the music.
@@ -256,7 +279,7 @@ export function TourSoundtrackProvider({ src = null, children }) {
 
   return (
     <TourSoundtrackContext.Provider value={value}>
-      {src ? (
+      {src && !phone ? (
         <audio
           ref={bedRef}
           className="tour-soundtrack-bed"
@@ -268,7 +291,7 @@ export function TourSoundtrackProvider({ src = null, children }) {
       ) : null}
       {children}
       {/* Persistent across login, welcome, preload, booking — hidden on 360 (chrome has its own). */}
-      {src ? <SoundToggleButton className="tour-sound-btn--shell" /> : null}
+      {src && !phone ? <SoundToggleButton className="tour-sound-btn--shell" /> : null}
     </TourSoundtrackContext.Provider>
   );
 }

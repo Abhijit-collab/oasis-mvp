@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { isSlowNetwork, resolveClipUrl } from "@/hooks/usePreloadVideos";
+import { isMobileTourDevice } from "@/lib/rotateGate";
 
 const END_HOLD_PAD = 0.05;
 const END_HOLD_PAD_ANDROID = 0.18;
@@ -637,8 +638,11 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     finishingRef.current = false;
     clearStallWatch();
     clearEndedHandler();
+    // Phones keep the current frame covered until the new clip has decoded.
+    // On a laptop that cover is a second picture on top of the video and flickers.
+    const phone = isMobileTourDevice();
     const coverEl = hasFrameRef.current ? activeEl().current : null;
-    if (!holdStillOnRef.current && coverEl) {
+    if (phone && !holdStillOnRef.current && coverEl) {
       paintHoldStill(coverEl, { anyClient: true });
     }
 
@@ -680,15 +684,41 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     playEl.playbackRate = 1;
     playElRef.current = playEl;
 
-    // play() has to happen in this tap. Pause again when the decoded frame
-    // is still the previous clip so that clip cannot stay on screen.
+    // play() has to happen in this tap. On a phone, pause again when the
+    // decoded frame is still the previous clip so that clip cannot stay on screen.
     const playPromise = playEl.play();
-    if (needsSrc || playEl.seeking || playEl.currentTime > 0.05) {
+    if (phone && (needsSrc || playEl.seeking || playEl.currentTime > 0.05)) {
       try {
         playEl.pause();
       } catch {
         /* ignore */
       }
+    }
+
+    if (!phone) {
+      onPlayingChangeRef.current?.(true);
+      attachStallWatch(playEl, session);
+      (async () => {
+        try {
+          if (playPromise) await playPromise;
+        } catch {
+          kickBuffer(playEl, { keepPlaying: true });
+          await waitForData(playEl);
+          if (playSessionRef.current !== session) return;
+          try {
+            if (playEl.currentTime > 0.05) playEl.currentTime = 0;
+            await playEl.play();
+          } catch {
+            abortPlaySession(session);
+            return;
+          }
+        }
+        if (playSessionRef.current !== session) return;
+        await revealBuffer(playEl);
+        if (playSessionRef.current !== session) return;
+        attachEndedHandler(playEl, session, isBack);
+      })();
+      return true;
     }
 
     (async () => {

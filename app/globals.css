@@ -412,6 +412,11 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
   html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:grid!important}
   .be-stage-chrome .tour-sound-btn--explorer{display:none!important}
 }
+@media (hover: none) and (pointer: coarse) {
+  .tour-sound-btn,
+  html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell,
+  .be-stage-chrome .tour-sound-btn{display:none!important}
+}
 @media(orientation:landscape) and (max-height:480px){
   .be-fs-btn{
     right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px);

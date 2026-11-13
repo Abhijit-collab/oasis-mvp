@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { isSlowNetwork } from "@/hooks/usePreloadVideos";
+import { isSlowNetwork, resolveClipUrl } from "@/hooks/usePreloadVideos";
 
 const END_HOLD_PAD = 0.05;
 const END_HOLD_PAD_ANDROID = 0.18;
@@ -209,6 +209,12 @@ const sameClip = (a, b) => {
   return a === b || srcTail(a) === srcTail(b);
 };
 
+const clipOf = (el) => el?.dataset?.clip || el?.currentSrc || el?.src || "";
+const assignClip = (el, src) => {
+  el.dataset.clip = src;
+  el.src = resolveClipUrl(src);
+};
+
 /**
  * Dual-buffer video stage — always plays clips forward (use *-rev.mp4 for back nav).
  * Call beginPlay() from a click/tap handler so iOS allows playback under user gesture.
@@ -386,9 +392,9 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     const idx = bufIndex(el);
     const isActive = idx === activeIdx.current;
 
-    if (!sameClip(el.currentSrc || el.src, src)) {
+    if (!sameClip(clipOf(el), src)) {
       if (!isActive) markBufReady(idx, false);
-      el.src = src;
+      assignClip(el, src);
       kickBuffer(el);
       const ok = await waitForData(el);
       if (!ok) return false;
@@ -513,7 +519,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     const land = landAfterPlayRef.current;
     if (isBack && land?.clipSrc) {
       const landAt = land.holdAt ?? "end";
-      const playSrc = playEl.currentSrc || playEl.src;
+      const playSrc = clipOf(playEl);
 
       if (sameClip(playSrc, land.clipSrc)) {
         await freezeAtHold(playEl, landAt, { fromPlayEnd: true });
@@ -595,8 +601,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     const holdEl = hasFrameRef.current ? activeEl().current : null;
     const inactive = inactiveEl().current;
 
-    const activeHas = holdEl && sameClip(holdEl.currentSrc || holdEl.src, src);
-    const inactiveHas = inactive && sameClip(inactive.currentSrc || inactive.src, src);
+    const activeHas = holdEl && sameClip(clipOf(holdEl), src);
+    const inactiveHas = inactive && sameClip(clipOf(inactive), src);
 
     let playEl;
     if (!isBack && activeHas) {
@@ -609,8 +615,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     if (!playEl) return false;
 
     // Assign src synchronously under the gesture when needed.
-    if (!sameClip(playEl.currentSrc || playEl.src, src)) {
-      playEl.src = src;
+    if (!sameClip(clipOf(playEl), src)) {
+      assignClip(playEl, src);
     }
 
     try {
@@ -699,7 +705,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       const back = inactiveEl().current;
       if (!visible) return;
 
-      const visibleHasClip = sameClip(visible.currentSrc || visible.src, clipSrc);
+      const visibleHasClip = sameClip(clipOf(visible), clipSrc);
 
       if (visibleHasClip) {
         // Android already snapped a still after soft-end — don't kick/seek again (tears + overlap).
@@ -731,7 +737,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       const warmEl = inactiveEl().current;
       if (!warmEl) return;
       markBufReady(bufIndex(warmEl), false);
-      if (!sameClip(warmEl.currentSrc || warmEl.src, warmSrc)) {
+      if (!sameClip(clipOf(warmEl), warmSrc)) {
         const warmed = await loadClip(warmEl, warmSrc, { markReady: false });
         if (cancelled || !warmed) return;
       }

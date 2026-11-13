@@ -11,6 +11,7 @@ import { ENTRANCE_IMAGE as DEFAULT_ENTRANCE_IMAGE } from "@/data/assets";
 
 const STORAGE_KEY = "oasis_access";
 const IDLE_TIMEOUT_MS = 120 * 1000;
+const TOUR_PRELOAD_FALLBACK_MS = 8000;
 
 const IDLE_EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
 
@@ -38,6 +39,9 @@ export default function AuthGate({
   loginBrand = null,
   welcomeProduct = "The Oasis",
   loginBackgroundVideo = null,
+  loginBackgroundPoster = null,
+  loginBackgroundVideoMobile = null,
+  useMobileTeaser = false,
   loginBackgroundAudio = null,
   loginMinimal = false,
   projectLogo = null,
@@ -76,6 +80,12 @@ export default function AuthGate({
     if (!preloadTourAfterLogin) return;
     // Teaser done — start Seq/Rev warm while user is still on login.
     preloadTourAssetsAfterLogin();
+  }, [preloadTourAfterLogin, preloadTourAssetsAfterLogin]);
+
+  useEffect(() => {
+    if (!preloadTourAfterLogin) return undefined;
+    const t = setTimeout(() => preloadTourAssetsAfterLogin(), TOUR_PRELOAD_FALLBACK_MS);
+    return () => clearTimeout(t);
   }, [preloadTourAfterLogin, preloadTourAssetsAfterLogin]);
 
   useEffect(() => {
@@ -155,6 +165,9 @@ export default function AuthGate({
         accent={loginBrand?.accent}
         codePlaceholder={loginBrand?.codePlaceholder}
         backgroundVideo={loginBackgroundVideo}
+        backgroundPoster={loginBackgroundPoster}
+        backgroundVideoMobile={loginBackgroundVideoMobile}
+        useMobileTeaser={useMobileTeaser}
         backgroundAudio={loginBackgroundAudio}
         minimal={loginMinimal}
         projectLogo={projectLogo}

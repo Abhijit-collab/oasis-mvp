@@ -26,6 +26,10 @@ export const ELEVATION_IMAGE = CDN_IMAGES.elevation;
 export const START_IMAGE = CDN_IMAGES.mainGate;
 /** Login page full-bleed background loop */
 export const LOGIN_BG_VIDEO = cdnUrl("teaser/Websiteteaser.mp4");
+export const LOGIN_BG_POSTER = cdnUrl("teaser/Websiteteaser_poster.webp");
+export const LOGIN_BG_VIDEO_MOBILE = cdnUrl("teaser-m/Websiteteaser.mp4");
+/** Flip to true once the 720p teaser is uploaded. */
+export const USE_MOBILE_TEASER = false;
 /** Desktop login teaser soundtrack (plays with the video) */
 export const LOGIN_BG_AUDIO = cdnUrl("music-cover-video/short++music.mp3.mpeg");
 

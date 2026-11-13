@@ -28,6 +28,9 @@ html:has(.be-root),body:has(.be-root){
    and the SVG overlay uses preserveAspectRatio="none", so both distort the same
    way -> the entire image shows, fills the screen, and zones stay aligned. */
 .be-stage{position:absolute;inset:0;width:100%;height:100%;line-height:0;background:#06070a}
+.clip-wait{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:5}
+.clip-wait span{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.25);border-top-color:#d8b65a;animation:cw .8s linear infinite}
+@keyframes cw{to{transform:rotate(360deg)}}
 .be-stage-chrome{
   position:absolute;inset:0;z-index:36;pointer-events:none}
 .be-stage-chrome .be-fs-btn,
@@ -1944,4 +1947,11 @@ html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
 .pg-overlay--phone.pg-overlay--landscape .pg-nav--next{right:max(10px,env(safe-area-inset-right,0px))}
 .pg-overlay--phone.pg-overlay--landscape .pg-count{
   bottom:max(12px,env(safe-area-inset-bottom,0px))}
+.slow-net{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  z-index:50;display:flex;align-items:center;gap:12px;max-width:min(92vw,460px);padding:12px 14px;
+  background:rgba(12,14,18,.82);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border:1px solid rgba(216,182,90,.45);border-radius:12px;color:#f3ead2;font-size:13px;line-height:1.4;
+  animation:sn .3s ease}
+.slow-net button{flex:none;background:none;border:0;color:#d8b65a;font-size:16px;cursor:pointer;padding:4px}
+@keyframes sn{from{opacity:0;transform:translate(-50%,8px)}}
 

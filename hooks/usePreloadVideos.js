@@ -7,8 +7,16 @@ const MOBILE_CLIP_TIMEOUT_MS = 150000;
 const SLOW_CLIP_TIMEOUT_MS = 180000;
 /** Cap parallel full-buffer downloads so Slow/Fast 4G isn't saturated by 9 MP4s. */
 const FULL_CONCURRENCY = 3;
-const MOBILE_CONCURRENCY = 2;
+const MOBILE_CONCURRENCY = 1;
 const SLOW_CONCURRENCY = 1;
+/** Flip to true once the 720p clip folders are uploaded. */
+const USE_MOBILE_SET = false;
+const MOBILE_FOLDERS = [
+  ["/24fps-video-comp/", "/24fps-video-comp-m/"],
+  ["/24fps-comp-rev/", "/24fps-comp-rev-m/"],
+];
+const BYTE_PROGRESS_MS = 250;
+const FALLBACK_CLIP_BYTES = 2_000_000;
 
 function connectionInfo() {
   if (typeof navigator === "undefined") return null;
@@ -28,6 +36,24 @@ export function isSlowNetwork() {
   return false;
 }
 
+// ===== MEASURED SPEED =====
+const SLOW_MBPS = 2;
+const MIN_SAMPLE_BYTES = 200_000;
+let lastMbps = null;
+
+function recordSpeed(bytes, ms) {
+  if (bytes < MIN_SAMPLE_BYTES || ms <= 0) return;
+  lastMbps = (bytes * 8) / (ms / 1000) / 1_000_000;
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("oasis-speed"));
+}
+
+export const measuredMbps = () => lastMbps;
+
+/** Slow = browser reports slow OR measured clip download speed is low. */
+export function isConnectionSlow() {
+  return isSlowNetwork() || (lastMbps !== null && lastMbps < SLOW_MBPS);
+}
+
 function isMobileClient() {
   if (typeof window === "undefined") return false;
   return (
@@ -36,10 +62,13 @@ function isMobileClient() {
   );
 }
 
-function bufferReadyThreshold() {
-  // Slow 4G: unlock with a smaller head of each gated clip.
-  if (isSlowNetwork()) return 0.35;
-  return 0.55;
+/** Swap in a 720p folder on phones and slow networks once those files exist. */
+function variantUrl(url) {
+  if (!url || !USE_MOBILE_SET || !(isMobileClient() || isSlowNetwork())) return url;
+  for (const [from, to] of MOBILE_FOLDERS) {
+    if (url.includes(from)) return url.replace(from, to);
+  }
+  return url;
 }
 
 function clipTimeoutMs() {
@@ -54,87 +83,86 @@ function store() {
     g.__oasisVideoPrefetch = {
       /** url -> { depth: 'metadata' | 'full', promise } */
       cache: new Map(),
-      /** url -> HTMLVideoElement kept alive after full preload */
+      /** url -> HTMLVideoElement kept alive after a metadata preload */
       retained: new Map(),
+      /** original desktop url -> object URL. Never revoked. */
+      blobs: new Map(),
+      /** original desktop url -> in-flight blob download */
+      blobJobs: new Map(),
+      /** original desktop url -> { loaded, total } */
+      bytes: new Map(),
     };
+  } else {
+    const slot = g.__oasisVideoPrefetch;
+    if (!slot.blobs) slot.blobs = new Map();
+    if (!slot.blobJobs) slot.blobJobs = new Map();
+    if (!slot.bytes) slot.bytes = new Map();
   }
   return g.__oasisVideoPrefetch;
 }
 
-function ensureRetainedHost() {
-  if (typeof document === "undefined") return null;
-  let host = document.getElementById("oasis-video-preload-host");
-  if (!host) {
-    host = document.createElement("div");
-    host.id = "oasis-video-preload-host";
-    host.setAttribute("aria-hidden", "true");
-    host.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none";
-    document.body.appendChild(host);
-  }
-  return host;
+/** True once the original URL has a blob URL in memory. */
+export function isClipReady(url) {
+  return Boolean(url) && store().blobs.has(url);
 }
 
-function bufferCoverage(video) {
-  if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return 0;
-  if (!video.buffered?.length) return 0;
-  let maxEnd = 0;
-  for (let i = 0; i < video.buffered.length; i += 1) {
-    maxEnd = Math.max(maxEnd, video.buffered.end(i));
-  }
-  return Math.min(1, maxEnd / video.duration);
+/** Blob URL when the clip is downloaded, otherwise the original URL. */
+export function resolveClipUrl(url) {
+  return store().blobs.get(url) || url;
 }
 
-/** Timeout: accept a playable head of the clip so slower networks still unlock. */
-function timeoutLooksPlayable(video, need, depth) {
-  if (depth !== "full") return video.readyState >= HTMLMediaElement.HAVE_METADATA;
-  const cover = bufferCoverage(video);
-  if (cover >= need) return true;
-  if (cover >= Math.min(0.4, need)) return true;
-  if (isSlowNetwork() && cover >= 0.2) return true;
-  if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
-  if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA && cover >= 0.12) return true;
-  return false;
+/** Bytes received for the original URL. */
+export function clipBytes(url) {
+  return store().bytes.get(url) || { loaded: 0, total: 0 };
 }
 
-/** Watch an existing <video> until it hits the buffer threshold (no second download). */
-function waitForBuffer(video, url, need) {
-  return new Promise((resolve) => {
-    if (!video) {
-      resolve({ url, ok: false });
-      return;
+/**
+ * Download a clip fully into a blob URL. Deduped per original URL.
+ * Resolves { url, ok } and never throws. A failure can be retried.
+ */
+export function loadClipBlob(url) {
+  if (!url) return Promise.resolve({ url, ok: false });
+  const bucket = store();
+  if (bucket.blobs.has(url)) return Promise.resolve({ url, ok: true });
+  const inflight = bucket.blobJobs.get(url);
+  if (inflight) return inflight;
+
+  const job = (async () => {
+    try {
+      const t0 = performance.now();
+      const res = await fetch(variantUrl(url), { mode: "cors" });
+      if (!res.ok || !res.body) {
+        const error = new Error("clip fetch failed");
+        error.status = res.status || 0;
+        throw error;
+      }
+      const totalHeader = Number(res.headers.get("Content-Length"));
+      const total = Number.isFinite(totalHeader) && totalHeader > 0 ? totalHeader : 0;
+      bucket.bytes.set(url, { loaded: 0, total });
+
+      const reader = res.body.getReader();
+      const chunks = [];
+      let loaded = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.byteLength;
+        store().bytes.set(url, { loaded, total });
+      }
+      recordSpeed(loaded, performance.now() - t0);
+
+      const objectUrl = URL.createObjectURL(new Blob(chunks, { type: "video/mp4" }));
+      store().blobs.set(url, objectUrl);
+      return { url, ok: true };
+    } catch (error) {
+      store().blobJobs.delete(url);
+      return { url, ok: false, status: Number(error?.status) || 0 };
     }
-    if (bufferCoverage(video) >= need) {
-      resolve({ url, ok: true });
-      return;
-    }
+  })();
 
-    let settled = false;
-    const finish = (ok) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      clearInterval(poll);
-      video.removeEventListener("progress", onProg);
-      video.removeEventListener("loadeddata", onProg);
-      video.removeEventListener("canplaythrough", onProg);
-      video.removeEventListener("error", onErr);
-      resolve({ url, ok });
-    };
-
-    const onProg = () => {
-      if (bufferCoverage(video) >= need) finish(true);
-    };
-    const onErr = () => finish(false);
-
-    const poll = setInterval(onProg, 400);
-    const timer = setTimeout(() => finish(timeoutLooksPlayable(video, need, "full")), clipTimeoutMs());
-
-    video.addEventListener("progress", onProg);
-    video.addEventListener("loadeddata", onProg);
-    video.addEventListener("canplaythrough", onProg);
-    video.addEventListener("error", onErr, { once: true });
-  });
+  bucket.blobJobs.set(url, job);
+  return job;
 }
 
 function preloadOne(url, depth = "metadata") {
@@ -144,131 +172,44 @@ function preloadOne(url, depth = "metadata") {
       return;
     }
 
-    const { retained } = store();
-    const need = bufferReadyThreshold();
-
-    // Reuse in-flight / retained element — never open a second network load for the same URL.
-    if (depth === "full" && retained.has(url)) {
-      waitForBuffer(retained.get(url), url, need).then(resolve);
+    if (depth === "full") {
+      loadClipBlob(url).then(resolve);
       return;
     }
 
+    const { retained } = store();
     const video = document.createElement("video");
-    video.preload = depth === "full" ? "auto" : "metadata";
+    video.preload = "metadata";
     video.muted = true;
     video.playsInline = true;
     video.setAttribute("playsinline", "");
     video.setAttribute("webkit-playsinline", "");
-    video.setAttribute("data-oasis-preload", depth);
+    video.setAttribute("data-oasis-preload", "metadata");
 
     let settled = false;
     const settle = (ok) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      clearInterval(poll);
-      video.removeEventListener("canplaythrough", onFullReady);
-      video.removeEventListener("loadeddata", onPartial);
       video.removeEventListener("loadedmetadata", onMetaReady);
-      video.removeEventListener("progress", onProgress);
       video.removeEventListener("error", onError);
-
-      if (depth === "metadata") {
-        retained.delete(url);
-        video.removeAttribute("src");
-        video.load();
-        video.remove();
-      } else if (ok) {
-        if (isMobileClient()) {
-          // Phones: HTTP cache is warm; free decoder slots for OrbitClipStage.
-          retained.delete(url);
-          try {
-            video.pause();
-          } catch {
-            /* ignore */
-          }
-          video.removeAttribute("src");
-          video.load();
-          video.remove();
-        } else {
-          const host = ensureRetainedHost();
-          if (host && video.parentNode !== host) host.appendChild(video);
-          retained.set(url, video);
-        }
-      } else {
-        retained.delete(url);
-        video.removeAttribute("src");
-        video.load();
-        video.remove();
-      }
-
+      retained.delete(url);
+      video.removeAttribute("src");
+      video.load();
+      video.remove();
       resolve({ url, ok });
     };
 
-    const onFullReady = () => {
-      if (bufferCoverage(video) >= need) settle(true);
-    };
     const onMetaReady = () => settle(true);
-    const onPartial = () => {
-      if (depth === "full" && bufferCoverage(video) >= need) settle(true);
-      else if (depth !== "full" && video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
-        settle(true);
-      }
-    };
-    const onProgress = () => {
-      if (depth === "full" && bufferCoverage(video) >= need) settle(true);
-    };
     const onError = () => settle(false);
-
-    const poll =
-      depth === "full"
-        ? setInterval(() => {
-            if (bufferCoverage(video) >= need) settle(true);
-          }, 400)
-        : null;
-
     const timer = setTimeout(
-      () => settle(timeoutLooksPlayable(video, need, depth)),
+      () => settle(video.readyState >= HTMLMediaElement.HAVE_METADATA),
       clipTimeoutMs()
     );
 
-    if (depth === "full") {
-      video.addEventListener("canplaythrough", onFullReady);
-      video.addEventListener("loadeddata", onPartial);
-      video.addEventListener("progress", onProgress);
-    } else {
-      video.addEventListener("loadedmetadata", onMetaReady, { once: true });
-    }
+    video.addEventListener("loadedmetadata", onMetaReady, { once: true });
     video.addEventListener("error", onError, { once: true });
-
-    if (depth === "full") {
-      const host = ensureRetainedHost();
-      host?.appendChild(video);
-      // Claim immediately so a parallel prefetch (login + 360 gate) cannot spawn a twin.
-      retained.set(url, video);
-    }
-
-    // Setting src starts the fetch — do NOT also call load() (duplicates every clip).
     video.src = url;
-
-  // Kick buffering on desktop too (helps under throttled networks).
-    if (depth === "full") {
-      const kick = video.play();
-      if (kick?.then) {
-        kick
-          .then(() => {
-            try {
-              video.pause();
-              if (video.currentTime > 0) video.currentTime = 0;
-            } catch {
-              /* ignore */
-            }
-          })
-          .catch(() => {
-            /* autoplay blocked — progress/timeout still apply */
-          });
-      }
-    }
   });
 }
 
@@ -336,7 +277,7 @@ export const prefetchVideo = (url, { depth = "metadata", force = false } = {}) =
   const { cache, retained } = store();
   const existing = cache.get(url);
 
-  if (existing && !(force && depth === "full" && !retained.has(url))) {
+  if (existing && !(force && depth === "full" && !retained.has(url) && !isClipReady(url))) {
     if (depth === "full" && existing.depth === "metadata") {
       const upgraded = {
         depth: "full",
@@ -358,19 +299,12 @@ export const prefetchVideo = (url, { depth = "metadata", force = false } = {}) =
 };
 
 /**
- * True when every URL already has a retained buffer at/above the full-preload threshold.
- * Used to decide adaptive gate: priority-ready → wait for all; else wait for priority only.
+ * True when every URL is fully downloaded into a blob URL.
  */
 export function areUrlsBufferedEnough(urls) {
   const list = [...new Set((urls || []).filter(Boolean))];
   if (!list.length) return true;
-  const { retained } = store();
-  const need = bufferReadyThreshold();
-  return list.every((url) => {
-    const video = retained.get(url);
-    if (!video) return false;
-    return bufferCoverage(video) >= need || timeoutLooksPlayable(video, need, "full");
-  });
+  return list.every((url) => isClipReady(url));
 }
 
 /** Free hidden preload <video>s so the tour stage can decode/play on iOS. */
@@ -394,7 +328,7 @@ export function releaseRetainedPreloadVideos() {
 
 /**
  * Preload video URLs. Reuses post-login prefetch work.
- * Full-depth lists only become ready when every clip hits the buffer threshold.
+ * Full-depth lists only become ready when every clip is a blob URL.
  * @param {string[]} urls
  * @param {{ depth?: 'metadata' | 'full' }} [options]
  */
@@ -415,13 +349,34 @@ export default function usePreloadVideos(urls, { depth = "metadata" } = {}) {
     }
 
     let cancelled = false;
+    let settled = false;
     let done = 0;
+    let timer = null;
+
+    const tickBytes = () => {
+      if (cancelled || settled) return;
+      let loaded = 0;
+      let total = 0;
+      for (const url of list) {
+        const sample = clipBytes(url);
+        loaded += sample.loaded;
+        total += sample.total > 0 ? sample.total : FALLBACK_CLIP_BYTES;
+      }
+      const ratio = total > 0 ? (loaded / total) * 100 : 0;
+      const allReady = list.every((url) => isClipReady(url));
+      setProgress(allReady ? 100 : Math.min(99, Math.round(ratio)));
+    };
+
+    if (depth === "full") {
+      tickBytes();
+      timer = setInterval(tickBytes, BYTE_PROGRESS_MS);
+    }
 
     (async () => {
       // Prefetch already queues; mapPool can await all promises without re-parallelizing downloads.
       const results = await mapPool(list, list.length, async (url) => {
         const result = await prefetchVideo(url, { depth });
-        if (!cancelled) {
+        if (!cancelled && depth !== "full") {
           done += 1;
           setProgress(Math.round((done / list.length) * 100));
         }
@@ -429,14 +384,17 @@ export default function usePreloadVideos(urls, { depth = "metadata" } = {}) {
       });
 
       if (cancelled) return;
-      const failed = results.filter((r) => !r.ok).length;
+      settled = true;
+      if (timer) clearInterval(timer);
+      const failed = results.filter((r) => r && !r.ok && r.status >= 400).length;
       setFailedCount(failed);
       setReady(true);
-      if (failed === 0) setProgress(100);
+      setProgress(100);
     })();
 
     return () => {
       cancelled = true;
+      if (timer) clearInterval(timer);
     };
   }, [listKey, depth]);
 

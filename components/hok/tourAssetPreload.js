@@ -7,26 +7,20 @@ export const ORBIT_STEP_PRELOAD_URLS = [
   ...ORBIT_STEP_CLIPS_REVERSE.filter(Boolean),
 ];
 
-/**
- * Gate / first wave:
- * Seq1–5 first (Seq4 was stalling arrows on Slow 4G when only 1–3 were gated).
- * Rev9 only for wrap-back — other reverses wait so forwards keep the pipe.
- */
+/** Gate / first wave: Seq1–Seq3 only. The rest download behind them. */
 export const ORBIT_PRIORITY_PRELOAD_URLS = [
   ORBIT_STEP_CLIPS[0],
   ORBIT_STEP_CLIPS[1],
   ORBIT_STEP_CLIPS[2],
-  ORBIT_STEP_CLIPS[3],
-  ORBIT_STEP_CLIPS[4],
-  ORBIT_STEP_CLIPS_REVERSE[8],
 ].filter(Boolean);
 
-/** After the gate: prefer leftover forward clips, then leftover reverses. */
+/** After the gate: Seq4–Seq9, then Rev9, then Rev1–Rev8. */
 export function orbitBackgroundPreloadUrls(priorityUrls = ORBIT_PRIORITY_PRELOAD_URLS) {
   const priority = new Set(priorityUrls.filter(Boolean));
   const forwards = ORBIT_STEP_CLIPS.filter((url) => url && !priority.has(url));
-  const reverses = ORBIT_STEP_CLIPS_REVERSE.filter((url) => url && !priority.has(url));
-  return [...forwards, ...reverses];
+  const rev9 = ORBIT_STEP_CLIPS_REVERSE[8];
+  const revEarly = ORBIT_STEP_CLIPS_REVERSE.slice(0, 8);
+  return [...forwards, rev9, ...revEarly].filter((url) => url && !priority.has(url));
 }
 
 let entranceImagePromise = null;
@@ -78,27 +72,6 @@ export function preloadTourAssetsAfterLogin() {
   if (g.__oasisTourPrefetchStarted) return;
   g.__oasisTourPrefetchStarted = true;
 
-  const priority = new Set(ORBIT_PRIORITY_PRELOAD_URLS);
   ORBIT_PRIORITY_PRELOAD_URLS.forEach((url) => prefetchVideo(url, { depth: "full" }));
-
-  const rest = orbitBackgroundPreloadUrls(ORBIT_PRIORITY_PRELOAD_URLS);
-  // Delay leftover clips so Seq1–5 + Rev9 claim bandwidth (longer on Slow 4G / phones).
-  const warmRest = () => {
-    rest.forEach((url) => prefetchVideo(url, { depth: "full" }));
-  };
-  const slow =
-    typeof navigator !== "undefined" &&
-    (() => {
-      const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-      if (!c) return false;
-      if (c.saveData) return true;
-      const t = String(c.effectiveType || "").toLowerCase();
-      return t === "slow-2g" || t === "2g" || t === "3g" || (typeof c.downlink === "number" && c.downlink > 0 && c.downlink <= 2.2);
-    })();
-  const delayMs = slow ? 8000 : 1200;
-  if (typeof requestIdleCallback === "function") {
-    requestIdleCallback(warmRest, { timeout: Math.max(2500, delayMs) });
-  } else {
-    setTimeout(warmRest, delayMs);
-  }
+  orbitBackgroundPreloadUrls().forEach((url) => prefetchVideo(url, { depth: "full" }));
 }

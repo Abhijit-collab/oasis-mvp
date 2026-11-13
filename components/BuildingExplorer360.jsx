@@ -19,11 +19,12 @@ import { useAuth } from "@/components/auth/AuthContext";
 import usePreloadVideos, {
   releaseRetainedPreloadVideos,
   areUrlsBufferedEnough,
-  prefetchVideo,
-  isSlowNetwork,
+  isClipReady,
+  loadClipBlob,
 } from "@/hooks/usePreloadVideos";
 import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
+import SlowNetworkNotice from "@/components/SlowNetworkNotice";
 import RotateButton from "@/components/RotateButton";
 import { getOrbitStepZones as defaultGetOrbitStepZones } from "@/data/orbit360Zones";
 import { ORBIT_STEP_PRELOAD_URLS as DEFAULT_PRELOAD_URLS } from "@/lib/tourAssetPreload";
@@ -37,6 +38,8 @@ import { isUnitSold } from "@/lib/unitStatus";
 import { useFilterPanelSelectionSync } from "@/hooks/useFilterPanelSelectionSync";
 
 const TOUR_REVEAL_MS = 900;
+const CLIP_WAIT_MAX_MS = 15000;
+const LONG_WAIT_MS = 2000;
 
 function OrbitSideChevron({ dir = "r" }) {
   const id = `be-orbit-grad-${dir}`;
@@ -232,13 +235,18 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const [isPhoneChrome, setIsPhoneChrome] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
 
-  // Prefetch the clip after next so Seq4 is warm while viewing Seq2/3.
+  // Jump the next clips ahead of the shared download queue once the tour is open.
   useEffect(() => {
-    if (!tourRevealed || isPlaying) return undefined;
-    const ahead = forwardClipAtStep(nextStepForward(step));
-    if (ahead) prefetchVideo(ahead, { depth: "full", force: isSlowNetwork() });
+    if (!tourRevealed) return undefined;
+    const next = forwardClipAtStep(step);
+    const after = forwardClipAtStep(nextStepForward(step));
+    const afterThat = forwardClipAtStep(nextStepForward(nextStepForward(step)));
+    const back = backClipAtStep(step);
+    [next, after, afterThat, back].forEach((src) => {
+      if (src) loadClipBlob(src);
+    });
     return undefined;
-  }, [step, tourRevealed, isPlaying]);
+  }, [step, tourRevealed]);
 
   // Only block the tour if every gated clip failed (partial success still opens).
   const clipsFailed = assetsReady && preloadTotal > 0 && failedCount >= preloadTotal;
@@ -539,16 +547,34 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     hasReverseClips && !isPlaying && !pendingRef.current && !homeResetting;
   const canNext = !isPlaying && !pendingRef.current && !homeResetting;
   const holdAt = holdAtOverride ?? holdAtForStep(step);
+  const [clipWaiting, setClipWaiting] = useState(false);
+  const [longWait, setLongWait] = useState(false);
+  useEffect(() => {
+    if (!clipWaiting) { setLongWait(false); return undefined; }
+    const t = setTimeout(() => setLongWait(true), LONG_WAIT_MS);
+    return () => clearTimeout(t);
+  }, [clipWaiting]);
 
-  const goNext = () => {
+  const ensureClip = async (src) => {
+    if (!src || isClipReady(src)) return;
+    setClipWaiting(true);
+    await Promise.race([
+      loadClipBlob(src),
+      new Promise((resolve) => setTimeout(resolve, CLIP_WAIT_MAX_MS)),
+    ]);
+    setClipWaiting(false);
+  };
+
+  const goNext = async () => {
     if (!canNext) return;
+    pendingRef.current = true;
     const fromStep = stepRef.current;
     const src = ORBIT_STEP_CLIPS[fromStep >= ORBIT_STEP_COUNT ? 0 : fromStep];
+    await ensureClip(src);
     const token = Date.now();
 
     clearTimeout(loopFadeTimerRef.current);
     setHoldAtOverride(null);
-    pendingRef.current = true;
     setLandAfterPlay(null);
     setClipSrc(src);
     setPlayDirection("forward");
@@ -565,16 +591,17 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     if (!started) handlePlayFailed();
   };
 
-  const goPrev = () => {
+  const goPrev = async () => {
     if (!canPrev) return;
     pendingRef.current = true;
     const fromStep = stepRef.current;
-    const landStep = prevStep(fromStep);
     const reverseClip = ORBIT_STEP_CLIPS_REVERSE[reverseClipIndexForBack(fromStep)];
     if (!reverseClip) {
       pendingRef.current = false;
       return;
     }
+    await ensureClip(reverseClip);
+    const landStep = prevStep(fromStep);
 
     const land = {
       clipSrc: holdClipForStep(landStep),
@@ -938,6 +965,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
               onPrepareHomeReady={handlePrepareHomeReady}
               onHoldFrameReady={handleHoldFrameReady}
             />
+            {clipWaiting && (
+              <div className="clip-wait">
+                <span />
+              </div>
+            )}
+            {tourRevealed && !showPreload && <SlowNetworkNotice force={longWait} />}
 
             {showStartImage && (
               <img

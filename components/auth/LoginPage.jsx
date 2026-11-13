@@ -89,6 +89,9 @@ export default function LoginPage({
   accent = "OASIS",
   codePlaceholder = "e.g. OASIS-VIP",
   backgroundVideo = null,
+  backgroundPoster = null,
+  backgroundVideoMobile = null,
+  useMobileTeaser = false,
   /** Desktop-only teaser soundtrack — plays in sync with the muted background video. */
   backgroundAudio = null,
   /** HOK: strip brand, badge, copy, perks, and name field */
@@ -476,6 +479,8 @@ export default function LoginPage({
   // Prevent focused inputs from stealing the first tap (iOS / mobile keyboard blur).
   const keepTapOnButton = (e) => e.preventDefault();
 
+  const teaserSrc =
+    useMobileTeaser && !isDesktop && backgroundVideoMobile ? backgroundVideoMobile : backgroundVideo;
   const showBrand = !minimal && (eyebrow || title || accent);
   const showDesktopIntro = Boolean(backgroundVideo && isDesktop && !desktopTeaserGate);
   const revealChrome = !showDesktopIntro;
@@ -500,7 +505,8 @@ export default function LoginPage({
               "login-bg-video"
               + (isDesktop && !desktopTeaserGate ? " login-bg-video--pending" : "")
             }
-            src={backgroundVideo}
+            src={teaserSrc}
+            poster={backgroundPoster || undefined}
             muted
             loop
             playsInline

@@ -1,3 +1,5 @@
+import SlowNetworkNotice from "@/components/SlowNetworkNotice";
+
 /** Full-screen tour buffering — shown after "Enter your private tour". */
 export default function TourPreloadScreen({
   progress = 0,
@@ -47,6 +49,7 @@ export default function TourPreloadScreen({
         </div>
       )}
       <p className="be-preload-pct">{pct}%</p>
+      <SlowNetworkNotice />
     </div>
   );
 }

@@ -19,6 +19,7 @@ export function TourSoundtrackProvider({ src = null, children }) {
   soundOnRef.current = soundOn;
   /** False after the user explicitly mutes, so a later tap does not force sound back on. */
   const wantAudibleRef = useRef(true);
+  const lastToggleAt = useRef(0);
   /** Was the bed actively playing when the tab was hidden? */
   const wasPlayingRef = useRef(false);
   const available = Boolean(src);
@@ -201,6 +202,10 @@ export function TourSoundtrackProvider({ src = null, children }) {
   }, [src, playAudible, playMuted]);
 
   const toggleSound = useCallback(() => {
+    const now = Date.now();
+    if (now - lastToggleAt.current < 400) return;
+    lastToggleAt.current = now;
+
     const bed = bedRef.current;
     if (!bed || !src) return;
 
@@ -284,12 +289,11 @@ export function SoundToggleButton({ className = "", placement = "global" }) {
     <button
       type="button"
       className={cls}
-      onClick={(e) => {
+      onPointerUp={(e) => {
         e.preventDefault();
         e.stopPropagation();
         toggleSound();
       }}
-      onPointerDown={(e) => e.stopPropagation()}
       aria-label={soundOn ? "Mute soundtrack" : "Unmute soundtrack"}
       aria-pressed={soundOn}
       title={soundOn ? "Mute" : "Unmute"}

@@ -365,7 +365,7 @@ html.be-ios .be-orbit-arw--r{right:var(--be-orbit-inset-r)!important;left:auto!i
   background:rgba(8,10,14,.55);border:1px solid rgba(255,255,255,.22);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
   box-shadow:0 8px 24px rgba(0,0,0,.35);
-  -webkit-tap-highlight-color:transparent;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
   transition:background .18s,border-color .18s,transform .18s,color .18s}
 .tour-sound-btn--on{
   border-color:rgba(216,182,90,.55);color:var(--gold-bright,#f2d27e)}
@@ -408,6 +408,9 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
     bottom:max(96px,calc(env(safe-area-inset-bottom,0px) + 88px));
     top:auto;
     z-index:40}
+  /* The in-tour control sits under the orbit layer on phones. Use the shell button. */
+  html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:grid!important}
+  .be-stage-chrome .tour-sound-btn--explorer{display:none!important}
 }
 @media(orientation:landscape) and (max-height:480px){
   .be-fs-btn{

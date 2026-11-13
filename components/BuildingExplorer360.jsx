@@ -758,10 +758,11 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
     if (direction === "back") {
       clearTimeout(loopFadeTimerRef.current);
-      setHoldAtOverride(null);
       newStep = prevStep(stepRef.current);
       setStep(newStep);
-      setClipSrc(holdClipForStep(newStep));
+      // Keep the reverse clip's last frame. Replacing it with the forward
+      // file forces a seek-to-end and locks the picture.
+      setHoldAtOverride("end");
     } else {
       newStep = nextStepForward(stepRef.current);
       setStep(newStep);

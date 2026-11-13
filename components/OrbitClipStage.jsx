@@ -443,7 +443,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     } else {
       const pad = isAndroidClient() ? END_HOLD_PAD_ANDROID : END_HOLD_PAD;
       const target = Math.max(0, el.duration - pad);
-      if (Math.abs((el.currentTime || 0) - target) > 0.03) {
+      const alreadyEnded = el.ended || (el.currentTime || 0) >= el.duration - 0.3;
+      if (!alreadyEnded && Math.abs((el.currentTime || 0) - target) > 0.03) {
         await seekAndWait(el, target);
       }
     }
@@ -583,33 +584,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
 
     const land = landAfterPlayRef.current;
     if (isBack && land?.clipSrc) {
-      const landAt = land.holdAt ?? "end";
-      const playSrc = clipOf(playEl);
-
-      if (sameClip(playSrc, land.clipSrc)) {
-        await freezeAtHold(playEl, landAt, { fromPlayEnd: true });
-        if (playSessionRef.current !== session) return;
-        onPlayingChangeRef.current?.(false);
-        onCompleteRef.current?.("back");
-        return;
-      }
-
-      const landEl = inactiveEl().current;
-      const landReady = landEl
-        ? await loadClip(landEl, land.clipSrc, { markReady: false })
-        : false;
-
-      if (playSessionRef.current !== session) return;
-
-      if (landReady && landEl) {
-        await freezeAtHold(landEl, landAt);
-        if (playSessionRef.current !== session) return;
-        const shown = await revealBuffer(landEl);
-        if (!shown) await freezeAtHold(playEl, "end", { fromPlayEnd: true });
-      } else {
-        await freezeAtHold(playEl, "end", { fromPlayEnd: true });
-      }
-
+      // The reverse file already ends on the previous view. Swapping to the
+      // forward clip and seeking it to the end freezes the phone for seconds.
       onPlayingChangeRef.current?.(false);
       onCompleteRef.current?.("back");
       return;

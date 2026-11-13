@@ -160,6 +160,45 @@ const startWarmCoverage = (el, { need = WARM_COVERAGE(), timeoutMs = WARM_COVERA
   };
 };
 
+/** True only after the src just assigned has actually decoded a frame. */
+const assignedFrameReady = (el) => {
+  if (!el || el.seeking) return false;
+  if (el.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
+  const assigned = el.src || "";
+  const current = el.currentSrc || "";
+  return Boolean(assigned) && current === assigned;
+};
+
+const waitForAssignedFrame = (el) =>
+  new Promise((resolve) => {
+    if (!el) {
+      resolve(false);
+      return;
+    }
+    if (assignedFrameReady(el)) {
+      resolve(true);
+      return;
+    }
+    let settled = false;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      el.removeEventListener("loadeddata", onReady);
+      el.removeEventListener("seeked", onReady);
+      el.removeEventListener("error", onErr);
+      resolve(ok);
+    };
+    const onReady = () => {
+      if (assignedFrameReady(el)) finish(true);
+    };
+    const onErr = () => finish(false);
+    const timer = setTimeout(() => finish(assignedFrameReady(el)), DATA_TIMEOUT_MS);
+    el.addEventListener("loadeddata", onReady);
+    el.addEventListener("seeked", onReady);
+    el.addEventListener("error", onErr, { once: true });
+  });
+
 /** Wait until the decoder has a frame ready to paint (avoids black flash on swap). */
 const waitForPaint = (el) =>
   new Promise((resolve) => {
@@ -173,24 +212,29 @@ const waitForPaint = (el) =>
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      el.removeEventListener("loadeddata", onReady);
+      el.removeEventListener("seeked", onReady);
       resolve();
+    };
+    const onReady = () => {
+      if (assignedFrameReady(el)) finish();
     };
 
     const timer = setTimeout(finish, PAINT_TIMEOUT_MS);
 
-    if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !el.seeking) {
+    if (assignedFrameReady(el)) {
       finish();
       return;
     }
 
-    el.addEventListener("seeked", finish, { once: true });
-    el.addEventListener("loadeddata", finish, { once: true });
+    el.addEventListener("loadeddata", onReady);
+    el.addEventListener("seeked", onReady);
 
     if (typeof el.requestVideoFrameCallback === "function") {
       try {
-        el.requestVideoFrameCallback(() => finish());
+        el.requestVideoFrameCallback(() => onReady());
       } catch {
-        finish();
+        /* keep waiting for the assigned clip's loadeddata */
       }
     }
   });
@@ -615,7 +659,10 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     if (!playEl) return false;
 
     // Assign src synchronously under the gesture when needed.
-    if (!sameClip(clipOf(playEl), src)) {
+    // Don't seek yet: on phones the old clip is still decoded, and seeking it
+    // to 0 shows that clip's opening frame (Seq1) until the reverse file loads.
+    const needsSrc = !sameClip(clipOf(playEl), src);
+    if (needsSrc) {
       assignClip(playEl, src);
     }
 
@@ -624,7 +671,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       playEl.playsInline = true;
       playEl.setAttribute("playsinline", "");
       playEl.setAttribute("webkit-playsinline", "");
-      if (playEl.currentTime > 0.05) playEl.currentTime = 0;
+      if (!needsSrc && playEl.currentTime > 0.05) playEl.currentTime = 0;
     } catch {
       /* ignore */
     }
@@ -646,7 +693,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         await waitForData(playEl);
         if (playSessionRef.current !== session) return;
         try {
-          if (playEl.currentTime > 0.05) playEl.currentTime = 0;
+          if (!needsSrc && playEl.currentTime > 0.05) playEl.currentTime = 0;
           await playEl.play();
         } catch {
           abortPlaySession(session);
@@ -654,6 +701,28 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         }
       }
 
+      if (playSessionRef.current !== session) return;
+      if (needsSrc) {
+        const ready = await waitForAssignedFrame(playEl);
+        if (playSessionRef.current !== session) return;
+        if (!ready) {
+          abortPlaySession(session);
+          return;
+        }
+        try {
+          if (playEl.currentTime > 0.05) playEl.currentTime = 0;
+        } catch {
+          /* ignore */
+        }
+        if (playEl.paused) {
+          try {
+            await playEl.play();
+          } catch {
+            abortPlaySession(session);
+            return;
+          }
+        }
+      }
       if (playSessionRef.current !== session) return;
       await revealBuffer(playEl);
       if (playSessionRef.current !== session) return;

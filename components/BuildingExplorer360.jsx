@@ -580,8 +580,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     setPlayDirection("forward");
     setMode("play");
     setPlayToken(token);
-    // Reveal video under the still immediately on tap (don't wait for play event).
-    if (startImage && fromStep === 0) setStartStillPhase("out");
     const started = stageRef.current?.beginPlay({
       src,
       direction: "forward",

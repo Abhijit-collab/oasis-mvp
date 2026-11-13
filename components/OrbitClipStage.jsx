@@ -31,9 +31,21 @@ const bufferCoverage = (el) => {
   return Math.min(1, maxEnd / el.duration);
 };
 
+const clipHasFrame = (el) => {
+  if (!el || el.seeking) return false;
+  if (el.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
+  // A new src keeps the previous clip's readyState on phones until loadstart.
+  if (el.dataset?.assign) return el.dataset.assignReady === "1";
+  return true;
+};
+
 const waitForData = (el) =>
   new Promise((resolve) => {
-    if (!el || el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    if (!el) {
+      resolve(false);
+      return;
+    }
+    if (clipHasFrame(el)) {
       resolve(true);
       return;
     }
@@ -42,17 +54,23 @@ const waitForData = (el) =>
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      el.removeEventListener("loadstart", onReady);
       el.removeEventListener("loadeddata", onReady);
       el.removeEventListener("canplay", onReady);
+      el.removeEventListener("seeked", onReady);
       el.removeEventListener("error", onErr);
       resolve(ok);
     };
-    const onReady = () => finish(true);
+    const onReady = () => {
+      if (clipHasFrame(el)) finish(true);
+    };
     const onErr = () => finish(false);
-    const timer = setTimeout(() => finish(el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA), DATA_TIMEOUT_MS);
-    el.addEventListener("loadeddata", onReady, { once: true });
-    el.addEventListener("canplay", onReady, { once: true });
-    el.addEventListener("error", onErr, { once: true });
+    const timer = setTimeout(() => finish(clipHasFrame(el)), DATA_TIMEOUT_MS);
+    el.addEventListener("loadstart", onReady);
+    el.addEventListener("loadeddata", onReady);
+    el.addEventListener("canplay", onReady);
+    el.addEventListener("seeked", onReady);
+    el.addEventListener("error", onErr);
   });
 
 /** Seek then wait for a decoded frame (Android tears if we paint mid-seek). */
@@ -160,44 +178,10 @@ const startWarmCoverage = (el, { need = WARM_COVERAGE(), timeoutMs = WARM_COVERA
   };
 };
 
-/** True only after the src just assigned has actually decoded a frame. */
-const assignedFrameReady = (el) => {
-  if (!el || el.seeking) return false;
-  if (el.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return false;
-  const assigned = el.src || "";
-  const current = el.currentSrc || "";
-  return Boolean(assigned) && current === assigned;
-};
+/** True only after the src just assigned has fired loadstart and then decoded. */
+const assignedFrameReady = (el) => clipHasFrame(el);
 
-const waitForAssignedFrame = (el) =>
-  new Promise((resolve) => {
-    if (!el) {
-      resolve(false);
-      return;
-    }
-    if (assignedFrameReady(el)) {
-      resolve(true);
-      return;
-    }
-    let settled = false;
-    const finish = (ok) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      el.removeEventListener("loadeddata", onReady);
-      el.removeEventListener("seeked", onReady);
-      el.removeEventListener("error", onErr);
-      resolve(ok);
-    };
-    const onReady = () => {
-      if (assignedFrameReady(el)) finish(true);
-    };
-    const onErr = () => finish(false);
-    const timer = setTimeout(() => finish(assignedFrameReady(el)), DATA_TIMEOUT_MS);
-    el.addEventListener("loadeddata", onReady);
-    el.addEventListener("seeked", onReady);
-    el.addEventListener("error", onErr, { once: true });
-  });
+const waitForAssignedFrame = (el) => waitForData(el);
 
 /** Wait until the decoder has a frame ready to paint (avoids black flash on swap). */
 const waitForPaint = (el) =>
@@ -208,10 +192,13 @@ const waitForPaint = (el) =>
     }
 
     let settled = false;
+    let timer = 0;
+    let giveUp = 0;
     const finish = () => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearTimeout(giveUp);
       el.removeEventListener("loadeddata", onReady);
       el.removeEventListener("seeked", onReady);
       resolve();
@@ -220,7 +207,10 @@ const waitForPaint = (el) =>
       if (assignedFrameReady(el)) finish();
     };
 
-    const timer = setTimeout(finish, PAINT_TIMEOUT_MS);
+    timer = setTimeout(() => {
+      if (clipHasFrame(el)) finish();
+    }, PAINT_TIMEOUT_MS);
+    giveUp = setTimeout(finish, DATA_TIMEOUT_MS);
 
     if (assignedFrameReady(el)) {
       finish();
@@ -254,8 +244,37 @@ const sameClip = (a, b) => {
 };
 
 const clipOf = (el) => el?.dataset?.clip || el?.currentSrc || el?.src || "";
+
+let clipAssignSeq = 0;
 const assignClip = (el, src) => {
+  el._assignCleanup?.();
+  const token = String(++clipAssignSeq);
   el.dataset.clip = src;
+  el.dataset.assign = token;
+  el.dataset.assignSawLoad = "0";
+  el.dataset.assignReady = "0";
+  const onLoad = () => {
+    if (el.dataset.assign !== token) return;
+    el.dataset.assignSawLoad = "1";
+    el.dataset.assignReady = "0";
+  };
+  const mark = () => {
+    if (el.dataset.assign !== token) return;
+    if (el.dataset.assignSawLoad !== "1") return;
+    if (el.seeking) return;
+    if (el.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    el.dataset.assignReady = "1";
+  };
+  el.addEventListener("loadstart", onLoad);
+  el.addEventListener("loadeddata", mark);
+  el.addEventListener("canplay", mark);
+  el.addEventListener("seeked", mark);
+  el._assignCleanup = () => {
+    el.removeEventListener("loadstart", onLoad);
+    el.removeEventListener("loadeddata", mark);
+    el.removeEventListener("canplay", mark);
+    el.removeEventListener("seeked", mark);
+  };
   el.src = resolveClipUrl(src);
 };
 
@@ -338,8 +357,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     setHoldStillOn(false);
   };
 
-  const paintHoldStill = (el) => {
-    if (!isAndroidClient() || !el) return false;
+  const paintHoldStill = (el, { anyClient = false } = {}) => {
+    if ((!anyClient && !isAndroidClient()) || !el) return false;
     const canvas = holdCanvasRef.current;
     if (!canvas) return false;
     const w = el.videoWidth;
@@ -392,13 +411,15 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   };
 
   const revealBuffer = async (el) => {
-    if (!el) return;
+    if (!el) return false;
     await waitForPaint(el);
+    if (!clipHasFrame(el)) return false;
     const idx = bufIndex(el);
     markBufReady(idx, true);
     if (idx !== activeIdx.current) swapActive();
     markBufReady(1 - idx, false);
     markHasFrame(true);
+    return true;
   };
 
   const freezeAtHold = async (el, at, { fromPlayEnd = false } = {}) => {
@@ -439,7 +460,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     if (!sameClip(clipOf(el), src)) {
       if (!isActive) markBufReady(idx, false);
       assignClip(el, src);
-      kickBuffer(el);
+      if (resolveClipUrl(src) === src) kickBuffer(el);
       const ok = await waitForData(el);
       if (!ok) return false;
     } else if (el.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -583,7 +604,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       if (landReady && landEl) {
         await freezeAtHold(landEl, landAt);
         if (playSessionRef.current !== session) return;
-        await revealBuffer(landEl);
+        const shown = await revealBuffer(landEl);
+        if (!shown) await freezeAtHold(playEl, "end", { fromPlayEnd: true });
       } else {
         await freezeAtHold(playEl, "end", { fromPlayEnd: true });
       }
@@ -637,9 +659,12 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     playDirectionRef.current = direction;
     if (land !== undefined) landAfterPlayRef.current = land;
     finishingRef.current = false;
-    clearHoldStill();
     clearStallWatch();
     clearEndedHandler();
+    const coverEl = hasFrameRef.current ? activeEl().current : null;
+    if (!holdStillOnRef.current && coverEl) {
+      paintHoldStill(coverEl, { anyClient: true });
+    }
 
     const isBack = direction === "back";
     const holdEl = hasFrameRef.current ? activeEl().current : null;
@@ -678,27 +703,23 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
 
     playEl.playbackRate = 1;
     playElRef.current = playEl;
-    onPlayingChangeRef.current?.(true);
-    attachStallWatch(playEl, session);
 
-    // Critical: invoke play() in the same turn as the tap.
+    // play() has to happen in this tap. Pause again when the decoded frame
+    // is still the previous clip so that clip cannot stay on screen.
     const playPromise = playEl.play();
+    if (needsSrc || playEl.seeking || playEl.currentTime > 0.05) {
+      try {
+        playEl.pause();
+      } catch {
+        /* ignore */
+      }
+    }
 
     (async () => {
       try {
         if (playPromise) await playPromise;
       } catch {
-        // Retry once after a short buffer kick (still muted) — do not pause.
-        kickBuffer(playEl, { keepPlaying: true });
-        await waitForData(playEl);
-        if (playSessionRef.current !== session) return;
-        try {
-          if (!needsSrc && playEl.currentTime > 0.05) playEl.currentTime = 0;
-          await playEl.play();
-        } catch {
-          abortPlaySession(session);
-          return;
-        }
+        /* pause() rejects the gesture play; the later play() is the real one */
       }
 
       if (playSessionRef.current !== session) return;
@@ -709,13 +730,26 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
           abortPlaySession(session);
           return;
         }
-        try {
-          if (playEl.currentTime > 0.05) playEl.currentTime = 0;
-        } catch {
-          /* ignore */
+      }
+      if (playEl.seeking || playEl.currentTime > 0.05) {
+        const deadline = performance.now() + DATA_TIMEOUT_MS;
+        while (performance.now() < deadline) {
+          if (playSessionRef.current !== session) return;
+          if (!playEl.seeking && playEl.currentTime <= 0.05) break;
+          await seekAndWait(playEl, 0);
         }
-        if (playEl.paused) {
+      }
+      if (playSessionRef.current !== session) return;
+      if (playEl.seeking || playEl.currentTime > 0.2) {
+        abortPlaySession(session);
+        return;
+      }
+      if (playEl.paused) {
+        try {
+          await playEl.play();
+        } catch {
           try {
+            kickBuffer(playEl, { keepPlaying: true });
             await playEl.play();
           } catch {
             abortPlaySession(session);
@@ -723,9 +757,15 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
           }
         }
       }
+      const shown = await revealBuffer(playEl);
       if (playSessionRef.current !== session) return;
-      await revealBuffer(playEl);
-      if (playSessionRef.current !== session) return;
+      if (!shown) {
+        abortPlaySession(session);
+        return;
+      }
+      clearHoldStill();
+      onPlayingChangeRef.current?.(true);
+      attachStallWatch(playEl, session);
       attachEndedHandler(playEl, session, isBack);
     })();
 
@@ -782,8 +822,14 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
           markBufReady(bufIndex(visible), true);
           markHasFrame(true);
         } else {
-          kickBuffer(visible);
-          await waitForData(visible);
+          try {
+            visible.pause();
+          } catch {
+            /* ignore */
+          }
+          if (visible.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+            await waitForData(visible);
+          }
           if (cancelled) return;
           await freezeAtHold(visible, holdAt);
           if (cancelled) return;

@@ -14,9 +14,11 @@ export function useTourSoundtrack() {
  */
 export function TourSoundtrackProvider({ src = null, children }) {
   const bedRef = useRef(null);
-  const [soundOn, setSoundOn] = useState(Boolean(src));
+  const [soundOn, setSoundOn] = useState(false);
   const soundOnRef = useRef(soundOn);
   soundOnRef.current = soundOn;
+  /** False after the user explicitly mutes, so a later tap does not force sound back on. */
+  const wantAudibleRef = useRef(true);
   /** Was the bed actively playing when the tab was hidden? */
   const wasPlayingRef = useRef(false);
   const available = Boolean(src);
@@ -37,6 +39,47 @@ export function TourSoundtrackProvider({ src = null, children }) {
       } catch {
         /* ignore */
       }
+    };
+  }, [src]);
+
+  // Phones block unmuted autoplay. The first tap is the unlock; the tour videos
+  // must not be the thing that starts it, or iOS drops the soundtrack.
+  useEffect(() => {
+    if (!src) return undefined;
+    let done = false;
+
+    const unlock = (e) => {
+      if (done) return;
+      if (e.target?.closest?.(".tour-sound-btn")) return;
+      done = true;
+      window.removeEventListener("pointerdown", unlock, true);
+      window.removeEventListener("touchend", unlock, true);
+      window.removeEventListener("keydown", unlock, true);
+      if (!wantAudibleRef.current) return;
+      const bed = bedRef.current;
+      if (!bed || (!bed.paused && !bed.muted)) return;
+      bed.loop = true;
+      bed.muted = false;
+      bed.volume = 1;
+      const play = bed.play();
+      if (play?.then) {
+        play.then(() => setSoundOn(true)).catch(() => {
+          bed.muted = true;
+          setSoundOn(false);
+        });
+      } else {
+        setSoundOn(true);
+      }
+    };
+
+    window.addEventListener("pointerdown", unlock, true);
+    window.addEventListener("touchend", unlock, true);
+    window.addEventListener("keydown", unlock, true);
+    return () => {
+      done = true;
+      window.removeEventListener("pointerdown", unlock, true);
+      window.removeEventListener("touchend", unlock, true);
+      window.removeEventListener("keydown", unlock, true);
     };
   }, [src]);
 
@@ -161,20 +204,26 @@ export function TourSoundtrackProvider({ src = null, children }) {
     const bed = bedRef.current;
     if (!bed || !src) return;
 
-    const next = !soundOn;
+    // Trust the element, not the icon. On a phone the icon can say "on"
+    // while the bed is still paused, and that tap must start the music.
+    const playing = !bed.paused && !bed.muted;
+    const next = !playing;
+    wantAudibleRef.current = next;
     bed.loop = true;
-    bed.playsInline = true;
     bed.muted = !next;
-    if (next) bed.volume = 1;
-    const play = bed.play();
-    if (play?.catch) {
-      play.catch(() => {
-        bed.muted = true;
-        setSoundOn(false);
-      });
+    if (next) {
+      bed.volume = 1;
+      const play = bed.play();
+      if (play?.catch) {
+        play.catch(() => {
+          bed.muted = true;
+          wantAudibleRef.current = false;
+          setSoundOn(false);
+        });
+      }
     }
     setSoundOn(next);
-  }, [src, soundOn]);
+  }, [src]);
 
   const pause = useCallback(() => {
     try {
@@ -203,16 +252,13 @@ export function TourSoundtrackProvider({ src = null, children }) {
   return (
     <TourSoundtrackContext.Provider value={value}>
       {src ? (
-        <video
+        <audio
           ref={bedRef}
           className="tour-soundtrack-bed"
           src={src}
-          muted
           loop
-          playsInline
           preload="auto"
           aria-hidden
-          tabIndex={-1}
         />
       ) : null}
       {children}
@@ -244,10 +290,6 @@ export function SoundToggleButton({ className = "", placement = "global" }) {
         toggleSound();
       }}
       onPointerDown={(e) => e.stopPropagation()}
-      onMouseDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      }}
       aria-label={soundOn ? "Mute soundtrack" : "Unmute soundtrack"}
       aria-pressed={soundOn}
       title={soundOn ? "Mute" : "Unmute"}

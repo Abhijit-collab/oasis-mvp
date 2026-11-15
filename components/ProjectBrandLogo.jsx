@@ -8,7 +8,6 @@ export default function ProjectBrandLogo({
   alt = "Brand",
   className = "",
   onClick,
-  title,
 }) {
   if (!src) return null;
 
@@ -19,7 +18,7 @@ export default function ProjectBrandLogo({
 
   if (onClick) {
     return (
-      <button type="button" className={classes} onClick={onClick} title={title || alt} aria-label={alt}>
+      <button type="button" className={classes} onClick={onClick} aria-label={alt}>
         {img}
       </button>
     );

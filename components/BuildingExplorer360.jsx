@@ -1051,14 +1051,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
               alt={brand.fullName || brand.name || "Brand"}
               className="project-brand-logo--explorer be-brand be-brand--logo"
               onClick={goHome}
-              title="Return to Main Gate"
             />
           ) : showBrand ? (
             <div
               className="be-brand"
               onClick={goHome}
               style={{ cursor: homeResetting ? "default" : "pointer" }}
-              title="Return to Main Gate"
             >
               <span className="be-crown">&#9819;</span>
               <div className="be-bk">

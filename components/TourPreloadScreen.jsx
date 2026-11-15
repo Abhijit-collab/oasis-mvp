@@ -8,6 +8,7 @@ export default function TourPreloadScreen({
   brandPrefix = "THE",
   brandName = "OASIS",
   variant = "bar",
+  loading = false,
 }) {
   const pct = Math.min(100, Math.max(0, Math.round(progress)));
   const message = label ?? (exiting ? "Opening your private tour\u2026" : "Preparing your private tour\u2026");
@@ -49,7 +50,7 @@ export default function TourPreloadScreen({
         </div>
       )}
       <p className="be-preload-pct">{pct}%</p>
-      <SlowNetworkNotice />
+      <SlowNetworkNotice loading={loading && !exiting} />
     </div>
   );
 }

@@ -3,12 +3,17 @@ import { useEffect, useState } from "react";
 import { isConnectionSlow } from "@/hooks/usePreloadVideos";
 
 const DISMISS_KEY = "oasis-slow-notice-dismissed";
+const STRUGGLE_MS = 8000;
 const MESSAGE =
   "Your connection seems slow. For the smoothest experience, switch to a stronger Wi-Fi or mobile network.";
 
-/** force=true shows it regardless of detection (used for long clip waits). */
-export default function SlowNetworkNotice({ force = false }) {
+/**
+ * Shown only when the link is slow and media has been loading for a while.
+ * A normal Wi-Fi buffer does not qualify.
+ */
+export default function SlowNetworkNotice({ loading = false }) {
   const [slow, setSlow] = useState(false);
+  const [struggling, setStruggling] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -24,7 +29,16 @@ export default function SlowNetworkNotice({ force = false }) {
     };
   }, []);
 
-  if (dismissed || !(slow || force)) return null;
+  useEffect(() => {
+    if (!loading) {
+      setStruggling(false);
+      return undefined;
+    }
+    const t = setTimeout(() => setStruggling(true), STRUGGLE_MS);
+    return () => clearTimeout(t);
+  }, [loading]);
+
+  if (dismissed || !slow || !struggling) return null;
 
   const close = () => {
     setDismissed(true);

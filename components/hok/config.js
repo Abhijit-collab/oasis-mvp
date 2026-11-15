@@ -34,4 +34,27 @@ export const HOK_TOUR_CONFIG = {
   preloadDepth: "full",
   preloadVariant: "feather",
   galleryImages: GALLERY_IMAGES,
+  aside: {
+    title: "Live a divine life",
+    lead: "Mumbai's first luxury Krishna theme residences",
+    place: "Dombivli, Mumbai",
+    facts: [
+      { value: "G+26", label: "Floor" },
+      { value: "15+", label: "Amenities" },
+      { value: "2029", label: "Completion" },
+      { value: "1100", label: "Curated 1 & 2 BHK flats" },
+    ],
+    amenities: [
+      "Krishna Prayer Hall",
+      "Double-height entrance lobby",
+      "Jogging track",
+      "Yoga & meditation deck",
+      "Landscaped gardens",
+      "Children's play area",
+      "Indoor & outdoor sports",
+      "Senior citizens' sit-out",
+      "3-level parking",
+      "24/7 CCTV surveillance",
+    ],
+  },
 };

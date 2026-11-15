@@ -26,6 +26,7 @@ import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
 import SlowNetworkNotice from "@/components/SlowNetworkNotice";
 import RotateButton from "@/components/RotateButton";
+import TourAside from "@/components/TourAside";
 import { getOrbitStepZones as defaultGetOrbitStepZones } from "@/data/orbit360Zones";
 import { ORBIT_STEP_PRELOAD_URLS as DEFAULT_PRELOAD_URLS } from "@/lib/tourAssetPreload";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
@@ -39,7 +40,6 @@ import { useFilterPanelSelectionSync } from "@/hooks/useFilterPanelSelectionSync
 
 const TOUR_REVEAL_MS = 900;
 const CLIP_WAIT_MAX_MS = 15000;
-const LONG_WAIT_MS = 2000;
 
 function OrbitSideChevron({ dir = "r" }) {
   const id = `be-orbit-grad-${dir}`;
@@ -120,6 +120,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     showBrand = true,
     preloadVariant = "bar",
     galleryImages = [],
+    aside = null,
   } = tour;
   const { logout, setIdleSuspended } = useAuth() || {};
   const soundtrack = useTourSoundtrack();
@@ -548,12 +549,6 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const canNext = !isPlaying && !pendingRef.current && !homeResetting;
   const holdAt = holdAtOverride ?? holdAtForStep(step);
   const [clipWaiting, setClipWaiting] = useState(false);
-  const [longWait, setLongWait] = useState(false);
-  useEffect(() => {
-    if (!clipWaiting) { setLongWait(false); return undefined; }
-    const t = setTimeout(() => setLongWait(true), LONG_WAIT_MS);
-    return () => clearTimeout(t);
-  }, [clipWaiting]);
 
   const ensureClip = async (src) => {
     if (!src || isClipReady(src)) return;
@@ -969,7 +964,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
                 <span />
               </div>
             )}
-            {tourRevealed && !showPreload && <SlowNetworkNotice force={longWait} />}
+            {tourRevealed && !showPreload && <SlowNetworkNotice loading={clipWaiting} />}
 
             {showStartImage && (
               <img
@@ -1038,6 +1033,16 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
         <div className="scrim-top" />
         <div className="scrim-bot" />
+
+        {tourRevealed && aside?.title ? (
+          <TourAside
+            title={aside.title}
+            lead={aside.lead}
+            place={aside.place}
+            facts={aside.facts}
+            amenities={aside.amenities}
+          />
+        ) : null}
 
         <div className="be-top">
           {brand?.logoUrl ? (
@@ -1179,6 +1184,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           brandPrefix={brand.prefix}
           brandName={brand.name}
           variant={preloadVariant}
+          loading={!assetsReady}
         />
       )}
     </div>

@@ -26,7 +26,7 @@ import useTourPreloadGate from "@/hooks/useTourPreloadGate";
 import TourPreloadScreen from "@/components/TourPreloadScreen";
 import SlowNetworkNotice from "@/components/SlowNetworkNotice";
 import RotateButton from "@/components/RotateButton";
-import TourAside from "@/components/TourAside";
+// import TourAside from "@/components/TourAside";
 import { getOrbitStepZones as defaultGetOrbitStepZones } from "@/data/orbit360Zones";
 import { ORBIT_STEP_PRELOAD_URLS as DEFAULT_PRELOAD_URLS } from "@/lib/tourAssetPreload";
 import { mergeLiveUnits } from "@/lib/mergeLiveUnits";
@@ -120,7 +120,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     showBrand = true,
     preloadVariant = "bar",
     galleryImages = [],
-    aside = null,
+    // aside = null,
   } = tour;
   const { logout, setIdleSuspended } = useAuth() || {};
   const soundtrack = useTourSoundtrack();
@@ -1034,6 +1034,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         <div className="scrim-top" />
         <div className="scrim-bot" />
 
+        {/* Left pane — paused
         {tourRevealed && aside?.title ? (
           <TourAside
             title={aside.title}
@@ -1043,6 +1044,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
             amenities={aside.amenities}
           />
         ) : null}
+        */}
 
         <div className="be-top">
           {brand?.logoUrl ? (

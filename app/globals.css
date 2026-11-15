@@ -343,8 +343,9 @@ html.be-ios .be-orbit-arw--r{right:var(--be-orbit-inset-r)!important;left:auto!i
 /* topbar */
 .tour-aside{
   position:absolute;z-index:7;left:max(36px,env(safe-area-inset-left,0px));
-  top:172px;bottom:auto;width:min(460px,36vw);color:#fff;pointer-events:none;
+  top:172px;width:min(460px,36vw);overflow:hidden;color:#fff;pointer-events:none;
   text-shadow:0 2px 18px rgba(0,0,0,.55)}
+.tour-aside-fit{transform-origin:top left;width:100%}
 .tour-aside-title{
   margin:0;font-weight:400;font-size:clamp(30px,2.5vw,42px);line-height:1.2;
   letter-spacing:0;text-transform:none;color:#fff}
@@ -396,7 +397,7 @@ html.be-ios .be-orbit-arw--r{right:var(--be-orbit-inset-r)!important;left:auto!i
   display:block;margin-top:0;font-size:18px;font-weight:400;letter-spacing:0;line-height:1.25;color:#fff}
 @media(hover:none) and (pointer:coarse),(max-width:900px){
   .tour-aside{
-    top:auto;bottom:156px;left:max(16px,env(safe-area-inset-left,0px));
+    left:max(16px,env(safe-area-inset-left,0px));
     width:min(280px,52vw)}
   .tour-aside-title{font-size:23px;letter-spacing:0}
   .tour-aside-rule{margin:3px 0 4px;width:110px}

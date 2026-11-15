@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 import { getPoiView } from "@/data/pois";
 import { isMobileTourDevice } from "@/lib/rotateGate";
 
@@ -77,6 +77,9 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
   const [marks, setMarks] = useState([]);
   const [revealed, setRevealed] = useState(0);
   const [activeN, setActiveN] = useState(null);
+  const [popPos, setPopPos] = useState(null);
+  const layerRef = useRef(null);
+  const cardRef = useRef(null);
   const ticket = useRef(0);
   const drawnTicket = useRef(0);
   const timers = useRef([]);
@@ -189,12 +192,42 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
     },
   }));
 
-  if (marks.length === 0) return null;
-
   const active = marks.find((mark) => mark.poi.n === activeN) || null;
 
+  useLayoutEffect(() => {
+    const layer = layerRef.current;
+    const card = cardRef.current;
+    if (!active || !layer || !card) return undefined;
+
+    const placeCard = () => {
+      const pad = 12;
+      const gap = 16;
+      const badge = 22;
+      const width = card.offsetWidth;
+      const height = card.offsetHeight;
+      const boundsW = layer.clientWidth;
+      const boundsH = layer.clientHeight;
+      // 1 o'clock: up and slightly right of the number.
+      const reach = badge + gap;
+      const left = active.bx + Math.sin(Math.PI / 6) * reach;
+      const top = active.by - Math.cos(Math.PI / 6) * reach - height;
+      setPopPos({
+        n: active.poi.n,
+        left: Math.max(pad, Math.min(left, boundsW - width - pad)),
+        top: Math.max(pad, Math.min(top, boundsH - height - pad)),
+      });
+    };
+
+    placeCard();
+    const observer = new ResizeObserver(placeCard);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [active]);
+
+  if (marks.length === 0) return null;
+
   return (
-    <div className="poi-layer" aria-hidden={false}>
+    <div className="poi-layer" ref={layerRef} aria-hidden={false}>
       <svg className="poi-svg" aria-hidden>
         {marks.map((mark, index) => (
           <g key={mark.poi.n} className={index < revealed ? "show" : ""}>
@@ -223,30 +256,38 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
           aria-label={`${mark.poi.n}. ${mark.poi.title}`}
           onClick={(event) => {
             event.stopPropagation();
-            setActiveN(mark.poi.n);
+            setActiveN((current) => (current === mark.poi.n ? null : mark.poi.n));
           }}
         >
           {mark.poi.n}
         </button>
       ))}
-      <aside className={"poi-panel" + (active ? " open" : "")}>
-        <button
-          type="button"
-          className="poi-panel-close"
-          aria-label="Close"
-          onClick={() => setActiveN(null)}
+      {active ? (
+        <div
+          className="poi-pop poi-panel open"
+          role="dialog"
+          aria-label={active.poi.title}
+          style={
+            popPos && popPos.n === active.poi.n
+              ? { left: popPos.left, top: popPos.top }
+              : { left: active.bx, top: active.by, visibility: "hidden" }
+          }
         >
-          ×
-        </button>
-        {active ? (
-          <>
-            <div className="poi-panel-num">POINT {String(active.poi.n).padStart(2, "0")}</div>
+          <div className="poi-pop-card" ref={cardRef}>
+            <button
+              type="button"
+              className="poi-panel-close"
+              aria-label="Close"
+              onClick={() => setActiveN(null)}
+            >
+              ×
+            </button>
             <h2>{active.poi.title}</h2>
             {active.poi.img ? <img src={active.poi.img} alt="" /> : null}
             {active.poi.desc ? <p>{active.poi.desc}</p> : null}
-          </>
-        ) : null}
-      </aside>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 });

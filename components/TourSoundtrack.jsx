@@ -319,7 +319,7 @@ export function SoundToggleButton({ className = "", placement = "global" }) {
       }}
       aria-label={soundOn ? "Mute soundtrack" : "Unmute soundtrack"}
       aria-pressed={soundOn}
-      title={soundOn ? "Mute" : "Unmute"}
+      data-hover={soundOn ? "Mute" : "Unmute"}
     >
       {soundOn ? (
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>

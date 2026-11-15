@@ -618,6 +618,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const stageBoxRef = useRef(null);
   const poiRef = useRef(null);
   const poiGen = useRef(0);
+  const [poisOn, setPoisOn] = useState(true);
+  const poisOnRef = useRef(true);
 
   const settledPoiViewId = (landedStep) =>
     landedStep === 0 && startImage ? "Seq1_StartImage" : viewIdFromSrc(holdClipForStep(landedStep));
@@ -629,9 +631,27 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const showSettledPois = (landedStep, gen) => {
     requestAnimationFrame(() => {
+      if (!poisOnRef.current) return;
       if (poiGen.current !== gen) return;
       poiRef.current?.showPoisForView(settledPoiViewId(landedStep));
     });
+  };
+
+  const togglePois = () => {
+    const next = !poisOnRef.current;
+    poisOnRef.current = next;
+    setPoisOn(next);
+    poiGen.current += 1;
+    if (!next) {
+      poiRef.current?.clearPois();
+      return;
+    }
+    if (isPlaying || mode === "play" || homeResetting) return;
+    const landed = stepRef.current;
+    const startStill =
+      landed === 0 && startImage && startStillPhase === "in";
+    if (startStill) return;
+    poiRef.current?.showPoisForView(settledPoiViewId(landed));
   };
 
   const handlePlayingChange = (playing) => {
@@ -929,10 +949,11 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     Boolean(startImage) && startStillPhase !== "hidden" && !homeResetting;
 
   useEffect(() => {
+    if (!poisOn) return;
     if (!tourRevealed || showPreload || isPlaying || homeResetting || mode === "play") return;
     if (step !== 0 || !showStartImage || startStillPhase !== "in") return;
     poiRef.current?.showPoisForView("Seq1_StartImage");
-  }, [tourRevealed, showPreload, isPlaying, homeResetting, mode, step, showStartImage, startStillPhase]);
+  }, [poisOn, tourRevealed, showPreload, isPlaying, homeResetting, mode, step, showStartImage, startStillPhase]);
 
   const showPremiumChrome = showFilters && tourRevealed && !homeResetting;
   const showZoneOverlay = Boolean(
@@ -1164,6 +1185,24 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
             <div className="be-stage-chrome">
               <AdoptXRLogo variant="white" placement="explorer" />
               <SoundToggleButton className="tour-sound-btn--explorer" />
+              <button
+                type="button"
+                className={"poi-toggle" + (poisOn ? " poi-toggle--on" : "")}
+                aria-pressed={poisOn}
+                aria-label={poisOn ? "Hide POI" : "Show POI"}
+                data-hover={poisOn ? "Hide POI" : "Show POI"}
+                onClick={togglePois}
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+                  <path
+                    fill="currentColor"
+                    d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"
+                  />
+                  {poisOn ? null : (
+                    <path d="M4 4 L20 20" stroke="currentColor" strokeWidth="1.8" fill="none" />
+                  )}
+                </svg>
+              </button>
               <FullscreenButton />
             </div>
           )}

@@ -19,7 +19,15 @@ export const POI_VIEWS = {
     type: "image",
     src: `${CDN}/image/Seq1_StartImage.png`,
     pois: [
-      { n: 1, x: 0.5609, y: 0.844, angle: -90, title: "Commercial Complex", desc: "", img: "" },
+      {
+        n: 1,
+        x: 0.5609,
+        y: 0.844,
+        angle: -90,
+        title: "Commercial Complex",
+        img: `${CDN}/hok-gallery/5_Podium1.png`,
+        desc: "Street-level shops and cafes along the podium, with a double-height lobby behind. Sample copy — about 18,000 sq.ft of retail, open from 8am to 10pm.",
+      },
       { n: 2, x: 0.7706, y: 0.7124, angle: -89, title: "Office Space", desc: "", img: "" },
     ],
   },
@@ -41,6 +49,17 @@ export const POI_VIEWS = {
       { n: 3, x: 0.4597, y: 0.7199, angle: -90, title: "Block 1 Entrance", desc: "", img: "" },
       { n: 4, x: 0.5251, y: 0.5865, angle: -90, title: "Block 2 Entrance", desc: "", img: "" },
       { n: 5, x: 0.5654, y: 0.6241, angle: -90, title: "Swimming Pool", desc: "", img: "" },
+    ],
+  },
+  Sequence3: {
+    id: "Sequence3",
+    type: "video",
+    src: `${CDN}/24fps-video-comp/Sequence3+Nyx3.mp4`,
+    pois: [
+      { n: 3, x: 0.4247, y: 0.6673, angle: -90, title: "Block 1 Entrance", desc: "", img: "" },
+      { n: 4, x: 0.543, y: 0.6335, angle: -90, title: "Block 2 Entrance", desc: "", img: "" },
+      { n: 5, x: 0.5009, y: 0.6523, angle: -90, title: "Swimming Pool", desc: "", img: "" },
+      { n: 6, x: 0.569, y: 0.7274, angle: -90, title: "Tennis Court", desc: "", img: "" },
     ],
   },
 };

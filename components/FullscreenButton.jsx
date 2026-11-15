@@ -14,30 +14,47 @@ function getFullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
 
+function visibleTourVideo() {
+  const videos = [...document.querySelectorAll("video.be-stage-video")];
+  return (
+    videos.find((video) => video.classList.contains("on") && video.videoWidth > 0) ||
+    videos.find((video) => video.videoWidth > 0) ||
+    videos[0] ||
+    null
+  );
+}
+
 export default function FullscreenButton() {
   const [active, setActive] = useState(false);
-  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    // iOS Safari/Chrome cannot fullscreen a webpage — hide the control.
-    if (isIOSDevice()) {
-      setHidden(true);
-      return undefined;
-    }
-
     const sync = () => setActive(Boolean(getFullscreenElement()));
     sync();
     document.addEventListener("fullscreenchange", sync);
     document.addEventListener("webkitfullscreenchange", sync);
+    const onIosEnd = () => setActive(false);
+    document.addEventListener("webkitendfullscreen", onIosEnd, true);
     return () => {
       document.removeEventListener("fullscreenchange", sync);
       document.removeEventListener("webkitfullscreenchange", sync);
+      document.removeEventListener("webkitendfullscreen", onIosEnd, true);
     };
   }, []);
 
   const toggle = useCallback(async () => {
     const root = document.documentElement;
+    const video = visibleTourVideo();
     try {
+      if (isIOSDevice() && video && typeof video.webkitEnterFullscreen === "function") {
+        if (video.webkitDisplayingFullscreen && video.webkitExitFullscreen) {
+          video.webkitExitFullscreen();
+          setActive(false);
+        } else {
+          video.webkitEnterFullscreen();
+          setActive(true);
+        }
+        return;
+      }
       if (getFullscreenElement()) {
         if (document.exitFullscreen) await document.exitFullscreen();
         else document.webkitExitFullscreen?.();
@@ -58,8 +75,6 @@ export default function FullscreenButton() {
     }
   }, []);
 
-  if (hidden) return null;
-
   return (
     <button
       type="button"
@@ -67,7 +82,7 @@ export default function FullscreenButton() {
       onClick={toggle}
       aria-pressed={active}
       aria-label={active ? "Exit full screen" : "Enter full screen"}
-      title={active ? "Exit full screen" : "Full screen"}
+      data-hover={active ? "Exit full screen" : "Full screen"}
     >
       {active ? (
         <svg viewBox="0 0 24 24" aria-hidden>

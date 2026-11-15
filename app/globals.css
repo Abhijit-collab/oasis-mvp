@@ -414,7 +414,7 @@ html.be-ios .be-orbit-arw--r{right:var(--be-orbit-inset-r)!important;left:auto!i
 .be-top{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;justify-content:space-between;
   align-items:center;padding:0 26px 18px;gap:8px;overflow:visible}
 .be-top-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0;z-index:50}
-.be-links--desktop{transform:translateY(-16px)}
+.be-links--desktop{display:none}
 .be-fs-btn{
   position:fixed;right:max(72px,calc(env(safe-area-inset-right,0px) + 64px));
   bottom:72px;top:auto;left:auto;
@@ -562,7 +562,7 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
 .project-brand-logo--login img{
   height:var(--login-logo-h,clamp(100px,13vw,140px));max-width:min(500px,60vw)}
 .project-brand-logo--explorer img{
-  height:clamp(104px,12.5vw,148px);max-width:min(520px,58vw)}
+  height:clamp(86px,10.4vw,122px);max-width:min(440px,48vw)}
 .project-brand-logo--welcome img{
   height:clamp(108px,14vw,150px);max-width:min(520px,78vw)}
 .project-brand-logo--booking img{
@@ -625,21 +625,32 @@ button.project-brand-logo{cursor:pointer}
 .be-download-item:hover{background:rgba(216,182,90,.14);color:var(--gold-bright)}
 
 /* Mobile hamburger nav (360 / explorer top bar) */
-.be-nav-mobile{display:none;position:relative;z-index:50;flex-shrink:0}
+.be-nav-mobile{display:block;position:relative;z-index:50;flex-shrink:0}
 .be-nav-burger{
   display:flex;flex-direction:column;justify-content:center;gap:5px;
-  width:44px;height:44px;padding:11px;border-radius:0;cursor:pointer;
-  background:transparent;border:none;
-  box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
-  transition:opacity .15s;-webkit-tap-highlight-color:transparent}
-.be-nav-burger:active{background:transparent;opacity:.7}
+  width:44px;height:44px;padding:11px;border-radius:50%;cursor:pointer;
+  background:rgba(12,14,18,.55);border:1px solid rgba(216,182,90,.7);
+  box-shadow:0 0 0 0 rgba(216,182,90,.28);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  animation:be-burger-pulse 3.6s ease-in-out infinite;
+  transition:opacity .15s,background .15s,border-color .15s;
+  -webkit-tap-highlight-color:transparent}
+.be-nav-burger:hover{border-color:rgba(242,210,126,.95);background:rgba(16,18,24,.72)}
+.be-nav-burger:active{opacity:.8}
 .be-nav-burger span{
-  display:block;height:2px;width:100%;background:#fff;
-  transition:transform .2s,opacity .15s;transform-origin:center;
-  box-shadow:0 1px 2px rgba(0,0,0,.45)}
+  display:block;height:2px;width:100%;background:#f7e7b0;
+  transition:transform .2s,opacity .15s,width .2s;transform-origin:center;
+  box-shadow:0 0 8px rgba(216,182,90,.75)}
 .be-nav-burger span:nth-child(2){width:70%}
+@keyframes be-burger-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(216,182,90,0),0 4px 14px rgba(0,0,0,.35);transform:scale(1)}
+  50%{box-shadow:0 0 0 7px rgba(216,182,90,.16),0 0 18px rgba(216,182,90,.55);transform:scale(1.07)}}
 .be-nav-mobile.open .be-nav-burger{
-  background:transparent;border:none}
+  animation:none;transform:none;
+  background:rgba(12,14,18,.72);border-color:rgba(242,210,126,.85);
+  box-shadow:0 4px 14px rgba(0,0,0,.35)}
+@media(prefers-reduced-motion:reduce){
+  .be-nav-burger{animation:none}}
 .be-nav-mobile.open .be-nav-burger span{width:100%;background:#fff}
 .be-nav-mobile.open .be-nav-burger span:nth-child(1){transform:translateY(7px) rotate(45deg)}
 .be-nav-mobile.open .be-nav-burger span:nth-child(2){opacity:0}
@@ -772,6 +783,66 @@ button.project-brand-logo{cursor:pointer}
   animation:bob 2.6s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-5px)}}
 .be-cta-hint .hand{font-size:15px}
+
+/* Laptop letterbox: logos and buttons sit on the video frame, not in the bars. */
+@media (hover:hover) and (pointer:fine) and (min-width:901px){
+  .be-root--contain.be-root--vid-box .be-top{
+    top:var(--be-vid-top);
+    left:var(--be-vid-left);
+    right:auto;
+    width:var(--be-vid-width)}
+  .be-root--contain.be-root--vid-box .project-brand-logo--explorer img{
+    max-width:min(440px,48vw,calc(var(--be-vid-width) - 280px))}
+  .be-root--contain.be-root--vid-box .adoptxr-mark--explorer{
+    left:var(--be-brand-center, calc(var(--be-vid-left) + 24px));
+    right:auto;top:auto;
+    bottom:calc(var(--be-vid-bottom) + 24px);
+    transform:translateX(var(--be-brand-shift, 0px))}
+  .be-stage-chrome .be-fs-btn{
+    right:20px;left:auto;top:auto}
+  .be-stage-chrome .tour-sound-btn{
+    right:88px;left:auto;top:auto}
+  .be-root--contain.be-root--vid-box .be-stage-chrome .be-fs-btn{
+    right:calc(var(--be-vid-right) + 20px);
+    bottom:calc(var(--be-vid-bottom) + 72px);
+    left:auto;top:auto}
+  .be-root--contain.be-root--vid-box .be-stage-chrome .tour-sound-btn{
+    right:calc(var(--be-vid-right) + 88px);
+    bottom:calc(var(--be-vid-bottom) + 72px);
+    left:auto;top:auto}
+  .be-rotate-wrap{display:none}
+  .be-orbit-arw{
+    --be-orbit-arw-size:68px;
+    display:flex;align-items:center;justify-content:center;
+    position:absolute;top:50%;z-index:40;
+    width:var(--be-orbit-arw-size);height:var(--be-orbit-arw-size);margin-top:calc(var(--be-orbit-arw-size) / -2);padding:0;
+    border:none;background:transparent;cursor:pointer;
+    opacity:0;transition:opacity .7s ease .45s;
+    overflow:visible}
+  .be-orbit-arw--on{opacity:1}
+  .be-orbit-arw-icon{width:48px;height:48px;display:block;overflow:visible;position:relative;z-index:1}
+  .be-orbit-arw-move{
+    display:flex;align-items:center;justify-content:center;
+    transition:-webkit-transform .55s ease,transform .55s ease,filter .55s ease}
+  .be-orbit-arw--l{left:var(--be-orbit-inset-l);right:auto}
+  .be-orbit-arw--r{right:var(--be-orbit-inset-r);left:auto}
+  .be-orbit-arw:hover .be-orbit-arw-icon{opacity:.85}
+  .be-orbit-arw:active .be-orbit-arw-icon{opacity:.8}
+  .be-orbit-arw--inactive{pointer-events:none}
+  .be-orbit-arw--on.be-orbit-arw--inactive{opacity:.35}
+  .be-orbit-arw--hidden{display:none!important}
+  .be-root--contain.be-root--vid-box .be-orbit-arw{
+    top:calc(var(--be-vid-top) + (var(--be-vid-height) / 2))}
+  .be-root--contain.be-root--vid-box .be-orbit-arw--l{
+    left:max(8px, calc((var(--be-vid-left) - var(--be-orbit-arw-size)) / 2));
+    right:auto}
+  .be-root--contain.be-root--vid-box .be-orbit-arw--r{
+    right:max(8px, calc((var(--be-vid-right) - var(--be-orbit-arw-size)) / 2));
+    left:auto}
+  .be-root--contain.be-root--vid-box .be-cta-hint{
+    left:calc(var(--be-vid-left) + (var(--be-vid-width) / 2));
+    bottom:calc(var(--be-vid-bottom) + 26px)}
+}
 
 /* block filter prompt — anchored above block overlay */
 .be-block-filter-prompt{

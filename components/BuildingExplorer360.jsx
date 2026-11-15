@@ -133,6 +133,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const [viewW, setViewW] = useState(null);
   const [viewTop, setViewTop] = useState(0);
   const [viewLeft, setViewLeft] = useState(0);
+  const [vidBox, setVidBox] = useState(null);
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [mode, setMode] = useState("hold");
@@ -232,6 +233,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const polledLiveUnits = useLiveUnitsPoll(liveUnits);
   const units = useMemo(() => mergeLiveUnits(polledLiveUnits), [polledLiveUnits]);
   const [tourRevealed, setTourRevealed] = useState(false);
+  const [showDragHint, setShowDragHint] = useState(true);
   const [orbitHint, setOrbitHint] = useState(false);
   const [isPhoneChrome, setIsPhoneChrome] = useState(false);
   const [preloadHidden, setPreloadHidden] = useState(false);
@@ -292,7 +294,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
     const update = () => {
       if (!isSmallDevice()) {
-        setAdaptiveFit("cover");
+        setAdaptiveFit("contain");
         setViewH(null);
         setViewW(null);
         setViewTop(0);
@@ -342,6 +344,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     const timer = setTimeout(() => setPreloadHidden(true), TOUR_REVEAL_MS);
     return () => clearTimeout(timer);
   }, [gateOpen, tourRevealed, preloadHidden]);
+
+  useEffect(() => {
+    if (!tourRevealed) return undefined;
+    const timer = setTimeout(() => setShowDragHint(false), 20000);
+    return () => clearTimeout(timer);
+  }, [tourRevealed]);
 
   // Keep shared login→tour soundtrack playing once the 360 stage is visible.
   useEffect(() => {
@@ -424,16 +432,95 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     };
   }, [tourRevealed, isPhoneChrome, clipSrc, displayFit, mode]);
 
-  /* Phone orbit arrows: JS class toggle + CSS transitions (reliable on iOS Safari) */
+  /** Laptop letterbox: keep logos and buttons on the video, not in the bars. */
   useEffect(() => {
-    if (!isPhoneChrome || !tourRevealed || navOpen || isPlaying) {
+    if (!tourRevealed || isPhoneChrome || displayFit !== "contain") {
+      setVidBox(null);
+      return undefined;
+    }
+
+    const stage = stageBoxRef.current;
+    if (!stage) return undefined;
+
+    const apply = () => {
+      const videos = [...stage.querySelectorAll("video.be-stage-video")];
+      const el =
+        videos.find((v) => v.style.visibility !== "hidden" && v.videoWidth > 0) ||
+        videos.find((v) => v.videoWidth > 0) ||
+        videos[0];
+      const cw = stage.clientWidth;
+      const ch = stage.clientHeight;
+      const vw = el?.videoWidth || 0;
+      const vh = el?.videoHeight || 0;
+      if (!cw || !ch || !vw || !vh) return;
+
+      const scale = Math.min(cw / vw, ch / vh);
+      const width = vw * scale;
+      const height = vh * scale;
+      const left = (cw - width) / 2;
+      const top = (ch - height) / 2;
+      const stageRect = stage.getBoundingClientRect();
+      const brand = stage
+        .closest(".be-root")
+        ?.querySelector(".project-brand-logo--explorer img, .project-brand-logo--explorer");
+      const brandRect = brand?.getBoundingClientRect();
+      const brandCenter =
+        brandRect && brandRect.width > 0
+          ? Math.round(brandRect.left + brandRect.width / 2 - stageRect.left)
+          : null;
+      const next = {
+        left: Math.round(left),
+        top: Math.round(top),
+        width: Math.round(width),
+        height: Math.round(height),
+        right: Math.round(cw - (left + width)),
+        bottom: Math.round(ch - (top + height)),
+        brandCenter,
+      };
+
+      setVidBox((prev) => {
+        if (
+          prev &&
+          prev.left === next.left &&
+          prev.top === next.top &&
+          prev.width === next.width &&
+          prev.height === next.height &&
+          prev.right === next.right &&
+          prev.bottom === next.bottom &&
+          prev.brandCenter === next.brandCenter
+        ) {
+          return prev;
+        }
+        return next;
+      });
+    };
+
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(stage);
+    const brandEl = stage
+      .closest(".be-root")
+      ?.querySelector(".project-brand-logo--explorer");
+    if (brandEl) ro.observe(brandEl);
+    window.addEventListener("resize", apply);
+    const id = window.setInterval(apply, 800);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", apply);
+      clearInterval(id);
+    };
+  }, [tourRevealed, isPhoneChrome, clipSrc, displayFit, mode]);
+
+  /* Orbit arrows: slide-and-glow pulse. Same timing on laptop and phone. */
+  useEffect(() => {
+    if (!tourRevealed || navOpen || isPlaying) {
       setOrbitHint(false);
       return undefined;
     }
     setOrbitHint(true);
     const id = window.setInterval(() => setOrbitHint((v) => !v), 700);
     return () => window.clearInterval(id);
-  }, [isPhoneChrome, tourRevealed, navOpen, isPlaying]);
+  }, [tourRevealed, navOpen, isPlaying]);
 
   useEffect(() => {
     return () => {
@@ -897,10 +984,24 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       className={
         "be-root" +
         (isPlaying ? " be-transitioning" : "") +
-        (displayFit === "cover" || displayFit === "contain" ? ` be-root--${displayFit}` : "")
+        (displayFit === "cover" || displayFit === "contain" ? ` be-root--${displayFit}` : "") +
+        (vidBox ? " be-root--vid-box" : "")
       }
       style={{
         "--filter-w": showPremiumChrome ? "400px" : "0px",
+        ...(vidBox
+          ? {
+              "--be-vid-left": `${vidBox.left}px`,
+              "--be-vid-top": `${vidBox.top}px`,
+              "--be-vid-width": `${vidBox.width}px`,
+              "--be-vid-height": `${vidBox.height}px`,
+              "--be-vid-right": `${vidBox.right}px`,
+              "--be-vid-bottom": `${vidBox.bottom}px`,
+              ...(vidBox.brandCenter != null
+                ? { "--be-brand-center": `${vidBox.brandCenter}px`, "--be-brand-shift": "-50%" }
+                : { "--be-brand-shift": "0px" }),
+            }
+          : null),
         ...(viewH
           ? {
               height: `${viewH}px`,
@@ -1087,19 +1188,16 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           </div>
         </div>
 
-        <div className="be-cta-hint">
-          {homeResetting ? (
-            <>Returning to Main Gate&hellip;</>
-          ) : zoneHint ? (
-            <>
-              <span className="hand">&#9757;</span> {zoneHint}
-            </>
-          ) : (
-            <>
-              <span className="hand">&#9757;</span> Drag left / right or use the 360 control
-            </>
-          )}
-        </div>
+        {!homeResetting && zoneHint && !/drag/i.test(zoneHint) ? (
+          <div className="be-cta-hint">
+            <span className="hand">&#9757;</span> {zoneHint}
+          </div>
+        ) : showDragHint && !homeResetting ? (
+          <div className="be-cta-hint">
+            <span className="hand">&#9757;</span>{" "}
+            {zoneHint || "Drag left / right or use the arrows"}
+          </div>
+        ) : null}
 
         <div className="be-rotate-wrap">
           <RotateButton
@@ -1143,8 +1241,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           (!canPrev ? " be-orbit-arw--inactive" : "") +
           (navOpen ? " be-orbit-arw--hidden" : "") +
           (tourRevealed ? " be-orbit-arw--on" : "") +
-          (isPhoneChrome ? " be-orbit-arw--mobile" : "") +
-          (isPhoneChrome && orbitHint && hasReverseClips && canPrev ? " be-orbit-arw--hint" : "")
+          " be-orbit-arw--mobile" +
+          (orbitHint && hasReverseClips && canPrev ? " be-orbit-arw--hint" : "")
         }
         aria-label="Rotate left"
         onClick={() => {
@@ -1163,8 +1261,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           (!canNext ? " be-orbit-arw--inactive" : "") +
           (navOpen ? " be-orbit-arw--hidden" : "") +
           (tourRevealed ? " be-orbit-arw--on" : "") +
-          (isPhoneChrome ? " be-orbit-arw--mobile" : "") +
-          (isPhoneChrome && orbitHint && canNext ? " be-orbit-arw--hint" : "")
+          " be-orbit-arw--mobile" +
+          (orbitHint && canNext ? " be-orbit-arw--hint" : "")
         }
         aria-label="Rotate right"
         onClick={() => {

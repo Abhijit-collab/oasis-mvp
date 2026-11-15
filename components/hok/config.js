@@ -28,7 +28,7 @@ export const HOK_TOUR_CONFIG = {
   showFilters: SHOW_FILTERS,
   startImage: START_IMAGE,
   showBrand: true,
-  /** Desktop: cover (original). Phones: keep aspect, contain if the screen is far from 16:9. */
+  /** Laptop and phone: show the whole frame. Bars appear when the window does not match the video. */
   mediaFit: "adapt",
   mediaPosition: "center top",
   preloadDepth: "full",

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import DownloadMenu from "@/components/DownloadMenu";
 import ProjectGalleryModal from "@/components/ProjectGalleryModal";
 
 const DOWNLOAD_ITEMS = [
@@ -29,8 +28,7 @@ function isPhoneLikeDevice() {
 }
 
 /**
- * Desktop: horizontal nav links.
- * Phones (iOS + Android): top-right hamburger that opens a dropdown.
+ * Header menu is a burger on every screen. The dropdown holds Home, Downloads, and Log out.
  */
 export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galleryImages = [] }) {
   const [open, setOpen] = useState(false);
@@ -91,32 +89,6 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
 
   return (
     <>
-      <div className="be-links be-links--desktop">
-        <span className="be-link" onClick={onHome} role="button" style={{ cursor: "pointer" }}>
-          Home
-        </span>
-        <DownloadMenu />
-        <span className="be-link">Location Map</span>
-        <span
-          className="be-link"
-          onClick={openGallery}
-          role="button"
-          tabIndex={hasGallery ? 0 : -1}
-          style={{ cursor: hasGallery ? "pointer" : "default" }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              openGallery();
-            }
-          }}
-        >
-          Gallery
-        </span>
-        <span className="be-link" onClick={onLogout} role="button" style={{ cursor: "pointer" }}>
-          Log out
-        </span>
-      </div>
-
       <div className={"be-nav-mobile" + (open ? " open" : "")} ref={rootRef}>
         <button
           type="button"

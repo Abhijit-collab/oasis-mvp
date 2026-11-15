@@ -34,6 +34,8 @@ import useLiveUnitsPoll from "@/hooks/useLiveUnitsPoll";
 import { getOrbitStepScope, getVisibleOrbitFlats } from "@/lib/orbitStepScope";
 import { getFloorSliderRange } from "@/lib/floorSliderRange";
 import BlockFilterPrompt from "@/components/BlockFilterPrompt";
+import PoiHotspots from "@/components/PoiHotspots";
+import { viewIdFromSrc } from "@/data/pois";
 import { anchorAbovePoints, anchorAbovePolygons } from "@/lib/zonePromptAnchor";
 import { isUnitSold } from "@/lib/unitStatus";
 import { useFilterPanelSelectionSync } from "@/hooks/useFilterPanelSelectionSync";
@@ -347,7 +349,12 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   useEffect(() => {
     if (!tourRevealed) return undefined;
-    const timer = setTimeout(() => setShowDragHint(false), 20000);
+    const phone =
+      document.documentElement.classList.contains("be-phone") ||
+      /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || "") ||
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
+      window.matchMedia("(max-width: 900px)").matches;
+    const timer = setTimeout(() => setShowDragHint(false), phone ? 10000 : 20000);
     return () => clearTimeout(timer);
   }, [tourRevealed]);
 
@@ -609,6 +616,23 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   const pendingRef = useRef(false);
   const stageRef = useRef(null);
   const stageBoxRef = useRef(null);
+  const poiRef = useRef(null);
+  const poiGen = useRef(0);
+
+  const settledPoiViewId = (landedStep) =>
+    landedStep === 0 && startImage ? "Seq1_StartImage" : viewIdFromSrc(holdClipForStep(landedStep));
+
+  const clearPoisForMove = () => {
+    poiGen.current += 1;
+    poiRef.current?.clearPois();
+  };
+
+  const showSettledPois = (landedStep, gen) => {
+    requestAnimationFrame(() => {
+      if (poiGen.current !== gen) return;
+      poiRef.current?.showPoisForView(settledPoiViewId(landedStep));
+    });
+  };
 
   const handlePlayingChange = (playing) => {
     setIsPlaying(playing);
@@ -629,6 +653,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     setClipSrc(holdClipForStep(stepRef.current));
     setHoldAtOverride(null);
     setHoldResetKey(Date.now());
+    showSettledPois(stepRef.current, poiGen.current);
   };
 
   const canPrev =
@@ -649,6 +674,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const goNext = async () => {
     if (!canNext) return;
+    clearPoisForMove();
     pendingRef.current = true;
     const fromStep = stepRef.current;
     const src = ORBIT_STEP_CLIPS[fromStep >= ORBIT_STEP_COUNT ? 0 : fromStep];
@@ -673,6 +699,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const goPrev = async () => {
     if (!canPrev) return;
+    clearPoisForMove();
     pendingRef.current = true;
     const fromStep = stepRef.current;
     const reverseClip = ORBIT_STEP_CLIPS_REVERSE[reverseClipIndexForBack(fromStep)];
@@ -704,6 +731,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const goHome = () => {
     if (homeResetting) return;
+    clearPoisForMove();
 
     clearTimeout(homeOutTimerRef.current);
     clearTimeout(homeInTimerRef.current);
@@ -835,6 +863,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   }, [step]);
 
   const onClipDone = (direction = "forward") => {
+    const gen = poiGen.current;
     pendingRef.current = false;
     let newStep = stepRef.current;
 
@@ -875,6 +904,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     setPlayDirection("forward");
     setMode("hold");
     setIsPlaying(false);
+    if (!(newStep === 0 && startImage)) showSettledPois(newStep, gen);
   };
 
   const zoneConfig = getOrbitStepZones(step);
@@ -897,6 +927,13 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   );
   const showStartImage =
     Boolean(startImage) && startStillPhase !== "hidden" && !homeResetting;
+
+  useEffect(() => {
+    if (!tourRevealed || showPreload || isPlaying || homeResetting || mode === "play") return;
+    if (step !== 0 || !showStartImage || startStillPhase !== "in") return;
+    poiRef.current?.showPoisForView("Seq1_StartImage");
+  }, [tourRevealed, showPreload, isPlaying, homeResetting, mode, step, showStartImage, startStillPhase]);
+
   const showPremiumChrome = showFilters && tourRevealed && !homeResetting;
   const showZoneOverlay = Boolean(
     zoneConfig && mode === "hold" && !isPlaying && !homeResetting
@@ -1130,6 +1167,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
               <FullscreenButton />
             </div>
           )}
+          <PoiHotspots ref={poiRef} stageRef={stageBoxRef} />
         </div>
 
         <div className="scrim-top" />

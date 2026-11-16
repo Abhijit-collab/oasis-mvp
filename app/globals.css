@@ -634,11 +634,14 @@ html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .poi-toggle{
   left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px)!important;
   top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px - 58px)!important;
   right:auto!important;bottom:auto!important}
-html.be-phone .be-fs-btn,
-html.be-ios .be-fs-btn{
+html.be-phone:not(.be-ios) .be-fs-btn{
   display:grid!important;visibility:visible!important;opacity:1!important;
   width:48px!important;height:48px!important;
   animation:none!important}
+html.be-ios .be-fs-btn,
+html.be-fs-unsupported .be-fs-btn{display:none!important}
+html.be-ios .poi-toggle{
+  bottom:max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px))!important}
 html.be-phone .be-fs-btn::after,
 html.be-ios .be-fs-btn::after{
   animation:none!important;opacity:0!important}
@@ -1409,8 +1412,18 @@ html.be-phone .be-top-actions{
 html.be-phone .be-nav-dropdown{
   right:0;left:auto;
   max-width:min(280px,calc(100vw - var(--be-orbit-inset-r, 12px) - 8px))}
-html.be-phone .project-brand-logo--explorer,
-html.be-phone .be-brand--logo.project-brand-logo--explorer{display:none!important}
+html.be-phone .project-brand-logo--explorer.be-brand--logo{
+  display:flex!important;
+  position:fixed;z-index:45;
+  left:0;top:max(16px,env(safe-area-inset-top,0px));
+  width:var(--be-vid-left,0px);height:auto;
+  margin:0;padding:0 6px;box-sizing:border-box;
+  justify-content:center;align-items:flex-start;
+  pointer-events:auto}
+html.be-phone .project-brand-logo--explorer img{
+  width:100%;height:auto;
+  max-height:22vh;
+  object-fit:contain;object-position:center top}
 @media(max-width:820px){
   .be-side{position:static;width:auto;margin:0;border-radius:0;top:auto;bottom:auto;
     transform:none!important;max-height:none;border-left:none;border-right:none;border-bottom:none}

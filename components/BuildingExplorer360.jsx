@@ -354,7 +354,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || "") ||
       window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
       window.matchMedia("(max-width: 900px)").matches;
-    const timer = setTimeout(() => setShowDragHint(false), phone ? 10000 : 20000);
+    const timer = setTimeout(() => setShowDragHint(false), phone ? 5000 : 20000);
     return () => clearTimeout(timer);
   }, [tourRevealed]);
 
@@ -385,28 +385,33 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     };
   }, []);
 
-  /** Android: pin AdoptXR + fullscreen to the contained video frame (not the letterbox). */
+  /** Phones: measure the letterbox so the logo can sit in the left black bar. Android also pins chrome to the picture. */
   useEffect(() => {
     if (!tourRevealed || !isPhoneChrome) return undefined;
-    if (typeof document !== "undefined" && document.documentElement.classList.contains("be-ios")) {
-      return undefined;
-    }
 
     const stage = stageBoxRef.current;
     if (!stage) return undefined;
 
     const apply = () => {
       const videos = [...stage.querySelectorAll("video.be-stage-video")];
-      const el =
+      const video =
         videos.find((v) => v.style.visibility !== "hidden" && v.readyState >= 2) ||
         videos.find((v) => v.videoWidth > 0) ||
         videos[0];
+      const still = stage.querySelector("img.be-start-still");
+      const el =
+        video && (video.videoWidth > 0 || video.readyState >= 2)
+          ? video
+          : still && still.naturalWidth > 0
+            ? still
+            : video || still;
       const cw = stage.clientWidth;
       const ch = stage.clientHeight;
       if (!el || !cw || !ch) return;
 
-      const vw = el.videoWidth || 0;
-      const vh = el.videoHeight || 0;
+      const image = el.tagName === "IMG";
+      const vw = (image ? el.naturalWidth : el.videoWidth) || 0;
+      const vh = (image ? el.naturalHeight : el.videoHeight) || 0;
       let left = 0;
       let top = 0;
       let width = cw;
@@ -420,11 +425,20 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         top = (ch - height) / 2;
       }
 
-      stage.style.setProperty("--be-vid-left", `${Math.round(left)}px`);
-      stage.style.setProperty("--be-vid-top", `${Math.round(top)}px`);
-      stage.style.setProperty("--be-vid-width", `${Math.round(width)}px`);
-      stage.style.setProperty("--be-vid-height", `${Math.round(height)}px`);
-      stage.classList.add("be-stage--has-vid-box");
+      const root = stage.closest(".be-root");
+      const box = [
+        ["--be-vid-left", `${Math.round(left)}px`],
+        ["--be-vid-top", `${Math.round(top)}px`],
+        ["--be-vid-width", `${Math.round(width)}px`],
+        ["--be-vid-height", `${Math.round(height)}px`],
+      ];
+      for (const [name, value] of box) {
+        root?.style.setProperty(name, value);
+        stage.style.setProperty(name, value);
+      }
+      if (!document.documentElement.classList.contains("be-ios")) {
+        stage.classList.add("be-stage--has-vid-box");
+      }
     };
 
     apply();

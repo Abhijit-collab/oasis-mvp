@@ -56,6 +56,51 @@ function arrowLength(el) {
   return Math.round(Math.max(44, Math.min(DESKTOP_ARROW, length)));
 }
 
+const BADGE_GAP = 48;
+const MIN_LINE = 32;
+
+/** On a phone, nearby numbers share one height and cover each other. Stretch the lines until they clear. */
+function separatePhoneBadges(marks) {
+  if (!isMobileTourDevice() || marks.length < 2) return marks;
+  const items = marks.map((mark) => ({ ...mark }));
+  const span = (mark) => Math.hypot(mark.bx - mark.x, mark.by - mark.y) || 1;
+  const setSpan = (mark, next) => {
+    const vx = mark.bx - mark.x;
+    const vy = mark.by - mark.y;
+    const cur = Math.hypot(vx, vy) || 1;
+    let len = Math.max(MIN_LINE, next);
+    mark.bx = mark.x + (vx / cur) * len;
+    mark.by = mark.y + (vy / cur) * len;
+    if (mark.by < 22 && vy < 0) {
+      len = Math.max(MIN_LINE, ((22 - mark.y) * cur) / vy);
+      mark.bx = mark.x + (vx / cur) * len;
+      mark.by = mark.y + (vy / cur) * len;
+    }
+    mark.len = Math.round(Math.hypot(mark.bx - mark.x, mark.by - mark.y));
+  };
+
+  for (let pass = 0; pass < 18; pass += 1) {
+    let moved = false;
+    for (let i = 0; i < items.length; i += 1) {
+      for (let j = i + 1; j < items.length; j += 1) {
+        const a = items[i];
+        const b = items[j];
+        const dist = Math.hypot(b.bx - a.bx, b.by - a.by);
+        if (dist >= BADGE_GAP) continue;
+        const extra = BADGE_GAP - dist + 8;
+        const upper = a.by <= b.by ? a : b;
+        const lower = upper === a ? b : a;
+        const before = upper.by;
+        setSpan(upper, span(upper) + extra);
+        if (Math.abs(upper.by - before) < 3) setSpan(lower, span(lower) - extra);
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return items;
+}
+
 function mediaElement(stage, type) {
   if (!stage) return null;
   if (type === "image") return stage.querySelector("img.be-start-still");
@@ -151,7 +196,7 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
             by: point.y + Math.sin(rad) * length,
           });
         }
-        setMarks(next);
+        setMarks(separatePhoneBadges(next));
         if (!animate) return true;
         drawnTicket.current = my;
         const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

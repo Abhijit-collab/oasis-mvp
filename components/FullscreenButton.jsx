@@ -6,55 +6,43 @@ function isIOSDevice() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   if (/iPad|iPhone|iPod/i.test(ua)) return true;
-  // iPadOS 13+ reports as Mac
   return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+function pageCanFullscreen() {
+  if (typeof document === "undefined" || isIOSDevice()) return false;
+  const root = document.documentElement;
+  return (
+    typeof root.requestFullscreen === "function" ||
+    typeof root.webkitRequestFullscreen === "function"
+  );
 }
 
 function getFullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
 
-function visibleTourVideo() {
-  const videos = [...document.querySelectorAll("video.be-stage-video")];
-  return (
-    videos.find((video) => video.classList.contains("on") && video.videoWidth > 0) ||
-    videos.find((video) => video.videoWidth > 0) ||
-    videos[0] ||
-    null
-  );
-}
-
 export default function FullscreenButton() {
   const [active, setActive] = useState(false);
 
   useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("be-fs-unsupported", !pageCanFullscreen());
     const sync = () => setActive(Boolean(getFullscreenElement()));
     sync();
     document.addEventListener("fullscreenchange", sync);
     document.addEventListener("webkitfullscreenchange", sync);
-    const onIosEnd = () => setActive(false);
-    document.addEventListener("webkitendfullscreen", onIosEnd, true);
     return () => {
+      root.classList.remove("be-fs-unsupported");
       document.removeEventListener("fullscreenchange", sync);
       document.removeEventListener("webkitfullscreenchange", sync);
-      document.removeEventListener("webkitendfullscreen", onIosEnd, true);
     };
   }, []);
 
   const toggle = useCallback(async () => {
+    if (!pageCanFullscreen()) return;
     const root = document.documentElement;
-    const video = visibleTourVideo();
     try {
-      if (isIOSDevice() && video && typeof video.webkitEnterFullscreen === "function") {
-        if (video.webkitDisplayingFullscreen && video.webkitExitFullscreen) {
-          video.webkitExitFullscreen();
-          setActive(false);
-        } else {
-          video.webkitEnterFullscreen();
-          setActive(true);
-        }
-        return;
-      }
       if (getFullscreenElement()) {
         if (document.exitFullscreen) await document.exitFullscreen();
         else document.webkitExitFullscreen?.();

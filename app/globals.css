@@ -94,7 +94,9 @@ html:has(.be-root),body:has(.be-root){
 .be-root:has(.poi-panel.open) .be-orbit-arw{
   opacity:0!important;visibility:hidden;pointer-events:none}
 .poi-pop-card img{width:100%;border-radius:8px;margin:16px 0;display:block}
-.poi-pop-card h2{font-family:var(--serif),Georgia,serif;font-size:22px;font-weight:600;margin-top:8px}
+.poi-pop-card h2{
+  font-family:var(--serif),Georgia,serif;font-size:22px;font-weight:600;
+  margin-top:8px;line-height:1.35;padding-right:22px}
 .poi-pop-card p{color:#ccc;line-height:1.6;font-size:14px;margin-top:10px}
 .poi-panel-num{color:#d8b65a;font-weight:600;font-size:13px;letter-spacing:.1em}
 .poi-panel-close{
@@ -108,7 +110,7 @@ html:has(.be-root),body:has(.be-root){
     overflow-y:auto;
     padding:26px 12px 12px;
     border-radius:10px}
-  .poi-pop-card h2{font-size:16px;line-height:1.2;margin-top:0}
+  .poi-pop-card h2{font-size:16px;line-height:1.35;margin-top:0;padding-right:18px}
   .poi-pop-card p{font-size:12px;line-height:1.45;margin-top:6px}
   .poi-pop-card img{max-height:92px;object-fit:cover;margin:8px 0;border-radius:6px}
   .poi-panel-close{top:2px;right:6px;font-size:22px}}
@@ -118,7 +120,7 @@ html.be-phone .poi-pop-card{
   overflow-y:auto;
   padding:26px 12px 12px;
   border-radius:10px}
-html.be-phone .poi-pop-card h2{font-size:16px;line-height:1.2;margin-top:0}
+html.be-phone .poi-pop-card h2{font-size:16px;line-height:1.35;margin-top:0;padding-right:18px}
 html.be-phone .poi-pop-card p{font-size:12px;line-height:1.45;margin-top:6px}
 html.be-phone .poi-pop-card img{max-height:92px;object-fit:cover;margin:8px 0;border-radius:6px}
 html.be-phone .poi-panel-close{top:2px;right:6px;font-size:22px}

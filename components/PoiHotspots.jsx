@@ -100,6 +100,16 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
     unlisten();
   }, []);
 
+  useEffect(() => {
+    if (activeN == null) return undefined;
+    const onClick = (event) => {
+      if (cardRef.current?.contains(event.target)) return;
+      setActiveN(null);
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [activeN]);
+
   useImperativeHandle(ref, () => ({
     clearPois() {
       ticket.current += 1;
@@ -273,7 +283,11 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
               : { left: active.bx, top: active.by, visibility: "hidden" }
           }
         >
-          <div className="poi-pop-card" ref={cardRef}>
+          <div
+            className="poi-pop-card"
+            ref={cardRef}
+            onClick={(event) => event.stopPropagation()}
+          >
             <button
               type="button"
               className="poi-panel-close"

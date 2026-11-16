@@ -391,7 +391,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
     };
   }, []);
 
-  /** Phones: measure the letterbox so the logo can sit in the left black bar. Android also pins chrome to the picture. */
+  /** Phones: measure the letterbox so the logo and buttons sit in the black bars. */
   useEffect(() => {
     if (!tourRevealed || !isPhoneChrome) return undefined;
 
@@ -431,20 +431,22 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         top = (ch - height) / 2;
       }
 
+      const right = Math.max(0, cw - left - width);
+      const bottom = Math.max(0, ch - top - height);
       const root = stage.closest(".be-root");
       const box = [
         ["--be-vid-left", `${Math.round(left)}px`],
         ["--be-vid-top", `${Math.round(top)}px`],
         ["--be-vid-width", `${Math.round(width)}px`],
         ["--be-vid-height", `${Math.round(height)}px`],
+        ["--be-vid-right", `${Math.round(right)}px`],
+        ["--be-vid-bottom", `${Math.round(bottom)}px`],
       ];
       for (const [name, value] of box) {
         root?.style.setProperty(name, value);
         stage.style.setProperty(name, value);
       }
-      if (!document.documentElement.classList.contains("be-ios")) {
-        stage.classList.add("be-stage--has-vid-box");
-      }
+      stage.classList.add("be-stage--has-vid-box");
     };
 
     apply();

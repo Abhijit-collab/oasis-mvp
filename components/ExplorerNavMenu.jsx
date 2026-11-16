@@ -35,6 +35,7 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
   const [downloadsOpen, setDownloadsOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
   const hasGallery = Array.isArray(galleryImages) && galleryImages.length > 0;
 
   useEffect(() => {
@@ -54,7 +55,19 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
 
   useEffect(() => {
     onOpenChange?.(open);
+    document.documentElement.classList.toggle("be-nav-open", open);
+    return () => document.documentElement.classList.remove("be-nav-open");
   }, [open, onOpenChange]);
+
+  useEffect(() => {
+    if (!open || !downloadsOpen) return undefined;
+    const menu = menuRef.current;
+    if (!menu) return undefined;
+    const frame = requestAnimationFrame(() => {
+      menu.scrollTop = menu.scrollHeight;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, downloadsOpen]);
 
   useEffect(() => {
     if (!open) setDownloadsOpen(false);
@@ -103,7 +116,7 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
           <span />
         </button>
         {open && (
-          <div className="be-nav-dropdown" role="menu">
+          <div className="be-nav-dropdown" role="menu" ref={menuRef}>
             <div className="be-nav-group">
               <button type="button" className="be-nav-item" role="menuitem" onClick={closeThen(onHome)}>
                 Home

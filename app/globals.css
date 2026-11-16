@@ -189,38 +189,37 @@ html.be-phone:not(.be-ios) .be-tour-reveal--in{
   object-fit:contain;object-position:center center;
   pointer-events:none;background:#06070a}
 
-/* Android: AdoptXR + fullscreen sit on the contained video frame, not the letterbox. */
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer{
+/* Phones: AdoptXR in the left black bar, fullscreen and POI in the right black bar. */
+html.be-phone .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer{
   position:absolute;
-  left:calc(var(--be-vid-left, 0px) + 12px);
-  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px);
-  bottom:auto;right:auto;
-  transform:translateY(-100%);
-  animation:none;opacity:.9;z-index:37}
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer img{
-  height:28px;max-width:min(120px,28vw)}
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .be-fs-btn{
+  left:0;right:auto;top:auto;
+  bottom:max(12px,env(safe-area-inset-bottom,0px));
+  width:var(--be-vid-left,0px);height:auto;
+  transform:none;
+  display:flex;justify-content:center;align-items:flex-end;
+  margin:0;padding:0 6px;box-sizing:border-box;
+  animation:none;opacity:.92;z-index:37}
+html.be-phone .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer img{
+  width:100%;height:auto;max-height:32px;max-width:100%;
+  object-fit:contain;object-position:center bottom}
+html.be-phone .be-stage--has-vid-box .be-stage-chrome .be-fs-btn{
   position:absolute;
-  left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px);
-  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px);
-  right:auto;bottom:auto;
+  left:auto;
+  right:max(4px, calc((var(--be-vid-right, 64px) - 48px) / 2));
+  top:auto;
+  bottom:max(12px,env(safe-area-inset-bottom,0px));
   width:48px;height:48px;z-index:37;
   animation:none}
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .tour-sound-btn{
+html.be-phone .be-stage--has-vid-box .be-stage-chrome .poi-toggle{
   position:absolute;
-  left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px - 56px);
-  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px);
-  right:auto;bottom:auto;
+  left:auto;
+  right:max(4px, calc((var(--be-vid-right, 64px) - 48px) / 2));
+  top:auto;
+  bottom:calc(max(12px, env(safe-area-inset-bottom, 0px)) + 58px);
   width:48px;height:48px;z-index:37}
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .poi-toggle{
-  position:absolute;
-  left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px);
-  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px - 58px);
-  right:auto;bottom:auto;
-  width:48px;height:48px;z-index:37}
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .be-fs-btn svg{
+html.be-phone .be-stage--has-vid-box .be-stage-chrome .be-fs-btn svg{
   width:22px;height:22px}
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .be-fs-btn::after{
+html.be-phone .be-stage--has-vid-box .be-stage-chrome .be-fs-btn::after{
   animation:none;opacity:0}
 
 .be-root--contain .be-stage img,
@@ -628,23 +627,29 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
     left:auto;top:auto}
 }
 /* Phones: POI toggle sits directly above the fullscreen button. */
+html.be-phone.be-nav-open .poi-toggle,
+html.be-ios.be-nav-open .poi-toggle{display:none!important}
 html.be-phone .poi-toggle,
 html.be-ios .poi-toggle{
   display:grid!important;visibility:visible!important;opacity:1!important;
-  position:fixed!important;z-index:50!important;
+  position:fixed!important;z-index:37!important;
   width:48px!important;height:48px!important;
-  left:auto!important;top:auto!important;
-  right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 24px)!important;
-  bottom:calc(max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px)) + 58px)!important}
-html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .poi-toggle{
-  position:absolute!important;
-  left:calc(var(--be-vid-left, 0px) + var(--be-vid-width, 100%) - 12px - 48px)!important;
-  top:calc(var(--be-vid-top, 0px) + var(--be-vid-height, 100%) - 12px - 48px - 58px)!important;
-  right:auto!important;bottom:auto!important}
+  top:auto!important;left:auto!important;
+  right:max(4px, calc((var(--be-vid-right, 64px) - 48px) / 2))!important;
+  bottom:calc(max(12px, env(safe-area-inset-bottom, 0px)) + 58px)!important}
+html.be-phone .be-stage-chrome .be-fs-btn{
+  position:fixed!important;z-index:37!important;
+  width:48px!important;height:48px!important;
+  top:auto!important;left:auto!important;
+  right:max(4px, calc((var(--be-vid-right, 64px) - 48px) / 2))!important;
+  bottom:max(12px, env(safe-area-inset-bottom, 0px))!important;
+  animation:none!important}
 html.be-phone:not(.be-ios) .be-fs-btn{
   display:grid!important;visibility:visible!important;opacity:1!important;
   width:48px!important;height:48px!important;
   animation:none!important}
+html.be-phone.be-nav-open .be-fs-btn,
+html.be-ios.be-nav-open .be-fs-btn{display:none!important}
 html.be-ios .be-fs-btn,
 html.be-fs-unsupported .be-fs-btn{display:none!important}
 html.be-ios .poi-toggle{
@@ -1407,7 +1412,10 @@ html.be-phone .be-cta-hint{
     transform:translateX(50%)}
   .be-nav-dropdown{
     right:0;left:auto;
-    max-width:min(280px,calc(100vw - var(--be-orbit-inset-r, 12px) - 8px))}
+    max-width:min(280px,calc(100vw - var(--be-orbit-inset-r, 12px) - 8px));
+    max-height:calc(100dvh - max(10px, env(safe-area-inset-top, 0px)) - 72px - env(safe-area-inset-bottom, 0px));
+    overflow-x:hidden;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
   .project-brand-logo--explorer,
   .be-brand--logo.project-brand-logo--explorer{display:none!important}
   .be-brand:not(.be-brand--logo){display:none!important}
@@ -1426,7 +1434,15 @@ html.be-phone .be-top-actions{
   transform:translateX(50%)}
 html.be-phone .be-nav-dropdown{
   right:0;left:auto;
-  max-width:min(280px,calc(100vw - var(--be-orbit-inset-r, 12px) - 8px))}
+  max-width:min(280px,calc(100vw - var(--be-orbit-inset-r, 12px) - 8px));
+  max-height:calc(100dvh - max(10px, env(safe-area-inset-top, 0px)) - 72px - env(safe-area-inset-bottom, 0px));
+  overflow-x:hidden;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+html.be-nav-open,html.be-nav-open body,html.be-ios.be-nav-open,html.be-ios.be-nav-open body,html.be-nav-open .be-root{
+  touch-action:manipulation!important}
+html.be-phone .be-nav-dropdown::-webkit-scrollbar{width:4px}
+html.be-phone .be-nav-dropdown::-webkit-scrollbar-thumb{
+  background:rgba(216,182,90,.55);border-radius:4px}
 html.be-phone .project-brand-logo--explorer.be-brand--logo{
   display:flex!important;
   position:fixed;z-index:45;

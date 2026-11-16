@@ -272,7 +272,14 @@ html.be-phone:not(.be-ios) .be-stage--has-vid-box .be-stage-chrome .be-fs-btn::a
   .be-orbit-arw--inactive{pointer-events:none}
   .be-orbit-arw--on.be-orbit-arw--inactive{opacity:.35}
   .be-orbit-arw--hidden{display:none!important}
-  .be-cta-hint{bottom:max(6px,calc(env(safe-area-inset-bottom,0px) + 4px));padding:8px 14px;font-size:12px}
+  .be-cta-hint{
+    top:auto;bottom:26px;left:50%;
+    padding:10px 16px;font-size:13px;color:#fff;
+    background:rgba(255,255,255,.14);
+    border:1px solid rgba(255,255,255,.32);
+    backdrop-filter:blur(18px) saturate(1.35);-webkit-backdrop-filter:blur(18px) saturate(1.35);
+    box-shadow:0 12px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.35);
+    animation:bob 2.6s ease-in-out infinite}
 }
 /* Pulse hint for 360 arrows — phones only (class toggled in JS for iOS) */
 .be-orbit-arw--mobile .be-orbit-arw-move{
@@ -935,6 +942,14 @@ button.project-brand-logo{cursor:pointer}
   letter-spacing:.03em;padding:11px 20px;border-radius:999px;box-shadow:0 8px 28px rgba(0,0,0,.4);
   animation:bob 2.6s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-5px)}}
+html.be-phone .be-cta-hint{
+  top:auto;bottom:26px;left:50%;
+  padding:10px 16px;font-size:13px;color:#fff;
+  background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.32);
+  backdrop-filter:blur(18px) saturate(1.35);-webkit-backdrop-filter:blur(18px) saturate(1.35);
+  box-shadow:0 12px 32px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.35);
+  animation:bob 2.6s ease-in-out infinite}
 .be-cta-hint .hand{font-size:15px}
 
 /* Laptop letterbox: logos and buttons sit on the video frame, not in the bars. */

@@ -354,8 +354,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent || "") ||
       window.matchMedia("(hover: none) and (pointer: coarse)").matches ||
       window.matchMedia("(max-width: 900px)").matches;
-    const timer = setTimeout(() => setShowDragHint(false), phone ? 5000 : 20000);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => setShowDragHint(false), phone ? 10000 : 20000);
+    if (!phone) return () => clearTimeout(timer);
+    const dismiss = () => setShowDragHint(false);
+    document.addEventListener("pointerdown", dismiss, true);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("pointerdown", dismiss, true);
+    };
   }, [tourRevealed]);
 
   // Keep shared login→tour soundtrack playing once the 360 stage is visible.

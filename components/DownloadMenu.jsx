@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const ITEMS = [
-  { label: "Rera Certificate", href: "#" },
+  { label: "Rera Certificate", href: "/api/downloads?id=rera" },
   { label: "Project Brochure", href: "#" },
   { label: "Architectural Plan", href: "#" },
 ];

@@ -2,12 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import ProjectGalleryModal from "@/components/ProjectGalleryModal";
-
-const DOWNLOAD_ITEMS = [
-  { label: "Rera Certificate", href: "#" },
-  { label: "Project Brochure", href: "#" },
-  { label: "Architectural Plan", href: "#" },
-];
+import { DOWNLOADS } from "@/data/downloads";
 
 const PHONE_CLASS = "be-phone";
 
@@ -100,6 +95,12 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
     setGalleryOpen(true);
   };
 
+  // Close after the tap so iOS still follows the link. Unmounting the <a> during
+  // click cancels the download on phones.
+  const closeAfterDownload = () => {
+    window.setTimeout(() => setOpen(false), 0);
+  };
+
   return (
     <>
       <div className={"be-nav-mobile" + (open ? " open" : "")} ref={rootRef}>
@@ -142,18 +143,38 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
                 </span>
               </button>
               {downloadsOpen &&
-                DOWNLOAD_ITEMS.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    className="be-nav-item be-nav-item--sub"
-                    role="menuitem"
-                    download
-                    onClick={() => setOpen(false)}
-                  >
-                    {item.label}
-                  </a>
-                ))}
+                DOWNLOADS.map((entry) =>
+                  entry.items ? (
+                    <div key={entry.label}>
+                      <div className="be-nav-label">{entry.label}</div>
+                      {entry.items.map((item) => (
+                        <a
+                          key={item.label}
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener"
+                          className="be-nav-item be-nav-item--sub"
+                          role="menuitem"
+                          onClick={closeAfterDownload}
+                        >
+                          {item.label}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <a
+                      key={entry.label}
+                      href={entry.url}
+                      target="_blank"
+                      rel="noopener"
+                      className="be-nav-item be-nav-item--sub"
+                      role="menuitem"
+                      onClick={closeAfterDownload}
+                    >
+                      {entry.label}
+                    </a>
+                  )
+                )}
             </div>
 
             <div className="be-nav-group be-nav-group--end">

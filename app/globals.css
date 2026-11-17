@@ -848,6 +848,8 @@ button.project-brand-logo{cursor:pointer}
 .be-nav-caret{font-size:11px;opacity:.7;transition:transform .18s;line-height:1}
 .be-nav-caret.open{transform:rotate(180deg)}
 .be-nav-item--sub{padding-left:22px;font-weight:400;font-size:clamp(11px,3vw,13px);color:rgba(255,255,255,.78)}
+html.be-phone .be-nav-dropdown a.be-nav-item{
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 
 /* 360 orbit rotate control */
 .be-rotate-wrap{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:6}

@@ -151,8 +151,7 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
                         <a
                           key={item.label}
                           href={item.url}
-                          target="_blank"
-                          rel="noopener"
+                          download
                           className="be-nav-item be-nav-item--sub"
                           role="menuitem"
                           onClick={closeAfterDownload}
@@ -165,8 +164,7 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
                     <a
                       key={entry.label}
                       href={entry.url}
-                      target="_blank"
-                      rel="noopener"
+                      download
                       className="be-nav-item be-nav-item--sub"
                       role="menuitem"
                       onClick={closeAfterDownload}

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>360</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#err{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(240px,84vw);color:#fff;font:15px/1.4 system-ui,sans-serif;text-align:center}
+#bar{height:8px;margin-top:14px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden}
+#fill{height:100%;width:35%;background:#d8b65a;animation:pano-slide 1.1s ease-in-out infinite}
+@keyframes pano-slide{from{transform:translateX(-120%)}to{transform:translateX(320%)}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="err" hidden><span id="label">Loading 360</span><div id="bar"><div id="fill"></div></div></div>
+<script>
+const src = new URLSearchParams(location.search).get("img");
+const status = document.getElementById("err");
+const canvas = document.getElementById("c");
+const gl = canvas.getContext("webgl", { antialias: true, alpha: false });
+
+const label = document.getElementById("label");
+const bar = document.getElementById("bar");
+function show(text, loading) {
+  status.hidden = !text;
+  if (!text) return;
+  label.textContent = text;
+  bar.hidden = !loading;
+}
+
+if (!src) {
+  show("Missing image");
+} else if (!gl) {
+  show("WebGL is not available");
+} else {
+  const vs = "attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}";
+  const fs = [
+    "precision highp float;",
+    "uniform sampler2D uTex;",
+    "uniform vec2 uRes;",
+    "uniform float uYaw,uPitch,uFov;",
+    "const float PI=3.141592653589793;",
+    "void main(){",
+    "vec2 ndc=(gl_FragCoord.xy/uRes)*2.0-1.0;",
+    "float aspect=uRes.x/uRes.y;",
+    "float t=tan(uFov*0.5);",
+    "vec3 dir=normalize(vec3(ndc.x*t*aspect,ndc.y*t,-1.0));",
+    "float cy=cos(uYaw),sy=sin(uYaw),cp=cos(uPitch),sp=sin(uPitch);",
+    "dir=vec3(dir.x,cp*dir.y-sp*dir.z,sp*dir.y+cp*dir.z);",
+    "dir=vec3(cy*dir.x+sy*dir.z,dir.y,-sy*dir.x+cy*dir.z);",
+    "float lon=atan(dir.x,dir.z);",
+    "float lat=asin(clamp(dir.y,-1.0,1.0));",
+    "vec2 uv=vec2(lon/(2.0*PI)+0.5,lat/PI+0.5);",
+    "gl_FragColor=texture2D(uTex,uv);",
+    "}"
+  ].join("");
+
+  function shader(type, source) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, vs));
+  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    show("Could not start the 360 viewer");
+  } else {
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "a");
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  const uTex = gl.getUniformLocation(prog, "uTex");
+  const uRes = gl.getUniformLocation(prog, "uRes");
+  const uYaw = gl.getUniformLocation(prog, "uYaw");
+  const uPitch = gl.getUniformLocation(prog, "uPitch");
+  const uFov = gl.getUniformLocation(prog, "uFov");
+  let yaw = Math.PI;
+  let pitch = 0;
+  let fov = Math.PI / 2;
+  let drag = false;
+  let lx = 0;
+  let ly = 0;
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  canvas.addEventListener("pointerdown", (event) => {
+    drag = true;
+    lx = event.clientX;
+    ly = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    yaw -= (event.clientX - lx) * 0.005;
+    pitch -= (event.clientY - ly) * 0.005;
+    pitch = Math.max(-1.2, Math.min(1.2, pitch));
+    lx = event.clientX;
+    ly = event.clientY;
+  });
+  canvas.addEventListener("pointerup", () => { drag = false; });
+  canvas.addEventListener("pointercancel", () => { drag = false; });
+  canvas.addEventListener("wheel", (event) => {
+    fov = Math.max(0.5, Math.min(1.6, fov + event.deltaY * 0.001));
+  }, { passive: true });
+
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.onload = () => {
+    clearTimeout(loader);
+    let source = image;
+    const max = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
+    if (image.width > max || image.height > max) {
+      const scale = Math.min(max / image.width, max / image.height);
+      const copy = document.createElement("canvas");
+      copy.width = Math.max(2, Math.floor(image.width * scale));
+      copy.height = Math.max(2, Math.floor(image.height * scale));
+      copy.getContext("2d").drawImage(image, 0, 0, copy.width, copy.height);
+      source = copy;
+    }
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    try {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    } catch (err) {
+      show("This panorama is too large for the browser");
+      return;
+    }
+    if (gl.getError()) {
+      show("This panorama is too large for the browser");
+      return;
+    }
+    show("");
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.uniform1i(uTex, 0);
+    (function frame() {
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      gl.uniform1f(uYaw, yaw);
+      gl.uniform1f(uPitch, pitch);
+      gl.uniform1f(uFov, fov);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      requestAnimationFrame(frame);
+    })();
+  };
+  image.onerror = () => {
+    clearTimeout(loader);
+    show("Could not load the 360 image");
+  };
+  const loadFrom = /^https?:\/\//.test(src) ? `/api/pano?u=${encodeURIComponent(src)}` : src;
+  const loader = setTimeout(() => show("Loading 360", true), 350);
+  image.src = loadFrom;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,8 +1,9 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
-import { getPoiView } from "@/data/pois";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
+import { getPoiView, panoSrc } from "@/data/pois";
 import { isMobileTourDevice } from "@/lib/rotateGate";
+import Pano360Overlay from "@/components/Pano360Overlay";
 
 const DESKTOP_ARROW = 90;
 const ARROW_AT_1080 = 90;
@@ -122,6 +123,8 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
   const [marks, setMarks] = useState([]);
   const [revealed, setRevealed] = useState(0);
   const [activeN, setActiveN] = useState(null);
+  const [panoUrl, setPanoUrl] = useState(null);
+  const close360 = useCallback(() => setPanoUrl(null), []);
   const [popPos, setPopPos] = useState(null);
   const layerRef = useRef(null);
   const cardRef = useRef(null);
@@ -344,9 +347,32 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
             <h2>{active.poi.title}</h2>
             {active.poi.img ? <img src={active.poi.img} alt="" /> : null}
             {active.poi.desc ? <p>{active.poi.desc}</p> : null}
+            {active.poi.pano ? (
+              <button
+                type="button"
+                className="poi-pano-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  setPanoUrl(panoSrc(active.poi.pano));
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden>
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"
+                  />
+                  <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                </svg>
+                View 360°
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
+      <Pano360Overlay url={panoUrl} onClose={close360} />
     </div>
   );
 });

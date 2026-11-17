@@ -14,6 +14,29 @@
 const CDN = "https://d38jpb447hexfu.cloudfront.net";
 const gallery = (file) => `${CDN}/hok-gallery/${file}`;
 
+const PANO_VIEWER = "/360/viewer.html";
+const PANO_BASE = "https://d38jpb447hexfu.cloudfront.net/360-view/";
+
+/** A filename loads in the self-hosted viewer. A full tour URL opens as-is. */
+export function panoSrc(pano) {
+  if (!pano) return null;
+  if (/^https?:\/\//.test(pano) && !/\.(png|jpe?g|webp|gif)(\?|$)/i.test(pano)) return pano;
+  const imgUrl = /^https?:\/\//.test(pano) ? pano : PANO_BASE + pano;
+  return `${PANO_VIEWER}?v=8&img=${encodeURIComponent(imgUrl)}`;
+}
+
+/** Panoee scenes. Paste a scene id here to turn on "View 360°" for that title. */
+const PANO_TOUR = "https://tour.panoee.net/6afc2622e76bc567ba2aac1f";
+const POOL_SCENE_ID = "swimming-pool-deck";
+const PANO_SCENES = {
+  "swimming pool": `${PANO_TOUR}/${POOL_SCENE_ID}`,
+  // "tennis court": `${PANO_TOUR}/TENNIS_SCENE_ID`,
+  // "kids playzone": `${PANO_TOUR}/KIDS_SCENE_ID`,
+  // "kids zone": `${PANO_TOUR}/KIDS_SCENE_ID`,
+  // "lawn & jogging track": `${PANO_TOUR}/LAWN_SCENE_ID`,
+  // "community hall": `${PANO_TOUR}/HALL_SCENE_ID`,
+};
+
 /** Same title uses the same gallery photo and description on every sequence. */
 const POI_COPY = {
   "commercial complex": {
@@ -75,9 +98,11 @@ const POI_COPY = {
 };
 
 function withCopy(poi) {
-  const extra = POI_COPY[String(poi.title || "").trim().toLowerCase()];
-  if (!extra) return poi;
-  return { ...poi, img: extra.img, desc: extra.desc };
+  const key = String(poi.title || "").trim().toLowerCase();
+  const extra = POI_COPY[key];
+  const pano = PANO_SCENES[key] || null;
+  if (!extra && !pano) return poi;
+  return { ...poi, ...(extra || {}), ...(pano ? { pano } : {}) };
 }
 
 export const POI_VIEWS = {
@@ -122,7 +147,7 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence2+Nyx3.mp4`,
     pois: [
-      { n: 6, x: 0.445, y: 0.7218, angle: -90, title: "Block 1 entrance", desc: "", img: "" },
+      { n: 6, x: 0.445, y: 0.7218, angle: -90, title: "Block 1 entrance", desc: "", img: "", pano: "Mono_360_2.0007_WEB.png" },
       { n: 7, x: 0.5275, y: 0.5752, angle: -90, title: "Block 2 Entrance", desc: "", img: "" },
       { n: 8, x: 0.574, y: 0.6128, angle: -90, title: "Tennis Court", desc: "", img: "" },
       { n: 9, x: 0.4926, y: 0.6166, angle: -90, title: "Kids Playzone", desc: "", img: "" },
@@ -133,7 +158,7 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence3+Nyx3.mp4`,
     pois: [
-      { n: 6, x: 0.4133, y: 0.6635, angle: -90, title: "Block 1 Entrance", desc: "", img: "" },
+      { n: 6, x: 0.4133, y: 0.6635, angle: -90, title: "Block 1 Entrance", desc: "", img: "", pano: "Mono_360_2.0007_WEB.png" },
       { n: 7, x: 0.555, y: 0.6391, angle: -90, title: "Block 2 Entrance", desc: "", img: "" },
       { n: 8, x: 0.5856, y: 0.7181, angle: -90, title: "Tennis Court", desc: "", img: "" },
       { n: 9, x: 0.5148, y: 0.6466, angle: -90, title: "Kids Playzone", desc: "", img: "" },

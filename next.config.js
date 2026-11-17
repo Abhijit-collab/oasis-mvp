@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async rewrites() {
+    return [{ source: "/analytics", destination: "/analytics/index.html" }];
+  },
   webpack: (config, { dev }) => {
     // OneDrive/synced folders can break webpack's on-disk pack cache (ENOENT on rename).
     if (dev) config.cache = { type: "memory" };

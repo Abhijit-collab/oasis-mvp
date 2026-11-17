@@ -509,8 +509,10 @@ export default function LoginPage({
             poster={backgroundPoster || undefined}
             muted
             loop
+            loop
             playsInline
-            preload={isDesktop ? "auto" : "metadata"}
+            autoPlay={!isDesktop}
+            preload="auto"
           />
         ) : null}
       </div>

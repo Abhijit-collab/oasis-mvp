@@ -83,13 +83,17 @@ html:has(.be-root),body:has(.be-root){
   position:absolute;z-index:4;pointer-events:none;
   width:min(320px,calc(100% - 24px))}
 .poi-pop-card{
-  position:relative;width:100%;max-height:min(52vh,460px);overflow-y:auto;
+  position:relative;width:100%;max-height:min(68vh,520px);overflow-x:hidden;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:rgba(216,182,90,.5) transparent;
   pointer-events:auto;
   background:rgba(12,14,18,.38);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   border:1px solid rgba(255,255,255,.22);border-radius:12px;
   padding:34px 18px 20px;color:#fff;
   box-shadow:0 12px 32px rgba(0,0,0,.28);
   animation:poi-pop-in .22s ease-out}
+.poi-pop-card::-webkit-scrollbar{width:4px}
+.poi-pop-card::-webkit-scrollbar-track{background:transparent}
+.poi-pop-card::-webkit-scrollbar-thumb{background:rgba(216,182,90,.5);border-radius:999px}
 @keyframes poi-pop-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 .be-root:has(.poi-panel.open) .be-orbit-arw{
   opacity:0!important;visibility:hidden;pointer-events:none}
@@ -153,6 +157,11 @@ html.be-phone .poi-panel-close{top:2px;right:6px;font-size:22px}
   width:44px;height:44px;padding:0;border-radius:50%;cursor:pointer;
   border:1px solid rgba(255,255,255,.35);background:rgba(12,14,18,.72);color:#fff;
   font-size:26px;line-height:1;display:grid;place-items:center}
+html.be-phone .pano360-panel{
+  width:min(92vw,calc(78dvh * 16 / 9));
+  height:auto;
+  aspect-ratio:16 / 9;
+  max-height:78dvh}
 @media(prefers-reduced-motion:reduce){
   .poi-line,.poi-dot,.poi-badge,.poi-badge::after,.poi-pop-card{transition:none;animation:none}
   .poi-badge{transform:none}}
@@ -1658,7 +1667,6 @@ html.login-lock,body.login-lock{
 .login-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(165deg,rgba(5,6,8,.58) 0%,rgba(5,6,8,.78) 55%,rgba(5,6,8,.88) 100%)}
 .login-bg--video::after{background:linear-gradient(165deg,rgba(5,6,8,.45) 0%,rgba(5,6,8,.62) 50%,rgba(5,6,8,.82) 100%);z-index:1}
 /* HOK minimal login — teaser + centered login card on demand */
-.login-page--minimal .login-bg-video{filter:brightness(.85) saturate(1.05)}
 .login-page--minimal .login-bg--video::after{
   background:linear-gradient(180deg,rgba(5,6,8,.08) 0%,rgba(5,6,8,.18) 50%,rgba(5,6,8,.38) 100%)}
 .login-page--minimal,.login-page--teaser{padding:0}

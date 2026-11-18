@@ -100,9 +100,16 @@ const POI_COPY = {
 function withCopy(poi) {
   const key = String(poi.title || "").trim().toLowerCase();
   const extra = POI_COPY[key];
-  const pano = PANO_SCENES[key] || null;
-  if (!extra && !pano) return poi;
-  return { ...poi, ...(extra || {}), ...(pano ? { pano } : {}) };
+  const scene = PANO_SCENES[key] || null;
+  if (!extra && !scene) return poi;
+  return {
+    ...poi,
+    ...(extra || {}),
+    ...(poi.desc ? { desc: poi.desc } : {}),
+    ...(poi.img ? { img: poi.img } : {}),
+    ...(scene ? { pano: scene } : {}),
+    ...(poi.pano ? { pano: poi.pano } : {}),
+  };
 }
 
 export const POI_VIEWS = {
@@ -111,25 +118,11 @@ export const POI_VIEWS = {
     type: "image",
     src: `${CDN}/image/Seq1_StartImage.png`,
     pois: [
-      {
-        n: 1,
-        x: 0.5609,
-        y: 0.844,
-        angle: -90,
-        title: "Commercial Complex",
-        img: `${CDN}/hok-gallery/5_Podium1.png`,
-        desc: "Street-level shops and cafes along the podium, with a double-height lobby behind. Sample copy — about 18,000 sq.ft of retail, open from 8am to 10pm.",
-      },
-      { n: 2, x: 0.7706, y: 0.7124, angle: -89, title: "Office Space", desc: "", img: "" },
-      {
-        n: 3,
-        x: 0.2536,
-        y: 0.6166,
-        angle: -90,
-        title: "Multi Storeyed Parking with Podium",
-        desc: "",
-        img: "",
-      },
+      { n: 1, x: 0.5394, y: 0.8402, angle: -90, title: "Shopping Complex", desc: "A curved row of street-level shops and cafes, with a covered walk along the podium and the tower rising above the glass front.", img: "", pano: "POI_1.png" },
+      { n: 2, x: 0.7599, y: 0.7049, angle: -90, title: "High End Office Complex", desc: "Glass-fronted offices beside the arrival gate, with a shaded drop-off and the residential tower set just behind the podium.", img: "", pano: "POI_2.png" },
+      { n: 3, x: 0.2401, y: 0.6147, angle: -90, title: "Multi Storey Parking with Podium", desc: "Stacked parking tucked under a landscaped podium, with the tower and shops rising above the street.", img: "", pano: "POI_3.png" },
+      { n: 4, x: 0.3584, y: 0.8477, angle: -90, title: "Entry Gate 1", desc: "The first arrival gate, with a shaded porch off the street and the tower rising just behind the shops.", img: "", pano: "POI_3.png" },
+      { n: 5, x: 0.724, y: 0.8477, angle: -90, title: "Entry Gate 2", desc: "The second arrival gate, with a glass pavilion beside the porch and the tower set along the street.", img: "", pano: "POI_2.png" },
     ],
   },
   Sequence1: {
@@ -137,9 +130,8 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence1+Nyx3.mp4`,
     pois: [
-      { n: 2, x: 0.6057, y: 0.8534, angle: -90, title: "Office Space", desc: "", img: "" },
-      { n: 4, x: 0.4471, y: 0.2218, angle: -90, title: "Grand Chakra", desc: "", img: "" },
-      { n: 5, x: 0.5571, y: 0.391, angle: -90, title: "Cornices With Chakra Elements", desc: "", img: "" },
+      { n: 7, x: 0.5502, y: 0.3966, angle: -90, title: "Other Terrace Elements", desc: "", img: "" },
+      { n: 8, x: 0.4552, y: 0.2256, angle: -90, title: "Neelachakra Headroom", desc: "", img: "" },
     ],
   },
   Sequence2: {
@@ -147,10 +139,10 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence2+Nyx3.mp4`,
     pois: [
-      { n: 6, x: 0.445, y: 0.7218, angle: -90, title: "Block 1 entrance", desc: "", img: "", pano: "Mono_360_2.0007_WEB.png" },
-      { n: 7, x: 0.5275, y: 0.5752, angle: -90, title: "Block 2 Entrance", desc: "", img: "" },
-      { n: 8, x: 0.574, y: 0.6128, angle: -90, title: "Tennis Court", desc: "", img: "" },
-      { n: 9, x: 0.4926, y: 0.6166, angle: -90, title: "Kids Playzone", desc: "", img: "" },
+      { n: 9, x: 0.5367, y: 0.2049, angle: -90, title: "Tower 2 Dwarka", desc: "The second residential tower, Dwarka, rising beside the arrival court with balconies stacked toward the sky.", img: "" },
+      { n: 8, x: 0.3943, y: 0.3233, angle: -90, title: "Tower 1 Vrindavanam", desc: "The first residential tower, Vrindavanam, set along the street with a shaded base and open balconies above.", img: "" },
+      { n: 10, x: 0.4543, y: 0.7105, angle: -90, title: "Tower 1 Entrance Portico", desc: "A shaded arrival portico with a Krishna relief between the columns, opening onto palms and the tower court.", img: "", pano: "POI_10.png" },
+      { n: 11, x: 0.5242, y: 0.5789, angle: -90, title: "Tower 2 Entrance Portico", desc: "A matching portico with a carved panel under the pergola, set between the glass lobbies and the garden court.", img: "", pano: "POI_11.png" },
     ],
   },
   Sequence3: {
@@ -158,11 +150,8 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence3+Nyx3.mp4`,
     pois: [
-      { n: 6, x: 0.4133, y: 0.6635, angle: -90, title: "Block 1 Entrance", desc: "", img: "", pano: "Mono_360_2.0007_WEB.png" },
-      { n: 7, x: 0.555, y: 0.6391, angle: -90, title: "Block 2 Entrance", desc: "", img: "" },
-      { n: 8, x: 0.5856, y: 0.7181, angle: -90, title: "Tennis Court", desc: "", img: "" },
-      { n: 9, x: 0.5148, y: 0.6466, angle: -90, title: "Kids Playzone", desc: "", img: "" },
-      { n: 10, x: 0.3287, y: 0.6654, angle: -90, title: "Main Entrance", desc: "", img: "" },
+      { n: 12, x: 0.4919, y: 0.6485, angle: -90, title: "Reflexology Walk", desc: "", img: "" },
+      { n: 13, x: 0.526, y: 0.6767, angle: -90, title: "Pergola Seating", desc: "A shaded pergola beside the play court, with seating under the carved roof and the towers on either side.", img: "", pano: "POI_13.png" },
     ],
   },
   Sequence4: {
@@ -170,11 +159,8 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence4+Nyx3.mp4`,
     pois: [
-      { n: 10, x: 0.3911, y: 0.5451, angle: -90, title: "Main Entrance", desc: "", img: "" },
-      { n: 9, x: 0.5317, y: 0.6993, angle: -90, title: "Kids Zone", desc: "", img: "" },
-      { n: 8, x: 0.555, y: 0.8421, angle: -90, title: "Tennis Court", desc: "", img: "" },
-      { n: 11, x: 0.7717, y: 0.6767, angle: -90, title: "Lawn & Jogging Track", desc: "", img: "" },
-      { n: 12, x: 0.8648, y: 0.7594, angle: -90, title: "Swimming Pool", desc: "", img: "" },
+      { n: 14, x: 0.5152, y: 0.8139, angle: -90, title: "Play Court Area", desc: "An outdoor court on the podium, fenced and floodlit, with the tower rising behind the palms.", img: "", pano: "POI_14.png" },
+      { n: 15, x: 0.5394, y: 0.9173, angle: -90, title: "Krishna Temple", desc: "A small temple shrine on the podium walk, set among palms with the tower beyond the garden.", img: "", pano: "POI_15.png" },
     ],
   },
   Sequence5: {
@@ -182,9 +168,11 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence5+Nyx3.mp4`,
     pois: [
-      { n: 11, x: 0.4852, y: 0.4154, angle: -90, title: "Lawn & Jogging Track", desc: "", img: "" },
-      { n: 12, x: 0.6121, y: 0.5094, angle: -90, title: "Swimming Pool", desc: "", img: "" },
-      { n: 13, x: 0.7083, y: 0.5057, angle: -90, title: "Community Hall", desc: "", img: "" },
+      { n: 16, x: 0.4104, y: 0.4248, angle: -90, title: "Ampitheatre", desc: "", img: "" },
+      { n: 17, x: 0.4946, y: 0.4173, angle: -90, title: "Grand Lawn", desc: "A broad lawn between the towers, opening onto a sculpture fountain, with gazebos and palms along the brick path.", img: "", pano: "POI_17.png" },
+      { n: 18, x: 0.5439, y: 0.3515, angle: -90, title: "Gazebo Sitting Area", desc: "A carved wooden gazebo beside the lawn, with cushioned seating and a view across the garden to the tower.", img: "", pano: "POI_18.png" },
+      { n: 19, x: 0.6039, y: 0.3985, angle: -90, title: "Swimming Pool Deck", desc: "A timber deck around the pool, with loungers under a slatted shade and the tower rising beyond the water.", img: "", pano: "POI_19.png" },
+      { n: 20, x: 0.4158, y: 0.5301, angle: -90, title: "Mural Walkway", desc: "A brick walk lined with flower beds and a carved mural wall, running between the towers.", img: "", pano: "POI_20.png" },
     ],
   },
   Sequence6: {
@@ -192,9 +180,8 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence6+Nyx3.mp4`,
     pois: [
-      { n: 11, x: 0.4535, y: 0.2199, angle: -90, title: "Lawn & Jogging Track", desc: "", img: "" },
-      { n: 12, x: 0.3625, y: 0.2744, angle: -90, title: "Swimming Pool", desc: "", img: "" },
-      { n: 13, x: 0.4048, y: 0.3496, angle: -90, title: "Community Hall", desc: "", img: "" },
+      { n: 21, x: 0.3262, y: 0.812, angle: -90, title: "Entry Gate 3", desc: "The third arrival gate, opening from the garden side with a shaded porch and the tower set just beyond.", img: "" },
+      { n: 22, x: 0.4507, y: 0.3459, angle: -90, title: "Garden Walkway", desc: "A raised brick walk through the garden, lined with flowers and palms, curving toward the tower.", img: "", pano: "POI_22.png" },
     ],
   },
   Sequence7: {
@@ -202,9 +189,7 @@ export const POI_VIEWS = {
     type: "video",
     src: `${CDN}/24fps-video-comp/Sequence7+Nyx3.mp4`,
     pois: [
-      { n: 11, x: 0.5243, y: 0.265, angle: -90, title: "Lawn & Jogging Track", desc: "", img: "" },
-      { n: 12, x: 0.39, y: 0.2707, angle: -90, title: "Swimming Pool", desc: "", img: "" },
-      { n: 13, x: 0.2906, y: 0.3102, angle: -90, title: "Community Hall", desc: "", img: "" },
+      { n: 23, x: 0.4238, y: 0.3459, angle: -90, title: "Outdoor Seating Area", desc: "A garden court with a carved mural wall and built-in seating, set among palms and flower beds.", img: "", pano: "POI_23.png" },
     ],
   },
 };

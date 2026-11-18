@@ -280,14 +280,8 @@ export default function LoginPage({
       if (settled || cancelled) return;
       settled = true;
       setTeaserProgress(100);
-      if (hasAudio) {
-        startTeaser({ fromGesture: false });
-        return;
-      }
-      setIntroExit(true);
-      revealTimer = window.setTimeout(() => {
-        startTeaser({ fromGesture: false });
-      }, 380);
+      // Stay on the first page until the visitor clicks.
+      setAwaitingEnter(true);
     };
 
     const start = () => {
@@ -368,9 +362,9 @@ export default function LoginPage({
     };
   }, [backgroundVideo, hasAudio, isDesktop, videoReady]);
 
-  // Browser blocked unmuted autoplay — one real gesture starts video + music (sound on).
+  // First page stays up until a click or key press anywhere, then the teaser starts.
   useEffect(() => {
-    if (!awaitingEnter || !isDesktop) return undefined;
+    if (!backgroundVideo || !isDesktop || desktopTeaserGate) return undefined;
 
     const onEnter = (e) => {
       if (e.type === "mousemove") return;
@@ -386,7 +380,7 @@ export default function LoginPage({
     return () => {
       types.forEach((type) => window.removeEventListener(type, onEnter, { capture: true }));
     };
-  }, [awaitingEnter, isDesktop]);
+  }, [backgroundVideo, desktopTeaserGate, isDesktop]);
 
   // Once teaser is fully buffered, start warming tour clips (does not wait for login).
   useEffect(() => {
@@ -509,7 +503,6 @@ export default function LoginPage({
             poster={backgroundPoster || undefined}
             muted
             loop
-            loop
             playsInline
             autoPlay={!isDesktop}
             preload="auto"
@@ -519,29 +512,21 @@ export default function LoginPage({
 
       {showDesktopIntro && (
         <div
-          className={"login-teaser-intro" + (awaitingEnter ? " login-teaser-intro--enter" : "")}
+          className="login-teaser-intro login-teaser-intro--enter"
           aria-busy={!awaitingEnter}
           aria-live="polite"
-          role={awaitingEnter ? "button" : undefined}
-          tabIndex={awaitingEnter ? 0 : undefined}
-          onClick={
-            awaitingEnter
-              ? (e) => {
-                  e.preventDefault();
-                  startTeaserRef.current?.({ fromGesture: true });
-                }
-              : undefined
-          }
-          onKeyDown={
-            awaitingEnter
-              ? (e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    startTeaserRef.current?.({ fromGesture: true });
-                  }
-                }
-              : undefined
-          }
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.preventDefault();
+            startTeaserRef.current?.({ fromGesture: true });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              startTeaserRef.current?.({ fromGesture: true });
+            }
+          }}
         >
           <div className="login-teaser-intro-glow" aria-hidden />
           {projectLogo ? (

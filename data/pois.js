@@ -22,7 +22,7 @@ export function panoSrc(pano) {
   if (!pano) return null;
   if (/^https?:\/\//.test(pano) && !/\.(png|jpe?g|webp|gif)(\?|$)/i.test(pano)) return pano;
   const imgUrl = /^https?:\/\//.test(pano) ? pano : PANO_BASE + pano;
-  return `${PANO_VIEWER}?v=8&img=${encodeURIComponent(imgUrl)}`;
+  return `${PANO_VIEWER}?v=10&img=${encodeURIComponent(imgUrl)}`;
 }
 
 /** Panoee scenes. Paste a scene id here to turn on "View 360°" for that title. */

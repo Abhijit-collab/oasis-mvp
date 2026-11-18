@@ -17,7 +17,8 @@ canvas{display:block;width:100%;height:100%}
 <canvas id="c"></canvas>
 <div id="err" hidden><span id="label">Loading 360</span><div id="bar"><div id="fill"></div></div></div>
 <script>
-const src = new URLSearchParams(location.search).get("img");
+const params = new URLSearchParams(location.search);
+const src = params.get("img");
 const status = document.getElementById("err");
 const canvas = document.getElementById("c");
 const gl = canvas.getContext("webgl", { antialias: true, alpha: false });
@@ -53,7 +54,7 @@ if (!src) {
     "dir=vec3(cy*dir.x+sy*dir.z,dir.y,-sy*dir.x+cy*dir.z);",
     "float lon=atan(dir.x,dir.z);",
     "float lat=asin(clamp(dir.y,-1.0,1.0));",
-    "vec2 uv=vec2(lon/(2.0*PI)+0.5,lat/PI+0.5);",
+    "vec2 uv=vec2(0.5-lon/(2.0*PI),lat/PI+0.5);",
     "gl_FragColor=texture2D(uTex,uv);",
     "}"
   ].join("");
@@ -110,7 +111,7 @@ if (!src) {
   });
   canvas.addEventListener("pointermove", (event) => {
     if (!drag) return;
-    yaw -= (event.clientX - lx) * 0.005;
+    yaw += (event.clientX - lx) * 0.005;
     pitch -= (event.clientY - ly) * 0.005;
     pitch = Math.max(-1.2, Math.min(1.2, pitch));
     lx = event.clientX;

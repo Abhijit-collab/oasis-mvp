@@ -162,6 +162,16 @@ html.be-phone .pano360-panel{
   height:auto;
   aspect-ratio:16 / 9;
   max-height:78dvh}
+/* Upright phone: the 360 box is landscape-sized, then turned so it fills the screen.
+   The class is set in JS from the real window size, so it does not depend on html.be-phone. */
+.pano360--sideways{padding:0}
+.pano360--sideways .pano360-panel{
+  position:fixed;top:0;left:100vw;left:100dvw;
+  width:100vh;width:100dvh;
+  height:100vw;height:100dvw;
+  max-width:none;max-height:none;aspect-ratio:auto;
+  margin:0;border-radius:0;
+  transform:rotate(90deg);transform-origin:top left}
 @media(prefers-reduced-motion:reduce){
   .poi-line,.poi-dot,.poi-badge,.poi-badge::after,.poi-pop-card{transition:none;animation:none}
   .poi-badge{transform:none}}
@@ -1662,6 +1672,13 @@ html.login-lock,body.login-lock{
 .login-bg--video{background:none;filter:none;transform:none;overflow:hidden}
 .login-bg-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;
   pointer-events:none;filter:brightness(.55)}
+/* Phones: keep the whole teaser inside the screen, sized to the viewport. */
+@media (max-width:900px), (hover:none) and (pointer:coarse) {
+  .login-bg--video{display:flex;align-items:center;justify-content:center;background:#000}
+  .login-bg-video{
+    position:relative;inset:auto;width:100%;height:100%;max-width:100%;max-height:100dvh;
+    object-fit:contain;object-position:center center}
+}
 .login-bg-audio{
   position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0;overflow:hidden;z-index:0}
 .login-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(165deg,rgba(5,6,8,.58) 0%,rgba(5,6,8,.78) 55%,rgba(5,6,8,.88) 100%)}
@@ -1991,8 +2008,8 @@ html:has(.login-welcome-bg),body:has(.login-welcome-bg){
   .login-welcome-modal .login-btn{padding:11px 14px;font-size:13px}
 }
 
-/* ---- Mobile rotate-to-landscape prompt ---- */
-/* Visible on portrait immediately (CSS). Hidden only after html.rotate-ok (stable landscape). */
+/* ---- Mobile rotate-to-landscape prompt (commented for portrait preview) ---- */
+/*
 body.rotate-prompt-open{overflow:hidden}
 .rotate-prompt{
   display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;padding:28px 22px;
@@ -2003,7 +2020,6 @@ body.rotate-prompt-open{overflow:hidden}
   .rotate-prompt{display:flex!important}
   body{overflow:hidden}
 }
-/* Keep covering during an unstable / partial tilt (landscape media alone is not enough). */
 @media(max-width:900px),(hover:none) and (pointer:coarse){
   html:not(.rotate-ok) .rotate-prompt{display:flex!important}
   html:not(.rotate-ok) .login-page,
@@ -2013,6 +2029,7 @@ body.rotate-prompt-open{overflow:hidden}
 html.rotate-ok .rotate-prompt{display:none!important}
 html.rotate-ok .login-page,
 html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
+*/
 .rotate-prompt-inner{
   width:100%;max-width:360px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:0}
 .rotate-prompt-anim{

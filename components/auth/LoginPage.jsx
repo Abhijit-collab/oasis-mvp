@@ -5,7 +5,7 @@ import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
 import AdoptXRLogo from "@/components/AdoptXRLogo";
 import ProjectBrandLogo from "@/components/ProjectBrandLogo";
-import { isMobileTourDevice, isRotateOk } from "@/lib/rotateGate";
+import { isMobileTourDevice } from "@/lib/rotateGate";
 import { useTourSoundtrack } from "@/components/TourSoundtrack";
 
 function clearInline(el, props) {
@@ -173,7 +173,9 @@ export default function LoginPage({
   // Only mount/play teaser video after rotate gate clears (stable landscape on phones).
   useEffect(() => {
     const sync = () => {
-      const allow = !isMobileTourDevice() || isRotateOk();
+      // Portrait preview: do not wait for landscape before showing the teaser.
+      const allow = true;
+      // const allow = !isMobileTourDevice() || isRotateOk();
       setVideoReady(allow);
       if (!allow && videoRef.current) {
         videoRef.current.pause();

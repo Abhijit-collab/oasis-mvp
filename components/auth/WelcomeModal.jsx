@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdoptXRLogo from "@/components/AdoptXRLogo";
 import PremiumBadge from "@/components/PremiumBadge";
 import PremiumPerks from "@/components/PremiumPerks";
 import ProjectBrandLogo from "@/components/ProjectBrandLogo";
@@ -103,6 +104,7 @@ export default function WelcomeModal({
           Enter your private tour
         </button>
       </div>
+      <AdoptXRLogo variant="white" placement="login" />
     </div>
   );
 }

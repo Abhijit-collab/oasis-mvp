@@ -1,3 +1,5 @@
+import AdoptXRLogo from "@/components/AdoptXRLogo";
+import ProjectBrandLogo from "@/components/ProjectBrandLogo";
 import SlowNetworkNotice from "@/components/SlowNetworkNotice";
 
 /** Full-screen tour buffering — shown after "Enter your private tour". */
@@ -7,6 +9,8 @@ export default function TourPreloadScreen({
   label,
   brandPrefix = "THE",
   brandName = "OASIS",
+  brandLogo = "",
+  brandLogoAlt = "Brand",
   variant = "bar",
   loading = false,
 }) {
@@ -22,6 +26,9 @@ export default function TourPreloadScreen({
         (isFeather ? " be-preload--feather" : "")
       }
     >
+      {brandLogo ? (
+        <ProjectBrandLogo src={brandLogo} alt={brandLogoAlt} className="project-brand-logo--preload" />
+      ) : null}
       {isFeather ? (
         <PeacockFeatherFlight progress={pct} />
       ) : (
@@ -51,6 +58,7 @@ export default function TourPreloadScreen({
       )}
       <p className="be-preload-pct">{pct}%</p>
       <SlowNetworkNotice loading={loading && !exiting} />
+      <AdoptXRLogo variant="white" placement="login" />
     </div>
   );
 }

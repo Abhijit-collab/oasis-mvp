@@ -79,7 +79,11 @@ export default function BookingPayment({
   const block = params.get("block") || "Block A";
   const returnTo =
     params.get("returnTo") ||
-    (pathname?.startsWith("/test") ? "/test" : pathname?.startsWith("/HOK") ? "/HOK" : "/");
+    (pathname?.toLowerCase().startsWith("/test")
+      ? "/test"
+      : pathname?.toLowerCase().startsWith("/hok")
+        ? "/HOK"
+        : "/");
   const units = useMemo(() => mergeLiveUnits(liveUnits), [liveUnits]);
   const unit = units[unitId];
 

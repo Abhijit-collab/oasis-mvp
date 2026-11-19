@@ -16,7 +16,7 @@ import {
  */
 export default function RotatePhonePrompt() {
   const pathname = usePathname();
-  const label = pathname?.startsWith("/HOK") ? "House of Krishna" : "The Oasis";
+  const label = pathname?.toLowerCase().startsWith("/hok") ? "House of Krishna" : "The Oasis";
   const settleRef = useRef(null);
 
   useEffect(() => {

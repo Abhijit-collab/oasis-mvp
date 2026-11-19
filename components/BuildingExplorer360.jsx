@@ -1054,6 +1054,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
         progress={displayProgress}
         brandPrefix={brand.prefix}
         brandName={brand.name}
+        brandLogo={brand.logoUrl}
+        brandLogoAlt={brand.fullName || brand.name}
         variant={preloadVariant}
       />
     );
@@ -1380,6 +1382,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           exiting={gateOpen && tourRevealed}
           brandPrefix={brand.prefix}
           brandName={brand.name}
+          brandLogo={brand.logoUrl}
+          brandLogoAlt={brand.fullName || brand.name}
           variant={preloadVariant}
           loading={!assetsReady}
         />

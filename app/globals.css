@@ -677,6 +677,12 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
 /* Phones: POI toggle sits directly above the fullscreen button. */
 html.be-phone.be-nav-open .poi-toggle,
 html.be-ios.be-nav-open .poi-toggle{display:none!important}
+/* Upright phones: an open menu covers the picture, so the POI marks stay out of the way. */
+@media (orientation:portrait) and (max-width:900px),
+       (orientation:portrait) and (hover:none) and (pointer:coarse){
+  html.be-nav-open .poi-layer{
+    visibility:hidden!important;pointer-events:none!important}
+}
 html.be-phone .poi-toggle,
 html.be-ios .poi-toggle{
   display:grid!important;visibility:visible!important;opacity:1!important;
@@ -762,6 +768,25 @@ html.be-ios .be-fs-btn svg{width:22px;height:22px}
 }
 @media(prefers-reduced-motion:reduce){
   .adoptxr-mark--explorer{animation:none;opacity:.88}
+}
+/* Upright phones: the side bar is gone, so keep AdoptXR at the bottom-left. */
+@media (orientation:portrait) and (max-width:900px),
+       (orientation:portrait) and (hover:none) and (pointer:coarse){
+  html.be-phone .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer{
+    left:max(14px,env(safe-area-inset-left,0px));
+    right:auto;top:auto;
+    bottom:max(16px,env(safe-area-inset-bottom,0px));
+    width:auto;height:auto;transform:none;
+    display:flex;justify-content:flex-start;align-items:flex-end;
+    padding:0;opacity:.92;animation:none}
+  html.be-phone .be-stage--has-vid-box .be-stage-chrome .adoptxr-mark--explorer img{
+    width:auto;height:32px;max-width:140px;max-height:none;
+    object-fit:contain;object-position:left bottom}
+  .login-welcome-bg .adoptxr-mark--login,
+  .be-preload .adoptxr-mark--login{
+    z-index:4;
+    left:max(14px,env(safe-area-inset-left,0px));
+    bottom:max(14px,env(safe-area-inset-bottom,0px))}
 }
 
 /* Project wordmark (House of Krishna) — main brand, always larger than AdoptXR mark */
@@ -1505,6 +1530,28 @@ html.be-phone .project-brand-logo--explorer img{
   width:100%;height:auto;
   max-height:22vh;
   object-fit:contain;object-position:center top}
+.project-brand-logo--preload{
+  position:absolute;z-index:5;pointer-events:none;
+  top:max(12px,env(safe-area-inset-top,0px));
+  left:max(12px,env(safe-area-inset-left,0px))}
+.project-brand-logo--preload img{
+  height:clamp(72px,18vw,110px);max-width:min(240px,62vw);
+  object-fit:contain;object-position:left top}
+/* Upright phones have no side bar, so the wordmark needs a real width. */
+@media (orientation:portrait) and (max-width:900px),
+       (orientation:portrait) and (hover:none) and (pointer:coarse){
+  html.be-phone .project-brand-logo--explorer.be-brand--logo{
+    display:flex!important;
+    left:max(12px,env(safe-area-inset-left,0px));
+    top:max(12px,env(safe-area-inset-top,0px));
+    width:auto;max-width:min(210px,54vw);
+    height:auto;padding:0;
+    justify-content:flex-start;align-items:flex-start}
+  html.be-phone .project-brand-logo--explorer img{
+    width:auto;height:clamp(68px,16vw,92px);
+    max-width:min(210px,54vw);max-height:none;
+    object-position:left top}
+}
 @media(max-width:820px){
   .be-side{position:static;width:auto;margin:0;border-radius:0;top:auto;bottom:auto;
     transform:none!important;max-height:none;border-left:none;border-right:none;border-bottom:none}
@@ -1672,12 +1719,24 @@ html.login-lock,body.login-lock{
 .login-bg--video{background:none;filter:none;transform:none;overflow:hidden}
 .login-bg-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;
   pointer-events:none;filter:brightness(.55)}
-/* Phones: keep the whole teaser inside the screen, sized to the viewport. */
-@media (max-width:900px), (hover:none) and (pointer:coarse) {
+/* Phones held upright: keep the whole teaser inside the screen. */
+@media (orientation:portrait) and (max-width:900px),
+       (orientation:portrait) and (hover:none) and (pointer:coarse) {
   .login-bg--video{display:flex;align-items:center;justify-content:center;background:#000}
   .login-bg-video{
     position:relative;inset:auto;width:100%;height:100%;max-width:100%;max-height:100dvh;
     object-fit:contain;object-position:center center}
+}
+/* Phones turned sideways: teaser fills the screen, and LOG IN keeps pulsing. */
+@media (orientation:landscape) and (max-height:520px) and (max-width:950px),
+       (orientation:landscape) and (hover:none) and (pointer:coarse) {
+  .login-bg--video{display:block;background:#000}
+  .login-bg-video{
+    position:absolute;inset:0;width:100%;height:100%;max-width:none;max-height:none;
+    object-fit:cover;object-position:center center}
+  .login-page .login-teaser-header--btn-only .login-teaser-btn{
+    animation:login-btn-call 1.7s ease-out infinite}
+  .login-page .login-teaser-btn::after{animation:login-btn-shine 2.6s ease-in-out infinite}
 }
 .login-bg-audio{
   position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;left:0;top:0;overflow:hidden;z-index:0}
@@ -1802,9 +1861,18 @@ html.login-lock,body.login-lock{
   right:var(--login-btn-right);
   left:auto;bottom:auto;margin:0;z-index:7;
   transform:translateY(-50%)}
+@keyframes login-btn-call{
+  0%,100%{box-shadow:0 0 0 0 rgba(242,210,126,.7),0 8px 28px rgba(216,182,90,.45),inset 0 1px 0 rgba(255,255,255,.55)}
+  70%{box-shadow:0 0 0 14px rgba(242,210,126,0),0 8px 32px rgba(216,182,90,.55),inset 0 1px 0 rgba(255,255,255,.55)}}
+@keyframes login-btn-shine{
+  0%,42%{left:-45%}
+  68%,100%{left:125%}}
 @media(hover:hover) and (pointer:fine){
   .login-teaser-header--btn-only .login-teaser-btn:hover{
     transform:translateY(calc(-50% - 2px))}
+}
+@media(prefers-reduced-motion:reduce){
+  .login-teaser-btn,.login-teaser-btn::after{animation:none}
 }
 
 /* Phones: larger text-only LOG IN, optically centered, near the ribbon */
@@ -1931,6 +1999,18 @@ html.login-lock,body.login-lock{
   font-size:clamp(7.5px,calc(var(--login-ribbon-size,148px) * .062),9px);
   font-weight:800;letter-spacing:.14em;text-transform:uppercase;
   box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+/* Phones held upright: LOG IN stays under the teaser. The ribbon keeps the top-right corner. */
+@media (orientation:portrait) and (max-width:900px),
+       (orientation:portrait) and (hover:none) and (pointer:coarse){
+  .login-brand-stack{
+    padding-bottom:max(16px,env(safe-area-inset-bottom,0px))}
+  .login-page .login-teaser-header--btn-only .login-teaser-btn{
+    top:calc((100dvh + min(100dvh,100vw * 9 / 16)) / 2 + 14px);
+    right:auto;left:50%;bottom:auto;
+    transform:translateX(-50%);
+    animation:login-btn-call 1.7s ease-out infinite}
+  .login-page .login-teaser-btn::after{animation:login-btn-shine 2.6s ease-in-out infinite}
+}
 .login-card-premium{display:flex;justify-content:flex-start;margin-bottom:4px}
 .login-welcome-badge-row{display:flex;justify-content:center;margin-bottom:6px}
 .login-welcome-modal .premium-perks{margin:0 auto 18px;max-width:360px}
@@ -2006,6 +2086,22 @@ html:has(.login-welcome-bg),body:has(.login-welcome-bg){
   .login-welcome-title{font-size:18px;margin-bottom:4px}
   .login-welcome-copy{font-size:11px;margin-bottom:8px}
   .login-welcome-modal .login-btn{padding:11px 14px;font-size:13px}
+}
+/* Upright phones: faded photo stays centered; the welcome box sits just under it. */
+@media (orientation:portrait) and (max-width:900px),
+       (orientation:portrait) and (hover:none) and (pointer:coarse){
+  .login-welcome-bg{
+    flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:0 14px max(16px,env(safe-area-inset-bottom,0px))}
+  .login-welcome-bg-image{
+    inset:0;width:100%;height:100%;max-height:none;
+    object-fit:contain;object-position:center center;
+    filter:brightness(.68);transform:none}
+  .login-welcome-bg-scrim{
+    background:rgba(4,6,10,.22)}
+  .login-welcome-modal{
+    margin-top:calc((100dvh + min(100dvh,100vw * 9 / 16)) / 2 + 14px);
+    background:rgba(12,14,18,.86)}
 }
 
 /* ---- Mobile rotate-to-landscape prompt (commented for portrait preview) ---- */

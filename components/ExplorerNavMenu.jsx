@@ -107,6 +107,7 @@ export default function ExplorerNavMenu({ onHome, onLogout, onOpenChange, galler
         <button
           type="button"
           className="be-nav-burger"
+          data-tour="menu"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           aria-haspopup="true"

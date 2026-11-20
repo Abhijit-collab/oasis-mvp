@@ -28,7 +28,7 @@ export default function RotateButton({
     <div className={`rb-pill ${className}`.trim()} role="group" aria-label="Rotate building view">
       <button
         type="button"
-        className={"rb-arw rb-l" + (inactiveLeft ? " rb-arw--inactive" : "")}
+        className={"rb-arw rb-l driver-allowed-element" + (inactiveLeft ? " rb-arw--inactive" : "")}
         aria-label="Rotate left"
         aria-disabled={inactiveLeft || undefined}
         onClick={(e) => {
@@ -50,7 +50,7 @@ export default function RotateButton({
 
       <button
         type="button"
-        className={"rb-arw rb-r" + (inactiveRight ? " rb-arw--inactive" : "")}
+        className={"rb-arw rb-r driver-allowed-element" + (inactiveRight ? " rb-arw--inactive" : "")}
         aria-label="Rotate right"
         aria-disabled={inactiveRight || undefined}
         onClick={(e) => {

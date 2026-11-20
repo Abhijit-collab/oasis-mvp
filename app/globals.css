@@ -638,7 +638,8 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
 @media (hover:hover) and (pointer:fine){
   .be-fs-btn::before,
   .tour-sound-btn::before,
-  .poi-toggle::before{
+  .poi-toggle::before,
+  .hok-tour-help::before{
     content:attr(data-hover);
     position:absolute;left:50%;bottom:calc(100% + 10px);
     transform:translateX(-50%) translateY(4px);
@@ -649,7 +650,9 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
     transition:opacity .15s ease,transform .15s ease}
   .be-fs-btn:hover::before,
   .tour-sound-btn:hover::before,
-  .poi-toggle:hover::before{opacity:1;transform:translateX(-50%) translateY(0)}}
+  .poi-toggle:hover::before,
+  .hok-tour-help:hover::before{opacity:1;transform:translateX(-50%) translateY(0)}
+  .hok-tour-help-slot:has(.hok-tour-notice) .hok-tour-help::before{opacity:0}}
 .be-fs-btn:hover::after,.be-fs-btn.on::after{animation:none;opacity:0}
 .be-fs-btn.on{
   color:#1a1405;background:linear-gradient(180deg,#f0cf72,#c9a44e);
@@ -672,6 +675,11 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
   .poi-toggle{
     left:auto;
     right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px);
+    bottom:calc(max(96px, calc(env(safe-area-inset-bottom, 0px) + 88px)) + 66px);
+    top:auto}
+  .hok-tour-help-slot{
+    left:auto;
+    right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px + 66px);
     bottom:calc(max(96px, calc(env(safe-area-inset-bottom, 0px) + 88px)) + 66px);
     top:auto}
   /* The in-tour control sits under the orbit layer on phones. Use the shell button. */
@@ -697,10 +705,17 @@ html:has(.tour-sound-btn--explorer) .tour-sound-btn--shell{display:none!importan
     right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px);
     bottom:calc(max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px)) + 66px);
     left:auto;top:auto}
+  .hok-tour-help-slot{
+    left:auto;
+    right:calc(var(--be-orbit-inset-r, max(12px, env(safe-area-inset-right, 0px))) + (var(--be-orbit-arw-size, 52px) / 2) - 28px + 66px);
+    bottom:calc(max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px)) + 66px);
+    top:auto}
 }
 /* Phones: POI toggle sits directly above the fullscreen button. */
 html.be-phone.be-nav-open .poi-toggle,
-html.be-ios.be-nav-open .poi-toggle{display:none!important}
+html.be-ios.be-nav-open .poi-toggle,
+html.be-phone.be-nav-open .hok-tour-help-slot,
+html.be-ios.be-nav-open .hok-tour-help-slot{display:none!important}
 /* Upright phones: an open menu covers the picture, so the POI marks stay out of the way. */
 @media (orientation:portrait) and (max-width:900px),
        (orientation:portrait) and (hover:none) and (pointer:coarse){
@@ -731,6 +746,14 @@ html.be-ios.be-nav-open .be-fs-btn{display:none!important}
 html.be-ios .be-fs-btn,
 html.be-fs-unsupported .be-fs-btn{display:none!important}
 html.be-ios .poi-toggle{
+  bottom:max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px))!important}
+html.be-phone .hok-tour-help-slot,
+html.be-ios .hok-tour-help-slot{
+  width:48px!important;height:48px!important;
+  left:auto!important;top:auto!important;
+  right:calc(max(4px, calc((var(--be-vid-right, 64px) - 48px) / 2)) + 56px)!important;
+  bottom:calc(max(12px, env(safe-area-inset-bottom, 0px)) + 58px)!important}
+html.be-ios .hok-tour-help-slot{
   bottom:max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px))!important}
 html.be-phone .be-fs-btn::after,
 html.be-ios .be-fs-btn::after{
@@ -2482,4 +2505,105 @@ html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
   animation:sn .3s ease}
 .slow-net button{flex:none;background:none;border:0;color:#d8b65a;font-size:16px;cursor:pointer;padding:4px}
 @keyframes sn{from{opacity:0;transform:translate(-50%,8px)}}
+
+.hok-tour-popover.driver-popover{
+  box-sizing:border-box;
+  width:min(320px,calc(100vw - 32px));
+  width:min(320px,calc(100dvw - 32px));
+  min-width:min(240px,calc(100vw - 32px));
+  min-width:min(240px,calc(100dvw - 32px));
+  max-width:min(320px,calc(100vw - 32px));
+  max-width:min(320px,calc(100dvw - 32px));
+  padding:16px 16px 14px;
+  border-radius:14px;
+  color:#fff;
+  font-family:var(--sans),system-ui,sans-serif;
+  background:linear-gradient(180deg,rgba(22,24,30,.88),rgba(12,14,18,.82));
+  border:1px solid rgba(216,182,90,.45);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 16px 40px rgba(0,0,0,.45);
+  -webkit-backdrop-filter:blur(16px) saturate(1.2);
+  backdrop-filter:blur(16px) saturate(1.2);
+  transform-origin:center;
+  animation:hok-tour-open 1.05s cubic-bezier(.22,1,.36,1) both}
+.hok-tour-popover .driver-popover-title{
+  color:#f2d27e;font-size:16px;font-weight:650;line-height:1.3;padding-right:28px}
+.hok-tour-popover .driver-popover-description{
+  color:rgba(255,255,255,.88);font-size:14px;line-height:1.45}
+.hok-tour-popover .driver-popover-progress-text{color:rgba(255,255,255,.62);font-size:12px}
+.hok-tour-popover .driver-popover-close-btn{color:rgba(255,255,255,.72)}
+.hok-tour-popover .driver-popover-close-btn:hover,
+.hok-tour-popover .driver-popover-close-btn:focus-visible{color:#f2d27e}
+.hok-tour-popover .driver-popover-footer-btn{
+  border-radius:999px;padding:6px 12px;font:600 12px/1.2 var(--sans),system-ui,sans-serif;
+  background:transparent;color:#f2d27e;border:1px solid rgba(216,182,90,.45)}
+.hok-tour-popover .driver-popover-next-btn,
+.hok-tour-popover .driver-popover-done-btn{
+  background:#d8b65a;color:#1a1405;border-color:#d8b65a;text-shadow:none}
+.hok-tour-popover .driver-popover-arrow{
+  position:absolute;
+  box-sizing:content-box;
+  width:0;height:0;
+  border-style:solid;
+  border-width:11px;
+  border-color:transparent;
+  z-index:2;
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.55))}
+.hok-tour-popover .driver-popover-arrow-side-left{
+  left:100%;right:auto;top:auto;bottom:auto;
+  border-left-color:#f2d27e;border-top-color:transparent;border-right-color:transparent;border-bottom-color:transparent}
+.hok-tour-popover .driver-popover-arrow-side-right{
+  right:100%;left:auto;top:auto;bottom:auto;
+  border-right-color:#f2d27e;border-top-color:transparent;border-left-color:transparent;border-bottom-color:transparent}
+.hok-tour-popover .driver-popover-arrow-side-top{
+  top:100%;bottom:auto;
+  border-top-color:#f2d27e;border-left-color:transparent;border-right-color:transparent;border-bottom-color:transparent}
+.hok-tour-popover .driver-popover-arrow-side-bottom{
+  bottom:100%;top:auto;
+  border-bottom-color:#f2d27e;border-top-color:transparent;border-left-color:transparent;border-right-color:transparent}
+@keyframes hok-tour-open{
+  from{opacity:0;transform:translateY(22px) scale(.94)}
+  to{opacity:1;transform:none}}
+@keyframes hok-tour-press{
+  0%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 0 0 rgba(242,210,126,.75)}
+  40%{transform:translate(-50%,-50%) scale(.9);box-shadow:0 0 0 10px rgba(242,210,126,0)}
+  100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 0 0 rgba(242,210,126,0)}}
+.poi-badge.hok-tour-press{animation:hok-tour-press .55s ease}
+@media (prefers-reduced-motion:reduce){
+  .hok-tour-popover.driver-popover,.poi-badge.hok-tour-press{animation:none}}
+.hok-tour-help-slot{
+  position:fixed;z-index:45;
+  left:auto;
+  right:calc(max(208px, calc(env(safe-area-inset-right, 0px) + 200px)) + 66px);
+  bottom:72px;
+  width:56px;height:56px}
+/* Desktop: POI sits on the video frame. Keep ? one button-width to its left. */
+@media (hover:hover) and (pointer:fine) and (min-width:901px){
+  .hok-tour-help-slot{
+    right:224px;
+    bottom:72px;
+    left:auto;top:auto}
+  .be-root--contain.be-root--vid-box .hok-tour-help-slot{
+    right:calc(var(--be-vid-right) + 224px);
+    bottom:calc(var(--be-vid-bottom) + 72px);
+    left:auto;top:auto}
+}
+.hok-tour-help{
+  position:relative;
+  width:100%;height:100%;padding:0;border-radius:50%;
+  display:grid;place-items:center;cursor:pointer;
+  color:#f2d27e;font:650 18px/1 var(--sans),system-ui,sans-serif;
+  background:rgba(12,14,18,.72);
+  border:1px solid rgba(216,182,90,.5);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.hok-tour-notice{
+  position:absolute;right:0;bottom:calc(100% + 10px);
+  width:min(260px,calc(100vw - 32px));margin:0;
+  padding:12px 14px;border-radius:14px;
+  color:#fff;font:600 13px/1.4 var(--sans),system-ui,sans-serif;
+  background:linear-gradient(180deg,rgba(22,24,30,.92),rgba(12,14,18,.88));
+  border:1px solid rgba(216,182,90,.45);
+  box-shadow:0 12px 32px rgba(0,0,0,.4);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 

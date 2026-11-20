@@ -35,6 +35,7 @@ import { getOrbitStepScope, getVisibleOrbitFlats } from "@/lib/orbitStepScope";
 import { getFloorSliderRange } from "@/lib/floorSliderRange";
 import BlockFilterPrompt from "@/components/BlockFilterPrompt";
 import PoiHotspots from "@/components/PoiHotspots";
+import HokOnboardingTour from "@/components/hok/HokOnboardingTour";
 import { viewIdFromSrc } from "@/data/pois";
 import { anchorAbovePoints, anchorAbovePolygons } from "@/lib/zonePromptAnchor";
 import { isUnitSold } from "@/lib/unitStatus";
@@ -102,7 +103,11 @@ const DEFAULT_TOUR = {
  * Left / right arrows play individual transition clips.
  * Back uses pre-encoded *-rev.mp4 files played forward.
  */
-export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_TOUR }) {
+export default function BuildingExplorer360({
+  liveUnits = null,
+  tour = DEFAULT_TOUR,
+  onboarding = false,
+}) {
   const {
     stepCount: ORBIT_STEP_COUNT,
     stepClips: ORBIT_STEP_CLIPS,
@@ -598,6 +603,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const applyMainGateReset = () => {
     pendingRef.current = false;
+    departStepRef.current = null;
     stepRef.current = 0;
     setStep(0);
     setMode("hold");
@@ -632,6 +638,8 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   };
 
   const pendingRef = useRef(false);
+  /** Step the in-flight arrow play left from. Completions use this, not a later step. */
+  const departStepRef = useRef(null);
   const stageRef = useRef(null);
   const stageBoxRef = useRef(null);
   const poiRef = useRef(null);
@@ -684,6 +692,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   /** Stall / failed play — unlock arrows without advancing the orbit step. */
   const handlePlayFailed = () => {
     pendingRef.current = false;
+    departStepRef.current = null;
     setIsPlaying(false);
     setMode("hold");
     setLandAfterPlay(null);
@@ -711,12 +720,20 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   };
 
   const goNext = async () => {
-    if (!canNext) return;
-    clearPoisForMove();
+    if (pendingRef.current || !canNext) return;
     pendingRef.current = true;
     const fromStep = stepRef.current;
+    departStepRef.current = fromStep;
+    clearPoisForMove();
     const src = ORBIT_STEP_CLIPS[fromStep >= ORBIT_STEP_COUNT ? 0 : fromStep];
     await ensureClip(src);
+    if (departStepRef.current !== fromStep) {
+      pendingRef.current = false;
+      return;
+    }
+    // Opening still sits over the video. Hide it as soon as Sequence 1 starts,
+    // otherwise the clip can finish underneath and the next arrow plays Sequence 2.
+    if (fromStep === 0 && startImage) setStartStillPhase("out");
     const token = Date.now();
 
     clearTimeout(loopFadeTimerRef.current);
@@ -736,16 +753,22 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
   };
 
   const goPrev = async () => {
-    if (!canPrev) return;
-    clearPoisForMove();
+    if (pendingRef.current || !canPrev) return;
     pendingRef.current = true;
     const fromStep = stepRef.current;
+    departStepRef.current = fromStep;
+    clearPoisForMove();
     const reverseClip = ORBIT_STEP_CLIPS_REVERSE[reverseClipIndexForBack(fromStep)];
     if (!reverseClip) {
       pendingRef.current = false;
+      departStepRef.current = null;
       return;
     }
     await ensureClip(reverseClip);
+    if (departStepRef.current !== fromStep) {
+      pendingRef.current = false;
+      return;
+    }
     const landStep = prevStep(fromStep);
 
     const land = {
@@ -902,18 +925,20 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const onClipDone = (direction = "forward") => {
     const gen = poiGen.current;
+    const fromStep = departStepRef.current ?? stepRef.current;
     pendingRef.current = false;
-    let newStep = stepRef.current;
+    departStepRef.current = null;
+    let newStep = fromStep;
 
     if (direction === "back") {
       clearTimeout(loopFadeTimerRef.current);
-      newStep = prevStep(stepRef.current);
+      newStep = prevStep(fromStep);
       setStep(newStep);
       // Keep the reverse clip's last frame. Replacing it with the forward
       // file forces a seek-to-end and locks the picture.
       setHoldAtOverride("end");
     } else {
-      newStep = nextStepForward(stepRef.current);
+      newStep = nextStepForward(fromStep);
       setStep(newStep);
 
       // Full orbit → soft dissolve last frame into start still (no hard cut).
@@ -1208,6 +1233,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
               <button
                 type="button"
                 className={"poi-toggle" + (poisOn ? " poi-toggle--on" : "")}
+                data-tour="poi-toggle"
                 aria-pressed={poisOn}
                 aria-label={poisOn ? "Hide POI" : "Show POI"}
                 data-hover={poisOn ? "Hide POI" : "Show POI"}
@@ -1338,7 +1364,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           (!canPrev ? " be-orbit-arw--inactive" : "") +
           (navOpen ? " be-orbit-arw--hidden" : "") +
           (tourRevealed ? " be-orbit-arw--on" : "") +
-          " be-orbit-arw--mobile" +
+          " be-orbit-arw--mobile driver-allowed-element" +
           (orbitHint && hasReverseClips && canPrev ? " be-orbit-arw--hint" : "")
         }
         aria-label="Rotate left"
@@ -1358,7 +1384,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           (!canNext ? " be-orbit-arw--inactive" : "") +
           (navOpen ? " be-orbit-arw--hidden" : "") +
           (tourRevealed ? " be-orbit-arw--on" : "") +
-          " be-orbit-arw--mobile" +
+          " be-orbit-arw--mobile driver-allowed-element" +
           (orbitHint && canNext ? " be-orbit-arw--hint" : "")
         }
         aria-label="Rotate right"
@@ -1371,6 +1397,18 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
           <OrbitSideChevron dir="r" />
         </span>
       </button>
+
+      {onboarding && tourRevealed && !showPreload ? (
+        <HokOnboardingTour
+          onFirstScreen={step === 0 && !isPlaying && !homeResetting}
+          onEnablePois={() => {
+            if (!poisOnRef.current) togglePois();
+          }}
+          onOpenPoi={(id) => poiRef.current?.openPoi(id)}
+          onClosePoi={() => poiRef.current?.closePoi()}
+          onOpenPano={() => poiRef.current?.openActivePano()}
+        />
+      ) : null}
 
       {showPreload && (
         <TourPreloadScreen

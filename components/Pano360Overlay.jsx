@@ -44,7 +44,11 @@ export default function Pano360Overlay({ url, onClose }) {
         onClose();
       }}
     >
-      <div className="pano360-panel" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="pano360-panel"
+        data-tour="pano-stage"
+        onClick={(event) => event.stopPropagation()}
+      >
         <iframe
           className="pano360-frame"
           src={open ? url : "about:blank"}

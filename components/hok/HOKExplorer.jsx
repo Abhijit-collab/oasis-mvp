@@ -9,5 +9,5 @@ export default function HOKExplorer({ liveUnits = null, galleryImages = null }) 
     Array.isArray(galleryImages) && galleryImages.length > 0
       ? { ...HOK_TOUR_CONFIG, galleryImages }
       : HOK_TOUR_CONFIG;
-  return <BuildingExplorer360 liveUnits={liveUnits} tour={tour} />;
+  return <BuildingExplorer360 liveUnits={liveUnits} tour={tour} onboarding />;
 }

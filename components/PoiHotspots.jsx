@@ -261,6 +261,21 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
       setRevealed(0);
       setActiveN(null);
     },
+    openPoi(id) {
+      setActiveN((current) => (current === id ? current : id));
+    },
+    closePoi() {
+      setActiveN(null);
+      setPanoUrl(null);
+    },
+    openActivePano() {
+      const mark = marks.find((item) => item.poi.n === activeN);
+      if (!mark?.poi?.pano) return false;
+      setPanoUrl(panoSrc(mark.poi.pano));
+      if (isPortraitPhone()) setActiveN(null);
+      window.dispatchEvent(new CustomEvent("hok-tour-360"));
+      return true;
+    },
     fadePois() {
       ticket.current += 1;
       drawnTicket.current = 0;
@@ -443,6 +458,7 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
             (activeN === mark.poi.n ? " active" : "")
           }
           data-n={mark.poi.n}
+          data-tour={mark.poi.n === 1 ? "poi-marker" : undefined}
           style={{ left: mark.bx, top: mark.by }}
           aria-label={mark.poi.title}
           onClick={(event) => {
@@ -484,11 +500,13 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
               <button
                 type="button"
                 className="poi-pano-btn"
+                data-tour="eye-360"
                 onClick={(event) => {
                   event.stopPropagation();
                   event.preventDefault();
                   setPanoUrl(panoSrc(active.poi.pano));
                   if (isPortraitPhone()) setActiveN(null);
+                  window.dispatchEvent(new CustomEvent("hok-tour-360"));
                 }}
               >
                 <svg viewBox="0 0 24 24" aria-hidden>

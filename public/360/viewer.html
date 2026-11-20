@@ -112,7 +112,7 @@ if (!src) {
   canvas.addEventListener("pointermove", (event) => {
     if (!drag) return;
     yaw += (event.clientX - lx) * 0.005;
-    pitch -= (event.clientY - ly) * 0.005;
+    pitch += (event.clientY - ly) * 0.005;
     pitch = Math.max(-1.2, Math.min(1.2, pitch));
     lx = event.clientX;
     ly = event.clientY;

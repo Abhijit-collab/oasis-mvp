@@ -1558,6 +1558,9 @@ html.be-phone .project-brand-logo--explorer img{
 .project-brand-logo--preload img{
   height:clamp(72px,18vw,110px);max-width:min(240px,62vw);
   object-fit:contain;object-position:left top}
+@media (orientation:landscape) and (max-height:520px) and (hover:none) and (pointer:coarse),
+       (orientation:landscape) and (max-height:520px) and (max-width:950px){
+  .project-brand-logo--preload{display:none!important}}
 /* Upright phones have no side bar, so the wordmark needs a real width. */
 @media (orientation:portrait) and (max-width:900px),
        (orientation:portrait) and (hover:none) and (pointer:coarse){

@@ -644,7 +644,7 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
 
   const clearPoisForMove = () => {
     poiGen.current += 1;
-    poiRef.current?.clearPois();
+    poiRef.current?.fadePois();
   };
 
   const showSettledPois = (landedStep, gen) => {

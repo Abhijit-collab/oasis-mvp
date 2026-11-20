@@ -56,29 +56,32 @@ html:has(.be-root),body:has(.be-root){
 .be-start-still--out{opacity:0;transition:opacity .48s cubic-bezier(.33,1,.68,1)}
 
 /* POI hotspots — lines and badges over the contained frame */
-.poi-layer{position:absolute;inset:0;z-index:8;pointer-events:none}
+.poi-layer{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:1;transition:opacity 1.15s ease}
+.poi-layer--leaving{opacity:0}
 .poi-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .poi-line{
-  stroke:#fff;stroke-width:2;fill:none;
-  stroke-dasharray:var(--len);stroke-dashoffset:var(--len);
-  transition:stroke-dashoffset .5s ease-out;
-  filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
-.poi-dot{fill:#fff;opacity:0;transition:opacity .3s}
-.poi-layer .show .poi-line{stroke-dashoffset:0}
-.poi-layer .show .poi-dot{opacity:1}
+  stroke:rgba(255,255,255,.9);stroke-width:1.5;fill:none;
+  opacity:0;transition:opacity .7s ease}
+.poi-dot{fill:#fff;opacity:0;transition:opacity .7s ease}
+.poi-layer .show .poi-line,.poi-layer .show .poi-dot{opacity:1}
 .poi-badge{
-  position:absolute;width:38px;height:38px;margin:-19px 0 0 -19px;padding:0;
-  border-radius:50%;border:2px solid #fff;background:rgba(20,20,20,.75);
-  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
-  color:#fff;font:600 15px/34px var(--sans),system-ui,sans-serif;text-align:center;
-  cursor:pointer;pointer-events:none;
-  transform:scale(0);transition:transform .35s cubic-bezier(.3,1.6,.5,1),background .2s}
-.poi-badge.show{transform:scale(1);pointer-events:auto}
-.poi-badge:hover,.poi-badge.active{background:#d8b65a;color:#1a1405}
-.poi-badge::after{
-  content:"";position:absolute;inset:-6px;border-radius:50%;
-  border:2px solid rgba(255,255,255,.5);animation:poi-pulse 1.8s infinite}
-@keyframes poi-pulse{from{transform:scale(.8);opacity:1}to{transform:scale(1.4);opacity:0}}
+  position:absolute;width:max-content;max-width:min(190px,28vw);margin:0;
+  padding:6px 12px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.32);
+  background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.04));
+  backdrop-filter:blur(16px) saturate(1.35);-webkit-backdrop-filter:blur(16px) saturate(1.35);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 16px rgba(0,0,0,.12);
+  color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45);
+  font:600 13px/1.2 var(--sans),system-ui,sans-serif;text-align:center;
+  white-space:normal;cursor:pointer;pointer-events:none;
+  opacity:0;transform:translate(-50%,-50%);transform-origin:center center;
+  transition:opacity .7s ease,background .2s,color .2s}
+.poi-badge.show{opacity:1;pointer-events:auto}
+.poi-badge:hover,.poi-badge.active{
+  background:linear-gradient(180deg,rgba(242,210,126,.38),rgba(216,182,90,.16));
+  color:#1a1405}
+@media (max-width:900px),(hover:none) and (pointer:coarse){
+  .poi-badge{max-width:min(148px,46vw);padding:5px 9px;font-size:11px;line-height:1.15}}
 .poi-pop{
   position:absolute;z-index:4;pointer-events:none;
   width:min(320px,calc(100% - 24px))}
@@ -173,8 +176,8 @@ html.be-phone .pano360-panel{
     margin:0;border:1px solid rgba(255,255,255,.16);border-radius:16px;
     transform:none}}
 @media(prefers-reduced-motion:reduce){
-  .poi-line,.poi-dot,.poi-badge,.poi-badge::after,.poi-pop-card{transition:none;animation:none}
-  .poi-badge{transform:none}}
+  .poi-line,.poi-dot,.poi-badge,.poi-pop-card{transition:none;animation:none}
+  .poi-badge{transform:translate(-50%,-50%)}}
 .be-stage-media{position:absolute;inset:0;z-index:1;transform:translateZ(0);backface-visibility:hidden}
 .be-stage-media--home-out{
   pointer-events:none;

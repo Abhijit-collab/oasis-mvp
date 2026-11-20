@@ -5,6 +5,7 @@ import { getPoiView, panoSrc } from "@/data/pois";
 import { isMobileTourDevice } from "@/lib/rotateGate";
 import Pano360Overlay from "@/components/Pano360Overlay";
 
+const POI_FADE_MS = 1150;
 const DESKTOP_ARROW = 90;
 const ARROW_AT_1080 = 90;
 const STAGGER_MS = 150;
@@ -66,18 +67,14 @@ function frameToScreen(el, fx, fy, stage) {
   };
 }
 
-/** Keep the number on the picture. Half the badge, so the circle clears the black bars. */
-function badgeBounds(rect) {
-  if (!rect) return null;
-  const pad = 20;
-  const bounds = {
-    left: rect.left + pad,
-    top: rect.top + pad,
-    right: rect.right - pad,
-    bottom: rect.bottom - pad,
-  };
-  if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return null;
-  return bounds;
+/** Screen box the labels may use. Inset by a small pad so text is not cut off. */
+function stageBounds(stage) {
+  if (!stage) return null;
+  const pad = 8;
+  const width = stage.clientWidth;
+  const height = stage.clientHeight;
+  if (!width || !height) return null;
+  return { left: pad, top: pad, right: width - pad, bottom: height - pad };
 }
 
 /** Desktop stays at the previous 90px. Phones scale with the picture height. */
@@ -90,63 +87,93 @@ function arrowLength(el) {
   return Math.round(Math.max(44, Math.min(DESKTOP_ARROW, length)));
 }
 
-const BADGE_GAP = 48;
-const MIN_LINE = 32;
+function labelMaxWidth() {
+  if (typeof window === "undefined") return 160;
+  if (isMobileTourDevice()) return Math.min(148, window.innerWidth * 0.46);
+  return Math.min(190, window.innerWidth * 0.28);
+}
 
-function spanInside(mark, len, bounds) {
-  const vx = mark.bx - mark.x;
-  const vy = mark.by - mark.y;
-  const cur = Math.hypot(vx, vy) || 1;
-  const ux = vx / cur;
-  const uy = vy / cur;
-  let next = len;
-  if (bounds) {
-    if (ux < 0) next = Math.min(next, (bounds.left - mark.x) / ux);
-    if (ux > 0) next = Math.min(next, (bounds.right - mark.x) / ux);
-    if (uy < 0) next = Math.min(next, (bounds.top - mark.y) / uy);
-    if (uy > 0) next = Math.min(next, (bounds.bottom - mark.y) / uy);
-  }
-  next = Math.max(8, next);
+/** Guess the pill size from the title so the first layout already has room. */
+function labelSize(title) {
+  const mobile = isMobileTourDevice();
+  const font = mobile ? 11 : 13;
+  const padX = mobile ? 16 : 20;
+  const padY = mobile ? 12 : 14;
+  const maxW = labelMaxWidth();
+  const textW = Math.max(font * 2, String(title || "").length * font * 0.56);
+  const inner = Math.max(48, maxW - padX);
+  const lines = Math.min(3, Math.max(1, Math.ceil(textW / inner)));
   return {
-    bx: mark.x + ux * next,
-    by: mark.y + uy * next,
-    len: Math.round(next),
+    w: Math.min(maxW, textW + padX),
+    h: lines * font * 1.2 + padY,
   };
 }
 
-/** On a phone, nearby numbers share one height and cover each other. Stretch the lines until they clear. */
-function separatePhoneBadges(marks, bounds) {
-  if (!isMobileTourDevice()) return marks;
-  const items = marks.map((mark) => ({ ...mark, ...spanInside(mark, mark.len, bounds) }));
-  if (items.length < 2) return items;
-  const span = (mark) => Math.hypot(mark.bx - mark.x, mark.by - mark.y) || 1;
-  const setSpan = (mark, next) => {
-    const placed = spanInside(mark, Math.max(MIN_LINE, next), bounds);
-    mark.bx = placed.bx;
-    mark.by = placed.by;
-    mark.len = placed.len;
-  };
+function clampLabel(mark, bounds) {
+  if (!bounds) return;
+  const hx = (mark.lw || 0) / 2;
+  const hy = (mark.lh || 0) / 2;
+  mark.bx = Math.max(bounds.left + hx, Math.min(bounds.right - hx, mark.bx));
+  mark.by = Math.max(bounds.top + hy, Math.min(bounds.bottom - hy, mark.by));
+  mark.len = Math.round(Math.hypot(mark.bx - mark.x, mark.by - mark.y));
+}
 
-  for (let pass = 0; pass < 18; pass += 1) {
+/** Push label pills apart using their real width and height so the words do not cover each other. */
+function separateLabels(marks, bounds, measured) {
+  const gap = isMobileTourDevice() ? 6 : 8;
+  const items = marks.map((mark) => {
+    const sized = measured?.[mark.poi.n] || labelSize(mark.poi.title);
+    return { ...mark, lw: sized.w, lh: sized.h };
+  });
+  for (const mark of items) clampLabel(mark, bounds);
+
+  for (let pass = 0; pass < 28; pass += 1) {
     let moved = false;
     for (let i = 0; i < items.length; i += 1) {
       for (let j = i + 1; j < items.length; j += 1) {
         const a = items[i];
         const b = items[j];
-        const dist = Math.hypot(b.bx - a.bx, b.by - a.by);
-        if (dist >= BADGE_GAP) continue;
-        const extra = BADGE_GAP - dist + 8;
-        const upper = a.by <= b.by ? a : b;
-        const lower = upper === a ? b : a;
-        const before = upper.by;
-        setSpan(upper, span(upper) + extra);
-        if (Math.abs(upper.by - before) < 3) setSpan(lower, span(lower) - extra);
+        const overlapX = (a.lw + b.lw) / 2 + gap - Math.abs(a.bx - b.bx);
+        const overlapY = (a.lh + b.lh) / 2 + gap - Math.abs(a.by - b.by);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        const dx = b.bx - a.bx || 0.5;
+        const dy = b.by - a.by || 0.5;
+        if (overlapX <= overlapY) {
+          const push = overlapX / 2 + 1;
+          const sign = dx >= 0 ? 1 : -1;
+          a.bx -= sign * push;
+          b.bx += sign * push;
+        } else {
+          const push = overlapY / 2 + 1;
+          const sign = dy >= 0 ? 1 : -1;
+          a.by -= sign * push;
+          b.by += sign * push;
+        }
         moved = true;
       }
     }
+    for (const mark of items) clampLabel(mark, bounds);
     if (!moved) break;
   }
   return items;
+}
+
+/** Where the leader should meet the pill, so the line stops at the words. */
+function leaderTip(mark) {
+  const w = mark.lw || 0;
+  const h = mark.lh || 0;
+  const dx = mark.x - mark.bx;
+  const dy = mark.y - mark.by;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  let reach = 0;
+  if (w > 0 && Math.abs(ux) > 0.001) reach = (w / 2) / Math.abs(ux);
+  if (h > 0 && Math.abs(uy) > 0.001) {
+    const yReach = (h / 2) / Math.abs(uy);
+    reach = reach ? Math.min(reach, yReach) : yReach;
+  }
+  return { x: mark.bx + ux * reach, y: mark.by + uy * reach };
 }
 
 function mediaElement(stage, type) {
@@ -176,6 +203,7 @@ function isPortraitPhone() {
 const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
   const [marks, setMarks] = useState([]);
   const [revealed, setRevealed] = useState(0);
+  const [leaving, setLeaving] = useState(false);
   const [activeN, setActiveN] = useState(null);
   const [panoUrl, setPanoUrl] = useState(null);
   const close360 = useCallback(() => setPanoUrl(null), []);
@@ -185,11 +213,20 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
   const ticket = useRef(0);
   const drawnTicket = useRef(0);
   const timers = useRef([]);
+  const leaveTimer = useRef(null);
   const stopListen = useRef(null);
 
   const stopTimers = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
+  };
+
+  const cancelLeave = () => {
+    if (leaveTimer.current != null) {
+      clearTimeout(leaveTimer.current);
+      leaveTimer.current = null;
+    }
+    setLeaving(false);
   };
 
   const unlisten = () => {
@@ -199,6 +236,7 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
 
   useEffect(() => () => {
     stopTimers();
+    if (leaveTimer.current != null) clearTimeout(leaveTimer.current);
     unlisten();
   }, []);
 
@@ -218,15 +256,32 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
       drawnTicket.current = 0;
       stopTimers();
       unlisten();
+      cancelLeave();
       setMarks([]);
       setRevealed(0);
       setActiveN(null);
+    },
+    fadePois() {
+      ticket.current += 1;
+      drawnTicket.current = 0;
+      stopTimers();
+      unlisten();
+      setActiveN(null);
+      setLeaving(true);
+      if (leaveTimer.current != null) clearTimeout(leaveTimer.current);
+      leaveTimer.current = window.setTimeout(() => {
+        leaveTimer.current = null;
+        setMarks([]);
+        setRevealed(0);
+        setLeaving(false);
+      }, POI_FADE_MS);
     },
     showPoisForView(viewId) {
       const my = ++ticket.current;
       drawnTicket.current = 0;
       stopTimers();
       unlisten();
+      cancelLeave();
       setMarks([]);
       setRevealed(0);
       setActiveN(null);
@@ -241,11 +296,9 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
         const length = arrowLength(el);
         const stage = stageRef?.current;
         const next = [];
-        let picture = null;
         for (const poi of view.pois) {
           const point = frameToScreen(el, poi.x, poi.y, stage);
           if (!point) return false;
-          picture = point.rect;
           const rad = (poi.angle * Math.PI) / 180;
           next.push({
             poi,
@@ -256,7 +309,7 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
             by: point.y + Math.sin(rad) * length,
           });
         }
-        setMarks(separatePhoneBadges(next, badgeBounds(picture)));
+        setMarks(separateLabels(next, stageBounds(stage)));
         if (!animate) return true;
         drawnTicket.current = my;
         const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -311,6 +364,24 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
 
   useLayoutEffect(() => {
     const layer = layerRef.current;
+    if (!layer || marks.length === 0) return;
+    const measured = {};
+    let dirty = false;
+    layer.querySelectorAll(".poi-badge").forEach((button) => {
+      const n = Number(button.dataset.n);
+      const w = button.offsetWidth;
+      const h = button.offsetHeight;
+      if (!w || !h) return;
+      measured[n] = { w, h };
+      const mark = marks.find((item) => item.poi.n === n);
+      if (!mark || Math.abs((mark.lw || 0) - w) > 4 || Math.abs((mark.lh || 0) - h) > 4) dirty = true;
+    });
+    if (!dirty) return;
+    setMarks((current) => separateLabels(current, stageBounds(stageRef?.current), measured));
+  }, [marks, stageRef]);
+
+  useLayoutEffect(() => {
+    const layer = layerRef.current;
     const card = cardRef.current;
     if (!active || !layer || !card) return undefined;
 
@@ -342,21 +413,25 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
   if (marks.length === 0) return null;
 
   return (
-    <div className="poi-layer" ref={layerRef} aria-hidden={false}>
+    <div className={"poi-layer" + (leaving ? " poi-layer--leaving" : "")} ref={layerRef} aria-hidden={false}>
       <svg className="poi-svg" aria-hidden>
-        {marks.map((mark, index) => (
+        {marks.map((mark, index) => {
+          const tip = leaderTip(mark);
+          const lineLen = Math.hypot(mark.x - tip.x, mark.y - tip.y);
+          return (
           <g key={mark.poi.n} className={index < revealed ? "show" : ""}>
             <line
               className="poi-line"
-              x1={mark.bx}
-              y1={mark.by}
+              x1={tip.x}
+              y1={tip.y}
               x2={mark.x}
               y2={mark.y}
-              style={{ "--len": mark.len }}
+              style={{ "--len": lineLen }}
             />
             <circle className="poi-dot" cx={mark.x} cy={mark.y} r="5" />
           </g>
-        ))}
+          );
+        })}
       </svg>
       {marks.map((mark, index) => (
         <button
@@ -367,14 +442,15 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
             (index < revealed ? " show" : "") +
             (activeN === mark.poi.n ? " active" : "")
           }
+          data-n={mark.poi.n}
           style={{ left: mark.bx, top: mark.by }}
-          aria-label={`${mark.poi.n}. ${mark.poi.title}`}
+          aria-label={mark.poi.title}
           onClick={(event) => {
             event.stopPropagation();
             setActiveN((current) => (current === mark.poi.n ? null : mark.poi.n));
           }}
         >
-          {mark.poi.n}
+          {mark.poi.title}
         </button>
       ))}
       {active ? (

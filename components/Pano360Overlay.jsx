@@ -1,37 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
-
-/** Upright phone: taller than wide, and a phone-sized or touch screen. */
-function isUprightPhone() {
-  if (typeof window === "undefined") return false;
-  const portrait = window.innerHeight > window.innerWidth;
-  if (!portrait) return false;
-  if (document.documentElement.classList.contains("be-phone")) return true;
-  if (window.innerWidth <= 900) return true;
-  return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
-}
 
 /**
  * One shared 360 viewer in a mid-size popup. Pass a scene URL to open it; pass null to close.
  * Closing blanks the iframe so the tour does not keep running.
- * On an upright phone the popup is turned sideways so the 360 fills the screen in landscape.
+ * Upright phones get a small popup. Landscape phones and desktop keep the wider window.
  */
 export default function Pano360Overlay({ url, onClose }) {
   const open = Boolean(url);
-  const [sideways, setSideways] = useState(false);
-
-  useEffect(() => {
-    const sync = () => setSideways(isUprightPhone());
-    sync();
-    window.addEventListener("resize", sync);
-    window.addEventListener("orientationchange", sync);
-    return () => {
-      window.removeEventListener("resize", sync);
-      window.removeEventListener("orientationchange", sync);
-    };
-  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -56,7 +34,7 @@ export default function Pano360Overlay({ url, onClose }) {
 
   return createPortal(
     <div
-      className={"pano360" + (open ? " pano360--open" : "") + (sideways ? " pano360--sideways" : "")}
+      className={"pano360" + (open ? " pano360--open" : "")}
       role="dialog"
       aria-modal="true"
       aria-label="360 tour"

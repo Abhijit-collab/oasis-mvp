@@ -38,13 +38,46 @@ function mediaBox(el) {
   return { vw, vh, scaleX, scaleY, offX, offY };
 }
 
-function frameToScreen(el, fx, fy) {
+function paintedRect(el, stage) {
   const box = mediaBox(el);
   if (!box) return null;
+  let originX = 0;
+  let originY = 0;
+  if (stage) {
+    const stageRect = stage.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    originX = elRect.left - stageRect.left;
+    originY = elRect.top - stageRect.top;
+  }
+  const left = originX + box.offX;
+  const top = originY + box.offY;
+  const width = box.vw * box.scaleX;
+  const height = box.vh * box.scaleY;
+  return { left, top, width, height, right: left + width, bottom: top + height };
+}
+
+function frameToScreen(el, fx, fy, stage) {
+  const rect = paintedRect(el, stage);
+  if (!rect) return null;
   return {
-    x: box.offX + fx * box.vw * box.scaleX,
-    y: box.offY + fy * box.vh * box.scaleY,
+    x: rect.left + fx * rect.width,
+    y: rect.top + fy * rect.height,
+    rect,
   };
+}
+
+/** Keep the number on the picture. Half the badge, so the circle clears the black bars. */
+function badgeBounds(rect) {
+  if (!rect) return null;
+  const pad = 20;
+  const bounds = {
+    left: rect.left + pad,
+    top: rect.top + pad,
+    right: rect.right - pad,
+    bottom: rect.bottom - pad,
+  };
+  if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return null;
+  return bounds;
 }
 
 /** Desktop stays at the previous 90px. Phones scale with the picture height. */
@@ -60,24 +93,38 @@ function arrowLength(el) {
 const BADGE_GAP = 48;
 const MIN_LINE = 32;
 
+function spanInside(mark, len, bounds) {
+  const vx = mark.bx - mark.x;
+  const vy = mark.by - mark.y;
+  const cur = Math.hypot(vx, vy) || 1;
+  const ux = vx / cur;
+  const uy = vy / cur;
+  let next = len;
+  if (bounds) {
+    if (ux < 0) next = Math.min(next, (bounds.left - mark.x) / ux);
+    if (ux > 0) next = Math.min(next, (bounds.right - mark.x) / ux);
+    if (uy < 0) next = Math.min(next, (bounds.top - mark.y) / uy);
+    if (uy > 0) next = Math.min(next, (bounds.bottom - mark.y) / uy);
+  }
+  next = Math.max(8, next);
+  return {
+    bx: mark.x + ux * next,
+    by: mark.y + uy * next,
+    len: Math.round(next),
+  };
+}
+
 /** On a phone, nearby numbers share one height and cover each other. Stretch the lines until they clear. */
-function separatePhoneBadges(marks) {
-  if (!isMobileTourDevice() || marks.length < 2) return marks;
-  const items = marks.map((mark) => ({ ...mark }));
+function separatePhoneBadges(marks, bounds) {
+  if (!isMobileTourDevice()) return marks;
+  const items = marks.map((mark) => ({ ...mark, ...spanInside(mark, mark.len, bounds) }));
+  if (items.length < 2) return items;
   const span = (mark) => Math.hypot(mark.bx - mark.x, mark.by - mark.y) || 1;
   const setSpan = (mark, next) => {
-    const vx = mark.bx - mark.x;
-    const vy = mark.by - mark.y;
-    const cur = Math.hypot(vx, vy) || 1;
-    let len = Math.max(MIN_LINE, next);
-    mark.bx = mark.x + (vx / cur) * len;
-    mark.by = mark.y + (vy / cur) * len;
-    if (mark.by < 22 && vy < 0) {
-      len = Math.max(MIN_LINE, ((22 - mark.y) * cur) / vy);
-      mark.bx = mark.x + (vx / cur) * len;
-      mark.by = mark.y + (vy / cur) * len;
-    }
-    mark.len = Math.round(Math.hypot(mark.bx - mark.x, mark.by - mark.y));
+    const placed = spanInside(mark, Math.max(MIN_LINE, next), bounds);
+    mark.bx = placed.bx;
+    mark.by = placed.by;
+    mark.len = placed.len;
   };
 
   for (let pass = 0; pass < 18; pass += 1) {
@@ -117,6 +164,13 @@ function mediaElement(stage, type) {
 function mediaReady(el, type) {
   if (!el) return false;
   return type === "image" ? el.complete && el.naturalWidth > 0 : el.videoWidth > 0;
+}
+
+/** Upright phone: the POI card should not sit behind the 360 popup. */
+function isPortraitPhone() {
+  if (typeof window === "undefined") return false;
+  if (window.innerHeight <= window.innerWidth) return false;
+  return isMobileTourDevice() || window.innerWidth <= 900;
 }
 
 const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
@@ -185,10 +239,13 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
         const el = mediaElement(stageRef?.current, view.type);
         if (!mediaReady(el, view.type)) return false;
         const length = arrowLength(el);
+        const stage = stageRef?.current;
         const next = [];
+        let picture = null;
         for (const poi of view.pois) {
-          const point = frameToScreen(el, poi.x, poi.y);
+          const point = frameToScreen(el, poi.x, poi.y, stage);
           if (!point) return false;
+          picture = point.rect;
           const rad = (poi.angle * Math.PI) / 180;
           next.push({
             poi,
@@ -199,7 +256,7 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
             by: point.y + Math.sin(rad) * length,
           });
         }
-        setMarks(separatePhoneBadges(next));
+        setMarks(separatePhoneBadges(next, badgeBounds(picture)));
         if (!animate) return true;
         drawnTicket.current = my;
         const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -355,6 +412,7 @@ const PoiHotspots = forwardRef(function PoiHotspots({ stageRef }, ref) {
                   event.stopPropagation();
                   event.preventDefault();
                   setPanoUrl(panoSrc(active.poi.pano));
+                  if (isPortraitPhone()) setActiveN(null);
                 }}
               >
                 <svg viewBox="0 0 24 24" aria-hidden>

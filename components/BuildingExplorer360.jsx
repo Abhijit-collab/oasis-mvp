@@ -418,18 +418,14 @@ export default function BuildingExplorer360({ liveUnits = null, tour = DEFAULT_T
       const image = el.tagName === "IMG";
       const vw = (image ? el.naturalWidth : el.videoWidth) || 0;
       const vh = (image ? el.naturalHeight : el.videoHeight) || 0;
-      let left = 0;
-      let top = 0;
-      let width = cw;
-      let height = ch;
-
-      if (vw > 0 && vh > 0) {
-        const scale = Math.min(cw / vw, ch / vh);
-        width = vw * scale;
-        height = vh * scale;
-        left = (cw - width) / 2;
-        top = (ch - height) / 2;
-      }
+      // A new clip reports 0 until its header arrives. Keep the last frame
+      // so the picture does not flash out to the full screen on an arrow tap.
+      if (!vw || !vh) return;
+      const scale = Math.min(cw / vw, ch / vh);
+      const width = vw * scale;
+      const height = vh * scale;
+      const left = (cw - width) / 2;
+      const top = (ch - height) / 2;
 
       const right = Math.max(0, cw - left - width);
       const bottom = Math.max(0, ch - top - height);

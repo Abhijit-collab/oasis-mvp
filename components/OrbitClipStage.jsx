@@ -102,14 +102,22 @@ const seekAndWait = (el, time) =>
  * iOS often ignores preload=auto — muted play/pause forces bytes to arrive.
  * Never pause when `keepPlaying` is set (active orbit play session).
  */
+const bumpKick = (el) => {
+  if (!el) return;
+  el._kickGen = (el._kickGen || 0) + 1;
+};
+
 const kickBuffer = (el, { keepPlaying = false } = {}) => {
   if (!el) return;
+  const gen = el._kickGen || 0;
   try {
     el.muted = true;
     const p = el.play();
     if (p?.then) {
       p.then(() => {
         if (keepPlaying) return;
+        // A tap may have started this element. A leftover warm-up pause flashes the picture.
+        if ((el._kickGen || 0) !== gen) return;
         try {
           el.pause();
         } catch {
@@ -334,6 +342,9 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   const holdCanvasRef = useRef(null);
   const holdStillOnRef = useRef(false);
   const [holdStillOn, setHoldStillOn] = useState(false);
+  // Buffer to show underneath the still. The still stays up until that frame is on screen.
+  const [coverIdx, setCoverIdx] = useState(null);
+  const coverTokenRef = useRef(0);
   const [active, setActive] = useState(0);
   const [hasFrame, setHasFrame] = useState(false);
   const [bufReady, setBufReady] = useState([false, false]);
@@ -350,12 +361,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
 
   const clearHoldStill = () => {
     holdStillOnRef.current = false;
-    const canvas = holdCanvasRef.current;
-    if (canvas) {
-      canvas.style.opacity = "0";
-      canvas.style.visibility = "hidden";
-    }
     setHoldStillOn(false);
+    setCoverIdx(null);
   };
 
   const paintHoldStill = (el, { anyClient = false } = {}) => {
@@ -642,6 +649,13 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
     // On a laptop that cover is a second picture on top of the video and flickers.
     const phone = isMobileTourDevice();
     const coverEl = hasFrameRef.current ? activeEl().current : null;
+    bumpKick(refA.current);
+    bumpKick(refB.current);
+    if (phone) {
+      // Cancel a cover drop left over from the previous arrow tap.
+      coverTokenRef.current += 1;
+      setCoverIdx(null);
+    }
     if (phone && !holdStillOnRef.current && coverEl) {
       paintHoldStill(coverEl, { anyClient: true });
     }
@@ -752,6 +766,7 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
       }
       if (playEl.paused) {
         try {
+          bumpKick(playEl);
           await playEl.play();
         } catch {
           try {
@@ -769,7 +784,10 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         abortPlaySession(session);
         return;
       }
-      clearHoldStill();
+      // Leave the snapshot up until this buffer is the one on screen.
+      // Dropping it in the same turn as the video swap is the phone flicker.
+      if (holdStillOnRef.current) setCoverIdx(bufIndex(playEl));
+      else clearHoldStill();
       onPlayingChangeRef.current?.(true);
       attachStallWatch(playEl, session);
       attachEndedHandler(playEl, session, isBack);
@@ -903,6 +921,39 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
   }, [mode, clipSrc, playToken, playDirection, beginPlay]);
 
   useEffect(() => {
+    if (coverIdx == null || !holdStillOn) return undefined;
+    const el = coverIdx === 0 ? refA.current : refB.current;
+    if (!el) return undefined;
+    const token = coverTokenRef.current;
+    let cancel = false;
+    const drop = () => {
+      if (cancel || coverTokenRef.current !== token) return;
+      holdStillOnRef.current = false;
+      setHoldStillOn(false);
+      setCoverIdx(null);
+    };
+    const backup = setTimeout(drop, 100);
+    if (typeof el.requestVideoFrameCallback === "function") {
+      const id = el.requestVideoFrameCallback(() => {
+        if (!cancel) requestAnimationFrame(drop);
+      });
+      return () => {
+        cancel = true;
+        clearTimeout(backup);
+        el.cancelVideoFrameCallback?.(id);
+      };
+    }
+    const id = requestAnimationFrame(() => {
+      if (!cancel) requestAnimationFrame(drop);
+    });
+    return () => {
+      cancel = true;
+      clearTimeout(backup);
+      cancelAnimationFrame(id);
+    };
+  }, [coverIdx, holdStillOn]);
+
+  useEffect(() => {
     return () => {
       clearStallWatch();
       clearEndedHandler();
@@ -911,8 +962,11 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
 
   const videoLayer = (videoRef, idx) => {
     const isActive = active === idx;
-    // Hide under Android hold canvas; during play always allow the active buffer.
-    const show = bufReady[idx] && (mode === "play" || !holdStillOn);
+    // Opacity only. Toggling visibility on a phone video flashes black on the tap.
+    // The still stays the picture until coverIdx reveals the clip that is about to play.
+    const show =
+      coverIdx === idx ||
+      (coverIdx == null && bufReady[idx] && !holdStillOn && (mode === "play" || isActive));
 
     return (
       <video
@@ -923,9 +977,8 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         preload="auto"
         disablePictureInPicture
         style={{
-          zIndex: isActive ? 3 : 1,
+          zIndex: isActive || coverIdx === idx ? 3 : 1,
           opacity: show ? 1 : 0,
-          visibility: show ? "visible" : "hidden",
         }}
       />
     );
@@ -941,7 +994,6 @@ const OrbitClipStage = forwardRef(function OrbitClipStage(
         aria-hidden
         style={{
           opacity: holdStillOn ? 1 : 0,
-          visibility: holdStillOn ? "visible" : "hidden",
         }}
       />
       {dragEnabled && (

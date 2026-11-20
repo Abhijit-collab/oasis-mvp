@@ -1,13 +1,65 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { driver } from "driver.js";
 import "driver.js/dist/driver.css";
+import { isMobileTourDevice } from "@/lib/rotateGate";
+import PortraitRotateHint from "./PortraitRotateHint";
 
 const TOUR_STORAGE_KEY = "hok_tour_done_v1";
 const TOUR_POI_ID = 1;
 const EYE_WAIT_MS = 3000;
 let tourShownForThisLogin = false;
+
+function isShown(button) {
+  if (!button) return false;
+  const box = button.getBoundingClientRect();
+  return getComputedStyle(button).display !== "none" && box.width >= 8 && box.height >= 8;
+}
+
+function fullscreenTourStep() {
+  const button = document.querySelector('[data-tour="fullscreen"]');
+  if (!isShown(button)) return [];
+  return [
+    {
+      element: '[data-tour="fullscreen"]',
+      popover: {
+        title: "Full screen",
+        description: "Fill the screen for a closer look.",
+        side: "top",
+        align: "end",
+      },
+    },
+  ];
+}
+
+function soundTourStep() {
+  const buttons = [...document.querySelectorAll(".tour-sound-btn")];
+  const visible = buttons.find(isShown);
+  buttons.forEach((button) => button.removeAttribute("data-tour"));
+  if (!visible) return [];
+  visible.setAttribute("data-tour", "sound");
+  return [
+    {
+      element: '[data-tour="sound"]',
+      popover: {
+        title: "Sound",
+        description: "Turn the soundtrack on or off.",
+        side: "top",
+        align: "end",
+      },
+    },
+  ];
+}
+
+function isPortraitPhone() {
+  if (typeof window === "undefined") return false;
+  const portrait =
+    window.matchMedia("(orientation: portrait)").matches &&
+    window.innerHeight > window.innerWidth + 40;
+  if (!portrait) return false;
+  return isMobileTourDevice() || document.documentElement.classList.contains("be-phone");
+}
 
 function writeTourDone() {
   try {
@@ -91,7 +143,21 @@ export default function HokOnboardingTour({ onFirstScreen = true, onEnablePois, 
   const panoListen = useRef(null);
   const onFirstRef = useRef(onFirstScreen);
   const [firstScreenHint, setFirstScreenHint] = useState(false);
+  /** wait until orientation is known, hint while the portrait card is up, go once the tutorial may start. */
+  const [rotateGate, setRotateGate] = useState("wait");
+  const rotateGateRef = useRef("wait");
+  rotateGateRef.current = rotateGate;
   onFirstRef.current = onFirstScreen;
+
+  const finishRotateHint = useCallback(() => {
+    rotateGateRef.current = "go";
+    setRotateGate("go");
+  }, []);
+
+  useEffect(() => {
+    if (isPortraitPhone()) setRotateGate("hint");
+    else finishRotateHint();
+  }, [finishRotateHint]);
   actionsRef.current = { onEnablePois, onOpenPoi, onClosePoi, onOpenPano };
 
   const startTour = () => {
@@ -190,6 +256,8 @@ export default function HokOnboardingTour({ onFirstScreen = true, onEnablePois, 
             align: "end",
           },
         },
+        ...fullscreenTourStep(),
+        ...soundTourStep(),
         {
           element: '[data-tour="poi-toggle"]',
           popover: {
@@ -300,11 +368,16 @@ export default function HokOnboardingTour({ onFirstScreen = true, onEnablePois, 
 
     let cancel = false;
     let frame = 0;
-    const started = performance.now();
+    let armedAt = 0;
     const tryStart = () => {
       if (cancel || tourShownForThisLogin) return;
+      if (rotateGateRef.current !== "go") {
+        frame = requestAnimationFrame(tryStart);
+        return;
+      }
+      if (!armedAt) armedAt = performance.now();
       if (!onFirstRef.current) {
-        if (performance.now() - started > 10000) return;
+        if (performance.now() - armedAt > 10000) return;
         frame = requestAnimationFrame(tryStart);
         return;
       }
@@ -315,7 +388,7 @@ export default function HokOnboardingTour({ onFirstScreen = true, onEnablePois, 
         startTourRef.current();
         return;
       }
-      if (performance.now() - started > 10000) return;
+      if (performance.now() - armedAt > 10000) return;
       frame = requestAnimationFrame(tryStart);
     };
     frame = requestAnimationFrame(tryStart);
@@ -367,6 +440,8 @@ export default function HokOnboardingTour({ onFirstScreen = true, onEnablePois, 
   };
 
   return (
+    <>
+    {rotateGate === "hint" ? <PortraitRotateHint onDone={finishRotateHint} /> : null}
     <div className="hok-tour-help-slot">
       {firstScreenHint ? (
         <p className="hok-tour-notice" role="status">
@@ -383,5 +458,6 @@ export default function HokOnboardingTour({ onFirstScreen = true, onEnablePois, 
         ?
       </button>
     </div>
+    </>
   );
 }

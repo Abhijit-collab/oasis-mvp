@@ -303,7 +303,7 @@ export function SoundToggleButton({ className = "", placement = "global" }) {
 
   const { soundOn, toggleSound } = soundtrack;
   const cls =
-    "tour-sound-btn"
+    "tour-sound-btn driver-allowed-element"
     + (placement !== "global" ? ` tour-sound-btn--${placement}` : "")
     + (soundOn ? " tour-sound-btn--on" : "")
     + (className ? ` ${className}` : "");

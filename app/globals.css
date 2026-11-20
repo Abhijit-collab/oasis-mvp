@@ -760,6 +760,34 @@ html.be-ios .be-fs-btn::after{
   animation:none!important;opacity:0!important}
 html.be-phone .be-fs-btn svg,
 html.be-ios .be-fs-btn svg{width:22px;height:22px}
+/* Android portrait: fullscreen, POI and tutorial in one vertical column. */
+@media (orientation:portrait){
+  html.be-phone:not(.be-ios) .be-stage-chrome .be-fs-btn,
+  html.be-phone:not(.be-ios) .poi-toggle,
+  html.be-phone:not(.be-ios) .hok-tour-help-slot{
+    left:auto!important;top:auto!important;
+    right:max(4px, calc((var(--be-vid-right, 64px) - 48px) / 2))!important}
+  html.be-phone:not(.be-ios) .be-stage-chrome .be-fs-btn{
+    bottom:max(12px, env(safe-area-inset-bottom, 0px))!important}
+  html.be-phone:not(.be-ios) .poi-toggle{
+    bottom:calc(max(12px, env(safe-area-inset-bottom, 0px)) + 56px)!important}
+  html.be-phone:not(.be-ios) .hok-tour-help-slot{
+    bottom:calc(max(12px, env(safe-area-inset-bottom, 0px)) + 112px)!important}
+}
+/* Android landscape: the same three buttons in one horizontal row. */
+@media (orientation:landscape){
+  html.be-phone:not(.be-ios) .be-stage-chrome .be-fs-btn,
+  html.be-phone:not(.be-ios) .poi-toggle,
+  html.be-phone:not(.be-ios) .hok-tour-help-slot{
+    left:auto!important;top:auto!important;
+    bottom:max(10px, env(safe-area-inset-bottom, 0px))!important}
+  html.be-phone:not(.be-ios) .be-stage-chrome .be-fs-btn{
+    right:max(8px, env(safe-area-inset-right, 0px))!important}
+  html.be-phone:not(.be-ios) .poi-toggle{
+    right:calc(max(8px, env(safe-area-inset-right, 0px)) + 56px)!important}
+  html.be-phone:not(.be-ios) .hok-tour-help-slot{
+    right:calc(max(8px, env(safe-area-inset-right, 0px)) + 112px)!important}
+}
 @media (hover:none) and (pointer:coarse){
   .be-fs-btn{width:48px;height:48px;animation:none}
   .be-fs-btn::after{animation:none;opacity:0}
@@ -2219,6 +2247,51 @@ html.rotate-ok .be-root{visibility:visible;pointer-events:auto}
   0%,18%{transform:rotate(0deg);opacity:.35}
   45%,55%{transform:rotate(90deg);opacity:1}
   82%,100%{transform:rotate(0deg);opacity:.35}}
+
+/* Portrait phones: landscape tip after loading, before the tutorial. */
+.land-hint{
+  position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+  padding:24px 18px;background:rgba(6,7,10,.62);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  animation:land-hint-in .4s ease}
+.land-hint--out{
+  animation:land-hint-out .56s ease forwards;
+  pointer-events:none}
+.land-hint-card{
+  position:relative;width:min(340px,100%);padding:28px 22px 18px;text-align:center;
+  border-radius:22px;
+  background:linear-gradient(180deg,rgba(28,30,36,.96),rgba(12,14,18,.94));
+  border:1px solid rgba(216,182,90,.48);
+  box-shadow:0 28px 70px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:land-hint-card-in .45s cubic-bezier(.22,1,.36,1)}
+.land-hint--out .land-hint-card{animation:land-hint-card-out .56s ease forwards}
+@keyframes land-hint-in{from{opacity:0}to{opacity:1}}
+@keyframes land-hint-out{to{opacity:0}}
+@keyframes land-hint-card-in{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes land-hint-card-out{to{opacity:0;transform:translateY(12px) scale(.98)}}
+.land-hint-close{
+  position:absolute;top:10px;right:10px;width:40px;height:40px;padding:0;
+  border:0;border-radius:50%;background:transparent;color:rgba(247,231,176,.8);
+  font-size:28px;line-height:1;cursor:pointer}
+.land-hint-close:hover,.land-hint-close:active{color:#fff}
+.land-hint-anim{width:112px;height:112px;margin:0 auto 6px}
+.land-hint-kicker{
+  margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:#f2d27e}
+.land-hint-title{
+  margin:0 0 8px;font-family:var(--serif),Georgia,serif;font-size:28px;font-weight:600;
+  line-height:1.15;color:#f7f3ea}
+.land-hint-copy{
+  margin:0 auto 14px;max-width:280px;font-size:14px;line-height:1.5;color:rgba(245,241,230,.78)}
+.land-hint-steps{
+  list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px;text-align:left}
+.land-hint-steps li{
+  padding:10px 12px;border-radius:12px;font-size:13px;font-weight:600;color:#f7e7b0;
+  background:rgba(255,255,255,.05);border:1px solid rgba(216,182,90,.28)}
+@media (prefers-reduced-motion:reduce){
+  .land-hint,.land-hint-card,
+  .land-hint-anim .rotate-prompt-phone,
+  .land-hint-anim .rotate-prompt-orbit{animation:none}}
 
 /* ---- Project gallery popup (desktop nav) ---- */
 .pg-overlay{

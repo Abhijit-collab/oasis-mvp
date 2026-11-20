@@ -66,7 +66,8 @@ export default function FullscreenButton() {
   return (
     <button
       type="button"
-      className={"be-fs-btn" + (active ? " on" : "")}
+      className={"be-fs-btn driver-allowed-element" + (active ? " on" : "")}
+      data-tour="fullscreen"
       onClick={toggle}
       aria-pressed={active}
       aria-label={active ? "Exit full screen" : "Enter full screen"}
